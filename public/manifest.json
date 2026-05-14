@@ -1,0 +1,16 @@
+{
+  "name": "FundLens",
+  "short_name": "FundLens",
+  "description": "India's beginner-friendly mutual fund analysis platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
