@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-100 dark:bg-slate-800;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 hover:opacity-90 hover:shadow-lg active:scale-95 transition-all duration-200 font-medium text-sm border-none;
+  }
+  .btn-secondary {
+    @apply border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all duration-200 font-medium text-sm text-slate-700 dark:text-slate-300;
+  }
+  .card {
+    @apply bg-white/90 dark:bg-slate-800/80 backdrop-blur-md rounded-xl shadow-sm border border-slate-200 dark:border-white/10 shadow-inner transition-all duration-200;
+  }
+  .card-hover {
+    @apply hover:scale-105 hover:shadow-xl;
+  }
+  .pill {
+    @apply rounded-full text-xs px-3 py-1 font-medium;
+  }
+  .input-base {
+    @apply w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all text-sm;
+  }
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+/* Bottom nav safe area */
+.bottom-nav-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Scrollbar hiding for horizontal scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Range slider styles */
+input[type='range'] {
+  @apply accent-blue-600;
+  cursor: pointer;
+}
+
+/* Chart tooltip — dark mode fix */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  @apply !bg-white dark:!bg-slate-800 !border-slate-200 dark:!border-slate-700 !rounded-lg !shadow-lg;
+}
+.recharts-default-tooltip {
+  background-color: inherit !important;
+}
+
+/* Toast slide-in animation */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(110%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stat pulse ring */
+@keyframes pingOnce {
+  0%   { transform: scale(1); opacity: 0.75; }
+  75%, 100% { transform: scale(1.8); opacity: 0; }
+}
+.ping-once {
+  animation: pingOnce 1s ease-out 1 forwards;
+}
+
+/* Category border left accent */
+.border-l-accent {
+  border-left-width: 3px;
+}
+
