@@ -51,6 +51,14 @@ export default function SIPCalculator() {
   // ELSS state
   const [elssAmount, setElssAmount] = useState(150000);
   const [taxSlab, setTaxSlab] = useState(30);
+  // FIRE state
+  const [fireMonthlyExpense, setFireMonthlyExpense] = useState(50000);
+  const [fireCurrentAge, setFireCurrentAge] = useState(28);
+  const [fireRetireAge, setFireRetireAge] = useState(45);
+  const [fireReturnRate, setFireReturnRate] = useState(12);
+  const [fireWithdrawalRate, setFireWithdrawalRate] = useState(4);
+  const [fireCurrentCorpus, setFireCurrentCorpus] = useState(500000);
+  const [fireInflation, setFireInflation] = useState(6);
 
   const effectiveReturn = Math.max(0, returns - expenseRatio);
 
@@ -83,7 +91,7 @@ export default function SIPCalculator() {
 
         {/* Page Tabs */}
         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 w-fit flex-wrap">
-          {[['calc','📈 SIP / Lumpsum'],['goal','🎯 Goal Calculator'],['elss','🧾 ELSS Tax Saver']].map(([id, label]) => (
+          {[['calc','📈 SIP / Lumpsum'],['goal','🎯 Goal Calculator'],['elss','🧾 ELSS Tax Saver'],['fire','🔥 FIRE Calculator']].map(([id, label]) => (
             <button key={id} onClick={() => setPageTab(id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${pageTab === id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
               {label}
@@ -522,8 +530,100 @@ export default function SIPCalculator() {
           </div>
         )}
 
+        {/* ─ FIRE CALCULATOR ─ */}
+        {pageTab === 'fire' && (() => {
+          const yearsToFire = Math.max(1, fireRetireAge - fireCurrentAge);
+          const futureMonthlyExpense = fireMonthlyExpense * Math.pow(1 + fireInflation / 100, yearsToFire);
+          const futureAnnualExpense = futureMonthlyExpense * 12;
+          const fireCorpus = futureAnnualExpense / (fireWithdrawalRate / 100);
+          const r = fireReturnRate / 100 / 12;
+          const n = yearsToFire * 12;
+          const existingGrowth = fireCurrentCorpus * Math.pow(1 + r, n);
+          const remaining = Math.max(0, fireCorpus - existingGrowth);
+          const monthlySIP = remaining > 0 && r > 0 ? remaining * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : remaining / Math.max(n, 1);
+          const progress = Math.min(100, Math.round((fireCurrentCorpus / fireCorpus) * 100));
+          const fmt = v => v >= 10000000 ? `₹${(v/10000000).toFixed(2)} Cr` : v >= 100000 ? `₹${(v/100000).toFixed(1)} L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
+          return (
+            <div className="space-y-6">
+              <div className="card p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 border-orange-200 dark:border-orange-800">
+                <h2 className="font-bold text-orange-700 dark:text-orange-300 mb-1">🔥 What is FIRE?</h2>
+                <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed"><strong>Financial Independence, Retire Early.</strong> Build a corpus so large that investment returns alone cover all expenses — forever. Classic rule: save 25× your annual expenses (4% withdrawal rate).</p>
+              </div>
+              <div className="grid lg:grid-cols-[400px,1fr] gap-6">
+                <div className="card p-5 space-y-3">
+                  <h3 className="font-bold text-slate-900 dark:text-white">Your FIRE Inputs</h3>
+                  {[
+                    ['Monthly Expenses (₹)', fireMonthlyExpense, setFireMonthlyExpense, 5000, 500000, 1000],
+                    ['Current Age', fireCurrentAge, setFireCurrentAge, 18, 65, 1],
+                    ['Target Retire Age', fireRetireAge, setFireRetireAge, 25, 80, 1],
+                    ['Portfolio Return (%)', fireReturnRate, setFireReturnRate, 6, 25, 0.5],
+                    ['Withdrawal Rate (%)', fireWithdrawalRate, setFireWithdrawalRate, 2, 8, 0.5],
+                    ['Inflation Rate (%)', fireInflation, setFireInflation, 3, 12, 0.5],
+                    ['Current Corpus (₹)', fireCurrentCorpus, setFireCurrentCorpus, 0, 100000000, 10000],
+                  ].map(([label, val, setter, min, max, step]) => (
+                    <div key={label}>
+                      <div className="flex justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{label}</label>
+                        <span className="text-xs font-bold text-orange-600 tabular-nums">{label.includes('₹') ? fmt(val) : `${val}${label.includes('%') ? '%' : ''}`}</span>
+                      </div>
+                      <input type="range" min={min} max={max} step={step} value={val} onChange={e => setter(Number(e.target.value))} className="w-full accent-orange-500"/>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-4">
+                  <div className="card p-5 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 border-orange-200 dark:border-orange-800 text-center">
+                    <p className="text-xs text-orange-600 uppercase tracking-wider font-bold mb-1">🔥 Your FIRE Number</p>
+                    <p className="text-4xl font-bold text-orange-700 dark:text-orange-300">{fmt(fireCorpus)}</p>
+                    <p className="text-xs text-orange-600 mt-1">Total corpus needed by age {fireRetireAge}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      ['Years to FIRE', `${yearsToFire} yrs`, `Age ${fireCurrentAge} → ${fireRetireAge}`, ''],
+                      ['Monthly SIP Needed', fmt(monthlySIP), 'to reach FIRE', 'text-emerald-600 dark:text-emerald-400'],
+                      ['Future Monthly Spend', fmt(futureMonthlyExpense), `at ${fireInflation}% inflation`, ''],
+                      ['Corpus from SIP', fmt(Math.max(0, fireCorpus - existingGrowth)), 'wealth you will create', 'text-blue-600 dark:text-blue-400'],
+                    ].map(([l,v,sub,cls]) => (
+                      <div key={l} className="card p-4 text-center">
+                        <p className="text-[10px] text-slate-400 mb-1">{l}</p>
+                        <p className={`text-xl font-bold ${cls || 'text-slate-900 dark:text-white'}`}>{v}</p>
+                        <p className="text-[10px] text-slate-400">{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="card p-4">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">FIRE Progress</span>
+                      <span className="text-xs font-bold text-orange-600">{progress}%</span>
+                    </div>
+                    <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full" style={{width:`${progress}%`}}/>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">{fmt(fireCurrentCorpus)} of {fmt(fireCorpus)} goal</p>
+                  </div>
+                  <div className="card p-4">
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">🗓️ Milestones</h4>
+                    <div className="space-y-2">
+                      {[0.25,0.5,0.75,1.0].map(pct => (
+                        <div key={pct} className="flex justify-between text-xs items-center">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${(progress/100)>=pct?'bg-emerald-500':'bg-slate-200 dark:bg-slate-600'}`}/>
+                            <span className="text-slate-500">{pct*100}% — {fmt(fireCorpus*pct)}</span>
+                          </div>
+                          <span className="font-semibold">{(progress/100)>=pct?'✅ Done':pct===1?`Age ${fireRetireAge}`:'—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="card p-3 bg-blue-50 dark:bg-blue-950 border-blue-100 dark:border-blue-900 text-xs text-blue-700 dark:text-blue-300">
+                    💡 The {fireWithdrawalRate}% withdrawal rate means withdrawing {fmt(futureAnnualExpense)}/year. Your corpus keeps growing — making this sustainable indefinitely.
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
       </div>
     </div>
   );
 }
-
