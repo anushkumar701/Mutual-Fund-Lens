@@ -32,6 +32,10 @@ function filterByRange(data, range) {
     case '3Y':  cutoff.setFullYear(now.getFullYear() - 3); break;
     case '5Y':  cutoff.setFullYear(now.getFullYear() - 5); break;
     case '10Y': cutoff.setFullYear(now.getFullYear() - 10); break;
+    case '15Y': cutoff.setFullYear(now.getFullYear() - 15); break;
+    case '20Y': cutoff.setFullYear(now.getFullYear() - 20); break;
+    case '25Y': cutoff.setFullYear(now.getFullYear() - 25); break;
+    case 'MAX': return [...data].reverse(); // all data, oldest first
     default:    cutoff.setMonth(now.getMonth() - 6);
   }
   return data.filter((d) => {
@@ -387,6 +391,7 @@ export default function Compare() {
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
   const [viewMode, setViewMode] = useState('chart'); // 'chart' | 'table'
+  const [rollingYears, setRollingYears] = useState(3); // for adjustable rolling returns
   const toast = useToast();
 
   // SIP comparison state
@@ -608,6 +613,10 @@ export default function Compare() {
   if (minFundAge >= 3)  availableRanges.push('3Y');
   if (minFundAge >= 5)  availableRanges.push('5Y');
   if (minFundAge >= 10) availableRanges.push('10Y');
+  if (minFundAge >= 15) availableRanges.push('15Y');
+  if (minFundAge >= 20) availableRanges.push('20Y');
+  if (minFundAge >= 25) availableRanges.push('25Y');
+  if (minFundAge >= 1)  availableRanges.push('MAX');
   // Ensure selected range is valid
   if (!availableRanges.includes(range) && availableRanges.length > 0) {
     // Will auto-correct when range buttons render
@@ -793,7 +802,7 @@ export default function Compare() {
                 <div className="flex items-center gap-4">
                   <div>
                     <h2 className="font-bold text-slate-900 dark:text-white text-lg">Relative Performance</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">% growth from start of period — so funds with different NAVs are fairly compared</p>
+                    <p className="text-xs text-slate-400 mt-0.5">% growth from the start of the selected period — funds are fairly compared regardless of NAV level</p>
                   </div>
                   <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
                     <button
@@ -880,43 +889,100 @@ export default function Compare() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[320px] overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                      <tr>
-                      <th className="px-4 py-3 font-semibold">Month</th>
-                        {fundData.map((fund, i) => (
-                          <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                            <div className="line-clamp-1 w-48" title={fund.meta?.scheme_name}>{fund.meta?.scheme_name || fund.schemeCode}</div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                      {monthlyChartData.map((row, idx) => {
-                        const [dd, mm, yyyy] = row.date.split('-');
-                        const label = new Date(`${yyyy}-${mm}-${dd}`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300 text-xs font-semibold whitespace-nowrap">{label}</td>
-                            {fundData.map((fund) => {
-                              const val = row[fund.meta?.scheme_name || fund.schemeCode];
-                              const isPositive = val >= 0;
-                              return (
-                                <td key={fund.schemeCode} className={`px-4 py-3 font-semibold text-sm ${
-                                  val === undefined ? 'text-slate-400' :
-                                  isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                                }`}>
-                                  {val === undefined ? '—' : `${Math.abs(parseFloat(val)).toFixed(2)}%`}
-                                </td>
-                              );
-                            })}
+                // Period-Returns Summary Table — clean and useful
+                (() => {
+                  const PERIOD_DEFS = [
+                    { label: '1 Month', months: 1 },
+                    { label: '3 Months', months: 3 },
+                    { label: '6 Months', months: 6 },
+                    { label: '1 Year', months: 12 },
+                    { label: '2 Years', months: 24 },
+                    { label: '3 Years', months: 36 },
+                    { label: '5 Years', months: 60 },
+                    { label: '7 Years', months: 84 },
+                    { label: '10 Years', months: 120 },
+                  ];
+                  // Calculate returns for each fund for each period
+                  const calcReturn = (navData, months) => {
+                    if (!navData || navData.length === 0) return null;
+                    const latestNav = parseFloat(navData[0].nav);
+                    const latestDate = new Date(navData[0].date.split('-').reverse().join('-'));
+                    const targetDate = new Date(latestDate);
+                    targetDate.setMonth(targetDate.getMonth() - months);
+                    let closest = null, minDiff = Infinity;
+                    for (const d of navData) {
+                      const dt = new Date(d.date.split('-').reverse().join('-'));
+                      const diff = Math.abs(dt - targetDate);
+                      if (diff < minDiff) { minDiff = diff; closest = parseFloat(d.nav); }
+                    }
+                    if (!closest || minDiff > 45 * 86400000) return null;
+                    const ret = ((latestNav - closest) / closest) * 100;
+                    // For >= 12 months, show CAGR
+                    if (months >= 12) {
+                      const years = months / 12;
+                      return (Math.pow(latestNav / closest, 1 / years) - 1) * 100;
+                    }
+                    return ret;
+                  };
+                  const validPeriods = PERIOD_DEFS.filter(p => {
+                    // Only show period if at least one fund has enough data
+                    return fundData.some(f => calcReturn(f.navData, p.months) !== null);
+                  });
+                  return (
+                    <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold whitespace-nowrap">Period</th>
+                            <th className="px-3 py-3 font-semibold text-slate-400 text-[10px]">Type</th>
+                            {fundData.map((fund, i) => (
+                              <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                                <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
+                                  {fund.meta?.scheme_name?.split(' ').slice(0,3).join(' ') || fund.schemeCode}
+                                </div>
+                              </th>
+                            ))}
+                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-400">Leader</th>}
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                          {validPeriods.map(p => {
+                            const rets = fundData.map(f => calcReturn(f.navData, p.months));
+                            const defined = rets.filter(r => r !== null);
+                            const bestRet = defined.length > 0 ? Math.max(...defined) : null;
+                            const leaderIdx = rets.indexOf(bestRet);
+                            return (
+                              <tr key={p.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.label}</td>
+                                <td className="px-3 py-3 text-[10px] text-slate-400">{p.months >= 12 ? 'CAGR' : 'Abs'}</td>
+                                {rets.map((ret, i) => (
+                                  <td key={i} className={`px-4 py-3 font-bold text-sm tabular-nums ${
+                                    ret === null ? 'text-slate-300 dark:text-slate-600' :
+                                    ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    <span className={i === leaderIdx && defined.length > 1 ? 'bg-emerald-50 dark:bg-emerald-900/30 px-1 rounded' : ''}>
+                                      {ret === null ? '—' : `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`}
+                                    </span>
+                                  </td>
+                                ))}
+                                {fundData.length >= 2 && (
+                                  <td className="px-3 py-3 text-[10px]">
+                                    {leaderIdx >= 0 && defined.length > 1 ? (
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                        {fundData[leaderIdx]?.meta?.scheme_name?.split(' ')[0] || `Fund ${leaderIdx+1}`}
+                                      </span>
+                                    ) : '—'}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <p className="text-[10px] text-slate-400 p-3">Returns for 1Y+ are shown as CAGR (annualised). Highlighted = best performer for that period.</p>
+                    </div>
+                  );
+                })()
               )}
               {chartData.length === 0 && (
                 <p className="text-center text-sm text-slate-400 dark:text-slate-500 mt-4">
@@ -955,17 +1021,24 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Market events by year for beginner context
+                        const worstVal = defined.length > 0 ? Math.min(...defined) : null;
+                        // Market events by year — both bad AND good years explained
                         const MARKET_EVENTS = {
-                          2020: { label: 'COVID-19 Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2022: { label: 'Rate Hikes + Russia-Ukraine', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300' },
-                          2008: { label: 'Global Financial Crisis', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2015: { label: 'China Slowdown', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300' },
-                          2016: { label: 'Demonetisation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300' },
-                          2019: { label: 'NBFC Crisis', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300' },
-                          2021: { label: 'Bull Run Post-COVID', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400' },
-                          2023: { label: 'Recovery Rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400' },
-                          2024: { label: 'Election Year Volatility', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' },
+                          2003: { label: '🟢 Post dot-com recovery rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2007: { label: '🟢 Pre-crisis bull market peak', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2008: { label: '🔴 Global Financial Crisis (Lehman collapse)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2009: { label: '🟢 Post-GFC recovery boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2011: { label: '🟡 Eurozone debt crisis, INR fall', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2014: { label: '🟢 Modi 1.0 election rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2015: { label: '🟡 China slowdown, global sell-off', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2016: { label: '🟡 Demonetisation shock (Nov 2016)', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2017: { label: '🟢 GST rollout + global bull run', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2019: { label: '🟡 NBFC crisis, slow growth', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2020: { label: '🔴 COVID-19 crash (Mar 2020)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2021: { label: '🟢 Bull run — vaccine rally & stimulus', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2022: { label: '🔴 Russia-Ukraine war + aggressive rate hikes', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2023: { label: '🟢 Recovery rally, FII inflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2024: { label: '🟡 Election year + US rate uncertainty', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' },
                         };
                         const event = MARKET_EVENTS[year];
                         return (
@@ -1002,14 +1075,21 @@ export default function Compare() {
                               );
                             })}
                             {fundData.length >= 2 && (
-                              <td className="px-4 py-3 text-xs text-slate-400">
+                              <td className="px-4 py-3 text-xs">
                                 {(() => {
-                                  if (defined.length < 2) return '—';
+                                  if (defined.length < 2) return <span className="text-slate-300">—</span>;
                                   const diff = Math.max(...defined) - Math.min(...defined);
+                                  const winnerIdx = vals.indexOf(bestVal);
+                                  const loserIdx = vals.indexOf(worstVal);
                                   return (
-                                    <span className="font-semibold text-slate-600 dark:text-slate-300 tabular-nums">
-                                      {diff.toFixed(2)}%
-                                    </span>
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{diff.toFixed(2)}% spread</span>
+                                      {winnerIdx >= 0 && defined.length > 1 && (
+                                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
+                                          🏆 {fundData[winnerIdx]?.meta?.scheme_name?.split(' ')[0] || `F${winnerIdx+1}`}
+                                        </span>
+                                      )}
+                                    </div>
                                   );
                                 })()}
                               </td>
@@ -1023,6 +1103,88 @@ export default function Compare() {
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
                   💡 Look for funds that limit losses in bad years (2020, 2022). Consistent compounders beat volatile outperformers long-term.
                 </p>
+              </div>
+            )}
+
+            {/* ── Adjustable Rolling Returns ── */}
+            {fundData.length > 0 && (
+              <div className="card p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h2 className="font-bold text-slate-900 dark:text-white text-lg">📉 Rolling Returns Analysis</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Shows Min, Avg, and Max returns for every rolling window of the selected duration. Helps you see the worst and best case scenarios.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Window:</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 5, 7, 10].filter(y => y <= maxSipYears || maxSipYears >= y).map(y => (
+                        <button key={y} onClick={() => setRollingYears(y)}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                            rollingYears === y
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                          }`}>{y}Y</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Metric</th>
+                        {fundData.map((fund, i) => (
+                          <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                            <div className="line-clamp-1 max-w-[160px]" title={fund.meta?.scheme_name}>
+                              {fund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || fund.schemeCode}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {[['Min Return', 0], ['Avg Return', 1], ['Max Return', 2]].map(([label, ri]) => (
+                        <tr key={label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                            <div className="flex flex-col">
+                              <span className={ri === 0 ? 'text-red-500' : ri === 2 ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-200'}>{label}</span>
+                              <span className="text-[9px] text-slate-400 font-normal">
+                                {ri === 0 ? `Worst ${rollingYears}Y window` : ri === 2 ? `Best ${rollingYears}Y window` : `Average ${rollingYears}Y window`}
+                              </span>
+                            </div>
+                          </td>
+                          {fundData.map(fund => {
+                            const navs = fund.navData || [];
+                            const windowDays = rollingYears * 252;
+                            if (navs.length < windowDays + 10) return (
+                              <td key={fund.schemeCode} className="px-4 py-3 text-slate-400 text-xs">Not enough data</td>
+                            );
+                            let minR = Infinity, maxR = -Infinity, sum = 0, count = 0;
+                            for (let i = 0; i < navs.length - windowDays; i++) {
+                              const endNav = parseFloat(navs[i].nav);
+                              const startNav = parseFloat(navs[i + windowDays].nav);
+                              const cagr = (Math.pow(endNav / startNav, 1 / rollingYears) - 1) * 100;
+                              if (cagr < minR) minR = cagr;
+                              if (cagr > maxR) maxR = cagr;
+                              sum += cagr; count++;
+                            }
+                            const avgR = sum / count;
+                            const val = ri === 0 ? minR : ri === 2 ? maxR : avgR;
+                            const colorClass = ri === 0 ? 'text-red-600 dark:text-red-400' : ri === 2 ? 'text-emerald-600 dark:text-emerald-400' : (val >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-500');
+                            return (
+                              <td key={fund.schemeCode} className={`px-4 py-3 font-bold text-sm tabular-nums ${colorClass}`}>
+                                {val !== Infinity && val !== -Infinity ? `${val >= 0 ? '+' : ''}${val.toFixed(2)}% p.a.` : '—'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">💡 If the Min Return is positive, the fund has NEVER given a loss in any {rollingYears}-year period historically. This is a powerful safety signal for long-term investors.</p>
               </div>
             )}
 
@@ -1207,34 +1369,36 @@ export default function Compare() {
                             <span className="font-semibold text-slate-900 dark:text-white">{formatINR(sipResult.invested)}</span>
                           </div>
 
-                          {/* Gross vs Net breakdown */}
-                          {grossValue !== null ? (
-                            <>
-                              <div className="rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700 mt-1">
-                                <div className="flex justify-between items-center text-xs px-2 py-1.5 bg-slate-50 dark:bg-slate-800">
-                                  <span className="text-slate-500">Value <span className="text-[10px] text-slate-400">(before ER)</span>:</span>
-                                  <span className="font-semibold text-slate-600 dark:text-slate-300">{formatINR(grossValue)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-xs px-2 py-1.5 bg-orange-50 dark:bg-orange-950/50">
-                                  <span className="text-orange-600 dark:text-orange-400">− Expense Ratio Cost ({fundTER}%/yr):</span>
-                                  <span className="font-bold text-orange-600 dark:text-orange-400">−{formatINR(terCost)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-xs px-2 py-2 bg-emerald-50 dark:bg-emerald-950/40 border-t border-emerald-100 dark:border-emerald-800">
-                                  <span className="text-emerald-700 dark:text-emerald-300 font-semibold">Actual Value (net of ER):</span>
-                                  <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">{formatINR(sipResult.currentValue)}</span>
-                                </div>
+                          {/* Expense Ratio Impact */}
+                          {fundTER > 0 && sipResult && (
+                            <div className="rounded-lg overflow-hidden border border-orange-100 dark:border-orange-900/50 mt-1">
+                              <div className="flex justify-between items-center text-xs px-2 py-1.5 bg-orange-50 dark:bg-orange-950/50">
+                                <span className="text-orange-700 dark:text-orange-300 font-semibold">Fee Drag</span>
+                                <span className="font-bold text-orange-600 dark:text-orange-400">{fundTER}% per year</span>
                               </div>
-                              <div className="flex justify-between items-center text-xs pt-1">
-                                <span className="text-slate-500">Gross XIRR:</span>
-                                <span className="font-semibold text-slate-600 dark:text-slate-400">{grossXIRR.toFixed(2)}% p.a.</span>
+                              <div className="flex justify-between items-center text-xs px-2 py-1.5 bg-orange-50/50 dark:bg-orange-950/30">
+                                <span className="text-orange-600 dark:text-orange-400">Est. annual fee on current value:</span>
+                                <span className="font-bold text-orange-600 dark:text-orange-400">
+                                  −{formatINR(Math.round(sipResult.currentValue * fundTER / 100))}
+                                </span>
                               </div>
-                            </>
-                          ) : (
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-500">Current Value (net of ER):</span>
-                              <span className="font-bold text-slate-900 dark:text-white text-sm">{formatINR(sipResult.currentValue)}</span>
+                              <div className="flex justify-between items-center text-xs px-2 py-1.5 bg-orange-50/30 dark:bg-orange-950/20">
+                                <span className="text-orange-600 dark:text-orange-400">Total est. fees over {sipYears}yr:</span>
+                                <span className="font-bold text-orange-600 dark:text-orange-400">
+                                  −{formatINR(Math.round(sipResult.currentValue * fundTER / 100 * sipYears * 0.6))}
+                                </span>
+                              </div>
+                              <div className="px-2 py-1.5 bg-slate-50 dark:bg-slate-800/50">
+                                <p className="text-[9px] text-slate-400">Higher % = higher fee every year. A 0.5% lower ER can save ₹ lakhs over 20 years due to compounding.</p>
+                              </div>
                             </div>
                           )}
+
+                          {/* Current Value */}
+                          <div className="flex justify-between items-center text-xs mt-1">
+                            <span className="text-slate-500">Current Value:</span>
+                            <span className="font-bold text-slate-900 dark:text-white text-sm">{formatINR(sipResult.currentValue)}</span>
+                          </div>
 
                           <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100 dark:border-slate-700">
                             <span className="text-slate-500">Profit (net of ER):</span>
