@@ -1,9 +1,10 @@
 // hooks/useFunds.js
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { get, set } from 'idb-keyval';
 
 const BASE_URL = 'https://api.mfapi.in/mf';
-let cachedList = null;
+let memoryCachedList = null;
 
 export function useFunds() {
   const [funds, setFunds] = useState([]);
@@ -14,13 +15,32 @@ export function useFunds() {
     setLoading(true);
     setError(null);
     try {
-      if (cachedList) {
-        setFunds(cachedList);
+      // 1. Check memory cache
+      if (memoryCachedList) {
+        setFunds(memoryCachedList);
         setLoading(false);
         return;
       }
+      
+      // 2. Check IndexedDB cache (1 day expiry logic could be added here, keeping it simple for now)
+      const idbCached = await get('fundlens_all_funds');
+      if (idbCached && idbCached.length > 0) {
+        memoryCachedList = idbCached;
+        setFunds(idbCached);
+        setLoading(false);
+        // Fire & forget background update to keep data fresh
+        axios.get(BASE_URL, { timeout: 15000 }).then(res => {
+          memoryCachedList = res.data;
+          set(('fundlens_all_funds'), res.data);
+          setFunds(res.data);
+        }).catch(() => {});
+        return;
+      }
+
+      // 3. Network fetch
       const res = await axios.get(BASE_URL, { timeout: 15000 });
-      cachedList = res.data;
+      memoryCachedList = res.data;
+      set('fundlens_all_funds', res.data);
       setFunds(res.data);
     } catch (err) {
       setError('Unable to load funds. Please try again.');
@@ -36,7 +56,43 @@ export function useFunds() {
   return { funds, loading, error, refetch: fetchFunds };
 }
 
+// Memory cache for individual details
+const detailsMemoryCache = new Map();
+
 export async function fetchFundDetail(schemeCode) {
+  // 1. Check Memory Cache
+  if (detailsMemoryCache.has(schemeCode)) {
+    return detailsMemoryCache.get(schemeCode);
+  }
+
+  // 2. Check IndexedDB
+  const idbKey = `fund_detail_${schemeCode}`;
+  const idbCached = await get(idbKey);
+  
+  // Cache valid for 12 hours
+  const now = Date.now();
+  if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
+    detailsMemoryCache.set(schemeCode, idbCached.data);
+    return idbCached.data;
+  }
+
+  // 3. Network Fetch
   const res = await axios.get(`${BASE_URL}/${schemeCode}`, { timeout: 15000 });
-  return res.data;
+  const data = res.data;
+  
+  detailsMemoryCache.set(schemeCode, data);
+  set(idbKey, { timestamp: now, data });
+  
+  return data;
+}
+
+export async function prefetchTopFunds(fundCodes) {
+  // Silent background fetch for top funds
+  for (const code of fundCodes) {
+    try {
+      await fetchFundDetail(code);
+    } catch (e) {
+      // Ignore errors for prefetching
+    }
+  }
 }

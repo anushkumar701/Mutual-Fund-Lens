@@ -212,3 +212,34 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
 
   return { invested: totalInvested, currentValue, profit, absoluteReturn, xirr };
 }
+
+// Best and Worst Month Tracking
+export function calculateBestWorstMonth(navData) {
+  if (!navData || navData.length < 30) return null;
+  const monthMap = {};
+  
+  // Group navs by month (navData is sorted newest first)
+  navData.forEach(d => {
+    const [dd, mm, yyyy] = d.date.split('-');
+    const key = `${yyyy}-${mm}`;
+    if (!monthMap[key]) monthMap[key] = [];
+    monthMap[key].push(parseFloat(d.nav));
+  });
+
+  const monthReturns = [];
+  for (const [month, navs] of Object.entries(monthMap)) {
+    if (navs.length < 2) continue;
+    const firstNav = navs[navs.length - 1]; // oldest in that month
+    const lastNav = navs[0]; // newest in that month
+    const returnPct = ((lastNav - firstNav) / firstNav) * 100;
+    monthReturns.push({ month, returnPct });
+  }
+
+  if (monthReturns.length === 0) return null;
+  monthReturns.sort((a, b) => a.returnPct - b.returnPct);
+  
+  return {
+    worst: monthReturns[0],
+    best: monthReturns[monthReturns.length - 1]
+  };
+}
