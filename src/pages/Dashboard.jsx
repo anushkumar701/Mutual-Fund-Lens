@@ -1,61 +1,167 @@
-import { useState, useMemo } from 'react';
+// pages/Dashboard.jsx
+// Future-proof: modular sections, easy to extend
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import ErrorState from '../components/ErrorState';
 import FundDetailModal from '../components/FundDetailModal';
 import { inferCategory } from '../utils/goalFilters';
+import { isFundClosed } from '../utils/fundFilters';
 
-const CAT = {
-  Equity: { e:'📈', b:'#3b82f6', bg:'bg-blue-50 dark:bg-blue-950', t:'text-blue-700 dark:text-blue-300', d:'Long-term wealth. Best for 7+ years.' },
-  Debt:   { e:'🏛️', b:'#10b981', bg:'bg-emerald-50 dark:bg-emerald-950', t:'text-emerald-700 dark:text-emerald-300', d:'Stable returns. Good for 1–3 years.' },
-  Hybrid: { e:'⚖️', b:'#f59e0b', bg:'bg-amber-50 dark:bg-amber-950', t:'text-amber-700 dark:text-amber-300', d:'Balanced equity & debt exposure.' },
-  ELSS:   { e:'🧾', b:'#8b5cf6', bg:'bg-purple-50 dark:bg-purple-950', t:'text-purple-700 dark:text-purple-300', d:'Tax saving under 80C. 3-yr lock-in.' },
-  Index:  { e:'📊', b:'#6366f1', bg:'bg-indigo-50 dark:bg-indigo-950', t:'text-indigo-700 dark:text-indigo-300', d:'Low cost. Tracks Nifty/Sensex.' },
-  Liquid: { e:'💧', b:'#14b8a6', bg:'bg-teal-50 dark:bg-teal-950', t:'text-teal-700 dark:text-teal-300', d:'Like savings account. Emergency fund.' },
-  Other:  { e:'📁', b:'#94a3b8', bg:'bg-slate-50 dark:bg-slate-800', t:'text-slate-600 dark:text-slate-400', d:'Specialty & other funds.' },
+// ─── Category config ───────────────────────────────────────────
+const CAT_CFG = {
+  Equity: { e:'📈', color:'#3b82f6', desc:'Long-term wealth. Best for 7+ years.' },
+  Debt:   { e:'🏛️', color:'#10b981', desc:'Stable returns. Good for 1–3 years.' },
+  Hybrid: { e:'⚖️', color:'#f59e0b', desc:'Balanced equity & debt exposure.' },
+  ELSS:   { e:'🧾', color:'#8b5cf6', desc:'Tax saving under 80C. 3-yr lock-in.' },
+  Index:  { e:'📊', color:'#6366f1', desc:'Low cost. Tracks Nifty/Sensex.' },
+  Liquid: { e:'💧', color:'#14b8a6', desc:'Like savings account. Emergency fund.' },
+  Other:  { e:'📁', color:'#94a3b8', desc:'Specialty & sector funds.' },
 };
 
-const GLOSSARY = [
-  { e:'💹', t:'NAV', d:'Price of 1 fund unit. Updated daily after market close.' },
-  { e:'🔄', t:'SIP', d:'Invest fixed amount monthly. Averages out market ups and downs.' },
-  { e:'📈', t:'CAGR', d:'Annualised return. Better than absolute % for fair comparison.' },
-  { e:'💸', t:'Expense Ratio', d:'Annual fund fee. Lower is better. Direct plans charge less.' },
-  { e:'✅', t:'Direct Plan', d:'No distributor commission. Always prefer Direct over Regular.' },
-  { e:'⚠️', t:'Regular Plan', d:'Includes distributor fee (~0.5–1% extra). Costs lakhs over time.' },
-  { e:'🧾', t:'ELSS', d:'Tax-saving equity fund. ₹1.5L deduction under 80C. 3-yr lock-in.' },
-  { e:'🚪', t:'Exit Load', d:'Penalty for early redemption. Usually 1% if exit within 1 year.' },
-  { e:'📐', t:'Sharpe Ratio', d:'Risk-adjusted return. Above 1 = good. Above 2 = excellent.' },
-  { e:'🔁', t:'Rolling Returns', d:'Return for every possible start date. More reliable than point-to-point.' },
-  { e:'🔥', t:'FIRE', d:'Financial Independence Retire Early. Corpus = 25× annual expenses.' },
-  { e:'🏦', t:'AUM', d:'Total money the fund manages. Higher AUM = more trust and stability.' },
-];
+// ─── Fund Search Box ───────────────────────────────────────────
+function FundSearchBox({ funds, onSelectFund }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-function QuickCalc() {
-  const [amt,setAmt]=useState(5000),[yrs,setYrs]=useState(10),[rate,setRate]=useState(12);
-  const mat=Math.round(amt*((Math.pow(1+rate/100/12,yrs*12)-1)/(rate/100/12))*(1+rate/100/12));
-  const inv=amt*yrs*12;
-  const fmt=n=>n>=10000000?`₹${(n/10000000).toFixed(2)} Cr`:n>=100000?`₹${(n/100000).toFixed(1)} L`:`₹${n.toLocaleString('en-IN')}`;
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const results = useMemo(() => {
+    if (!query.trim() || query.length < 2) return [];
+    const q = query.toLowerCase();
+    return funds
+      .filter(f => f.schemeName.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [query, funds]);
+
+  const handleSelect = (fund) => {
+    setQuery('');
+    setOpen(false);
+    onSelectFund(fund);
+  };
+
   return (
-    <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-100 dark:border-blue-900">
-      <h3 className="font-bold text-slate-900 dark:text-white mb-4">🧮 Quick SIP Calculator</h3>
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        {[['Monthly ₹',amt,setAmt,100,200000],['Years',yrs,setYrs,1,40],['Return %',rate,setRate,1,30]].map(([l,v,s,mn,mx])=>(
-          <div key={l}><label className="text-[10px] text-slate-500 block mb-1">{l}</label>
-          <input type="number" value={v} onChange={e=>s(Math.max(mn,Math.min(mx,+e.target.value)))} className="input-base w-full py-1.5 text-sm text-center font-semibold"/></div>
-        ))}
+    <div ref={ref} className="relative w-full max-w-2xl mx-auto">
+      <div className="relative">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/>
+        </svg>
+        <input
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search any fund by name or scheme code..."
+          className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-sm shadow-sm transition-all"
+        />
+        {query && (
+          <button onClick={() => { setQuery(''); setOpen(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+        )}
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center mb-3">
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-2"><div className="text-[10px] text-slate-400">Invested</div><div className="font-bold text-sm">{fmt(inv)}</div></div>
-        <div className="bg-emerald-50 dark:bg-emerald-950 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900"><div className="text-[10px] text-emerald-600">Returns</div><div className="font-bold text-sm text-emerald-600">+{fmt(mat-inv)}</div></div>
-        <div className="bg-blue-50 dark:bg-blue-950 rounded-lg p-2 border border-blue-100 dark:border-blue-900"><div className="text-[10px] text-blue-600">Total</div><div className="font-bold text-sm text-blue-700">{fmt(mat)}</div></div>
-      </div>
-      <Link to="/sip" className="btn-primary block text-center text-xs py-2">Full Calculator with Step-Up, FIRE & Tax →</Link>
-    </div>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 text-center">
+        🔍 Type to search · Click a fund to view details · No page change needed
+      </p>
 
+      {/* Dropdown results */}
+      {open && results.length > 0 && (
+        <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{results.length} results — click to view details</span>
+            <span className="text-[10px] text-blue-500">No page navigation</span>
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {results.map(fund => {
+              const cat = inferCategory(fund.schemeName);
+              const cfg = CAT_CFG[cat] || CAT_CFG.Other;
+              const closed = isFundClosed(fund.schemeName);
+              return (
+                <button
+                  key={fund.schemeCode}
+                  onClick={() => handleSelect(fund)}
+                  className="w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left border-b border-slate-50 dark:border-slate-700/50 last:border-0"
+                >
+                  <span className="text-lg mt-0.5 flex-shrink-0">{cfg.e}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{background: cfg.color}}>{cat}</span>
+                      {closed && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400">CLOSED</span>}
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{fund.schemeName}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Code #{fund.schemeCode}</p>
+                  </div>
+                  <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0 mt-1">View →</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <Link to="/screener" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              See all results in Screener →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {open && query.length >= 2 && results.length === 0 && (
+        <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl z-50 p-6 text-center">
+          <div className="text-3xl mb-2">🔍</div>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No funds found for "{query}"</p>
+          <p className="text-xs text-slate-400 mt-1">Try a shorter name or use the fund house name</p>
+        </div>
+      )}
+    </div>
   );
 }
 
+// ─── Quick SIP Calc ─────────────────────────────────────────────
+function QuickCalc() {
+  const [amt, setAmt] = useState(5000);
+  const [yrs, setYrs] = useState(10);
+  const [rate, setRate] = useState(12);
+  const mat = Math.round(amt * ((Math.pow(1 + rate / 100 / 12, yrs * 12) - 1) / (rate / 100 / 12)) * (1 + rate / 100 / 12));
+  const inv = amt * yrs * 12;
+  const fmt = n => n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(1)} L` : `₹${n.toLocaleString('en-IN')}`;
+  return (
+    <div className="card p-5 h-full">
+      <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">🧮 Quick SIP Calculator</h3>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {[['Monthly ₹', amt, setAmt, 100, 200000], ['Years', yrs, setYrs, 1, 40], ['Return %', rate, setRate, 1, 30]].map(([l, v, s, mn, mx]) => (
+          <div key={l}>
+            <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">{l}</label>
+            <input type="number" value={v} onChange={e => s(Math.max(mn, Math.min(mx, +e.target.value)))}
+              className="input-base w-full py-2 text-sm text-center font-bold"/>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center mb-4">
+        <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
+          <div className="text-[10px] text-slate-400 mb-1">You Invest</div>
+          <div className="font-bold text-sm text-slate-900 dark:text-white">{fmt(inv)}</div>
+        </div>
+        <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800">
+          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mb-1">Gains</div>
+          <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400">+{fmt(mat - inv)}</div>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 border border-blue-100 dark:border-blue-800">
+          <div className="text-[10px] text-blue-600 dark:text-blue-400 mb-1">Total</div>
+          <div className="font-bold text-sm text-blue-700 dark:text-blue-300">{fmt(mat)}</div>
+        </div>
+      </div>
+      <Link to="/sip" className="btn-primary w-full text-center block py-2.5 text-xs">
+        Full Calculator: Step-Up SIP, FIRE & Tax Saving →
+      </Link>
+    </div>
+  );
+}
+
+// ─── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
   const { funds, loading, error, refetch } = useFunds();
   const [watchlist] = useLocalStorage('fundlens_watchlist', []);
@@ -63,7 +169,10 @@ export default function Dashboard() {
 
   const catStats = useMemo(() => {
     const c = {};
-    for (const f of funds) { const cat = inferCategory(f.schemeName); c[cat]=(c[cat]||0)+1; }
+    for (const f of funds) {
+      const cat = inferCategory(f.schemeName);
+      c[cat] = (c[cat] || 0) + 1;
+    }
     return c;
   }, [funds]);
 
@@ -74,23 +183,44 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-blue-950 dark:via-slate-900 dark:to-indigo-950 pt-24 pb-14 px-4 md:pt-28">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"/>
-        <div className="relative max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white/50 dark:bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-5 border border-slate-200 dark:border-white/20 shadow-sm">
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950 pt-24 pb-16 px-4 md:pt-28">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"/>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"/>
+        </div>
+        <div className="relative max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-white/70 dark:bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-6 border border-slate-200/50 dark:border-white/20 shadow-sm">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"/>
-            <span className="text-slate-700 dark:text-slate-300">Live data · {loading ? '...' : `${funds.length.toLocaleString('en-IN')}+`} funds</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">
+              Live data · {loading ? '...' : `${funds.length.toLocaleString('en-IN')}+`} mutual funds
+            </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-slate-900 dark:text-white">
-            Analyse. Compare.<br/>
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">Invest Smarter.</span>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-slate-900 dark:text-white leading-tight">
+            Find & Analyse<br/>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+              Any Mutual Fund
+            </span>
           </h1>
-          <p className="text-slate-600 dark:text-slate-300 text-base mb-6 max-w-xl mx-auto">India's most comprehensive mutual fund analysis platform. Free forever.</p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link to="/screener" className="btn-primary px-6 py-3 shadow-lg">🔍 Find Best Funds →</Link>
-            <Link to="/compare" className="bg-white/60 dark:bg-white/10 border border-slate-200 dark:border-white/30 text-slate-900 dark:text-white font-semibold px-5 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/20 transition-all">⚖️ Compare Funds</Link>
-            <Link to="/sip" className="bg-white/60 dark:bg-white/10 border border-slate-200 dark:border-white/30 text-slate-900 dark:text-white font-semibold px-5 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/20 transition-all">🔥 SIP + FIRE Calc</Link>
+          <p className="text-slate-600 dark:text-slate-400 text-base mb-8 max-w-xl mx-auto">
+            Search, view details, compare and plan your investments — all free.
+          </p>
+
+          {/* ── Fund Search — Main Feature ── */}
+          {!loading && funds.length > 0 && (
+            <FundSearchBox funds={funds} onSelectFund={setModalFund}/>
+          )}
+
+          {loading && (
+            <div className="w-full max-w-2xl mx-auto h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
+              <span className="text-slate-400 text-sm">Loading funds...</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+            <Link to="/screener" className="btn-primary px-5 py-2.5 shadow-md">🔍 Browse & Filter Funds</Link>
+            <Link to="/compare" className="btn-secondary px-5 py-2.5">⚖️ Compare Funds</Link>
+            <Link to="/sip" className="btn-secondary px-5 py-2.5">🔥 SIP + FIRE Calc</Link>
           </div>
         </div>
       </section>
@@ -98,55 +228,57 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
         {error && <ErrorState message={error} onRetry={refetch}/>}
 
-        {/* Quick Calc + Guide */}
+        {/* ── Quick Tools Grid ── */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <QuickCalc/>
-          <div className="card p-5">
+          <div className="card p-5 h-full">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4">🎯 Which Fund for Which Goal?</h3>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {[
-                ['Emergency Fund','Liquid Fund','0–6 months','Very Low','teal'],
-                ['Short-term Goal','Debt Fund','1–3 years','Low','emerald'],
-                ['Tax Saving (80C)','ELSS Fund','3+ years','Medium','purple'],
-                ['Long-term Wealth','Equity Fund','7+ years','High','blue'],
-                ['FIRE / Retirement','Index Fund','20+ years','Medium','indigo'],
-              ].map(([goal,type,horizon,risk,c])=>(
-                <div key={goal} className="flex justify-between items-center text-xs pb-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                  <div><div className="font-semibold text-slate-700 dark:text-slate-300">{goal}</div><div className="text-slate-400">{horizon}</div></div>
-                  <div className="text-right">
-                    <div className={`font-bold text-${c}-600 dark:text-${c}-400`}>{type}</div>
-                    <div className="text-slate-400">Risk: {risk}</div>
+                { goal: 'Emergency Fund', type: 'Liquid Fund', horizon: '0–6 months', risk: 'Very Low', color: 'text-teal-600 dark:text-teal-400' },
+                { goal: 'Short-term Goal', type: 'Debt Fund', horizon: '1–3 years', risk: 'Low', color: 'text-emerald-600 dark:text-emerald-400' },
+                { goal: 'Save Tax (80C)', type: 'ELSS Fund', horizon: '3+ years (lock-in)', risk: 'Moderate', color: 'text-purple-600 dark:text-purple-400' },
+                { goal: 'Long-term Wealth', type: 'Equity Fund', horizon: '7+ years', risk: 'High', color: 'text-blue-600 dark:text-blue-400' },
+                { goal: 'FIRE / Retirement', type: 'Index Fund', horizon: '15+ years', risk: 'Moderate', color: 'text-indigo-600 dark:text-indigo-400' },
+              ].map(item => (
+                <div key={item.goal} className="flex items-center justify-between text-xs py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                  <div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{item.goal}</div>
+                    <div className="text-slate-400 mt-0.5">{item.horizon} · Risk: {item.risk}</div>
                   </div>
+                  <span className={`font-bold ${item.color}`}>{item.type}</span>
                 </div>
               ))}
             </div>
-            <Link to="/screener" className="btn-secondary w-full text-center text-xs py-2 mt-4 block">Find Funds by Goal →</Link>
+            <Link to="/screener" className="btn-secondary w-full text-center text-xs py-2 mt-4 block">
+              Find Funds by Goal →
+            </Link>
           </div>
         </section>
 
-        {/* Category cards */}
-        {!error && !loading && (
+        {/* ── Browse by Category ── */}
+        {!loading && !error && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">Browse by Category</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Click to explore funds in Screener</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Click any category to explore in Screener</p>
               </div>
-              <Link to="/screener" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">View All →</Link>
+              <Link to="/screener" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">View All →</Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {['Equity','ELSS','Index','Hybrid','Debt','Liquid','Other'].map(cat => {
-                const cfg = CAT[cat]||CAT.Other;
-                const count = catStats[cat]||0;
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+              {Object.entries(CAT_CFG).map(([cat, cfg]) => {
+                const count = catStats[cat] || 0;
                 if (!count) return null;
                 return (
                   <Link key={cat} to={`/screener?cat=${cat}`}
-                    className={`rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${cfg.bg}`}
-                    style={{borderColor: cfg.b+'30'}}>
+                    className="card p-4 text-center hover:shadow-md hover:-translate-y-0.5 transition-all group">
                     <div className="text-2xl mb-2">{cfg.e}</div>
-                    <div className={`text-sm font-bold ${cfg.t} mb-1`}>{cat}</div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 leading-snug">{cfg.d}</div>
-                    <div className={`text-[11px] font-bold ${cfg.t}`}>{count.toLocaleString('en-IN')} funds →</div>
+                    <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">{cat}</div>
+                    <div className="text-[10px] text-slate-400 leading-snug mb-2 hidden sm:block">{cfg.desc}</div>
+                    <div className="text-[11px] font-bold" style={{color: cfg.color}}>
+                      {count.toLocaleString('en-IN')} funds
+                    </div>
                   </Link>
                 );
               })}
@@ -154,21 +286,35 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Watchlist */}
+        {/* ── Watchlist ── */}
         {!loading && watchlistFunds.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">⭐ My Watchlist</h2>
-              <Link to="/screener?tab=watchlist" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">View all {watchlist.length} →</Link>
+              <Link to="/screener?tab=watchlist" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+                View all {watchlist.length} →
+              </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {watchlistFunds.map(fund => {
-                const cfg = CAT[inferCategory(fund.schemeName)]||CAT.Other;
+                const cat = inferCategory(fund.schemeName);
+                const cfg = CAT_CFG[cat] || CAT_CFG.Other;
                 return (
-                  <div key={fund.schemeCode} className="card p-4 border-l-[3px]" style={{borderLeftColor: cfg.b}}>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.t} mb-2 inline-block`}>{inferCategory(fund.schemeName)}</span>
-                    <h3 className="text-xs font-semibold text-slate-900 dark:text-white line-clamp-2 mb-3">{fund.schemeName}</h3>
-                    <Link to={`/compare?code=${fund.schemeCode}`} className="btn-primary w-full text-center text-xs py-1.5 block">Analyse →</Link>
+                  <div key={fund.schemeCode} className="card p-4 border-l-4" style={{borderLeftColor: cfg.color}}>
+                    <div className="text-xs font-bold mb-2" style={{color: cfg.color}}>{cfg.e} {cat}</div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 mb-3 leading-snug">
+                      {fund.schemeName}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button onClick={() => setModalFund(fund)}
+                        className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">
+                        View Details
+                      </button>
+                      <Link to={`/compare?code=${fund.schemeCode}`}
+                        className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-center transition-all">
+                        Analyse →
+                      </Link>
+                    </div>
                   </div>
                 );
               })}
@@ -176,57 +322,25 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Tips */}
-        <section>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">💡 Smart Investing Tips</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              ['📅','Start Early','₹5,000/month at 25 = ₹3.5 Cr by 60. Starting at 35 = only ₹1 Cr. Time is your biggest asset.'],
-              ['💸','Choose Direct Plans','Direct plans save 0.5–1% per year. On ₹10L over 20 years = ₹5–10 Lakh extra in your pocket.'],
-              ['🔁','Step-Up SIP Annually','₹5,000/month with 10% annual step-up grows to ₹11 Cr vs ₹3.5 Cr without step-up over 30 years.'],
-              ['🔥','FIRE is Achievable','Save 25× annual expenses. At ₹50K/month spend, FIRE corpus = ₹1.5 Cr. SIP gets you there.'],
-              ['⚖️','Diversify Smart','70% Equity + 20% Debt + 10% Liquid suits most long-term investors.'],
-              ['🧾','Save Tax with ELSS','ELSS saves up to ₹46,800/year in taxes (30% slab) with just 3-year lock-in.'],
-            ].map(([icon,title,body])=>(
-              <div key={title} className="card p-5 hover:shadow-md transition-shadow">
-                <div className="text-2xl mb-2">{icon}</div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1">{title}</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Glossary */}
-        <section>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📖 Beginner's Glossary</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {GLOSSARY.map(item=>(
-              <div key={item.t} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4 flex gap-3">
-                <span className="text-xl flex-shrink-0">{item.e}</span>
-                <div><div className="font-bold text-sm text-slate-900 dark:text-white mb-1">{item.t}</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.d}</p></div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* CTA */}
+        {/* ── 3 CTA cards ── */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            {t:'Fund Screener',d:'Filter by category, plan, AMC, expense ratio & more.',cta:'Find Funds →',to:'/screener',g:'from-blue-600 to-indigo-600'},
-            {t:'Compare Funds',d:'Side-by-side NAV, rolling returns, annual performance.',cta:'Compare →',to:'/compare',g:'from-emerald-600 to-teal-600'},
-            {t:'SIP + FIRE Calc',d:'SIP, Goal, ELSS tax saving, and FIRE retirement planning.',cta:'Calculate →',to:'/sip',g:'from-orange-500 to-red-500'},
-          ].map(c=>(
+            { t: 'Fund Screener', d: 'Advanced filters to find the right fund for you.', cta: 'Find Funds →', to: '/screener', g: 'from-blue-600 to-blue-700' },
+            { t: 'Compare Funds', d: 'Compare up to 4 funds side by side.', cta: 'Compare →', to: '/compare', g: 'from-emerald-600 to-teal-600' },
+            { t: 'SIP + FIRE Calc', d: 'Plan SIP, set goals, calculate FIRE date.', cta: 'Calculate →', to: '/sip', g: 'from-orange-500 to-red-500' },
+          ].map(c => (
             <div key={c.t} className={`rounded-2xl bg-gradient-to-br ${c.g} p-5 text-white`}>
               <h3 className="font-bold text-base mb-1">{c.t}</h3>
               <p className="text-sm opacity-80 mb-4">{c.d}</p>
-              <Link to={c.to} className="bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all inline-block">{c.cta}</Link>
+              <Link to={c.to} className="bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all inline-block">
+                {c.cta}
+              </Link>
             </div>
           ))}
         </section>
       </div>
 
+      {/* ── Fund Detail Modal ── */}
       {modalFund && (
         <FundDetailModal
           schemeCode={modalFund.schemeCode}
