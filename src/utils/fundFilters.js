@@ -61,3 +61,33 @@ export function filterFunds(funds, { search, category, planType, fundType, erBan
   if (goals && goals.length > 0) list = list.filter(f => goals.some(g => matchesGoal(f, g)));
   return list;
 }
+
+// Detect likely closed / matured funds from name
+export function isFundClosed(name) {
+  const n = name.toLowerCase();
+  return (
+    n.includes(' fmp ') ||
+    n.includes('fmp-') ||
+    n.includes('fixed maturity') ||
+    n.includes('fixed term plan') ||
+    n.includes('close ended') ||
+    n.includes('interval fund') ||
+    (n.includes('series') && (
+      n.includes('plan a') || n.includes('plan b') || n.includes('plan c') ||
+      n.includes('plan d') || n.includes('plan e') || n.includes('plan f') ||
+      n.includes('quarterly') || n.includes('annual plan') || n.includes('monthly plan')
+    ))
+  );
+}
+
+// Infer investment horizon recommendation from category
+export function getHorizon(name) {
+  const cat = inferCategory(name);
+  if (cat === 'Liquid') return '<1Y';
+  if (cat === 'Debt') return '1–3Y';
+  if (cat === 'Hybrid') return '3–5Y';
+  if (cat === 'ELSS') return '3Y+';
+  if (cat === 'Index') return '7Y+';
+  if (cat === 'Equity') return '7Y+';
+  return '3–5Y';
+}
