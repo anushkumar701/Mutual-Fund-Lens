@@ -841,49 +841,67 @@ export default function Compare() {
                 </div>
               </div>
               {viewMode === 'chart' ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                <ResponsiveContainer width="100%" height={340}>
+                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.15)" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
                       tickLine={false}
                       axisLine={false}
-                      interval="preserveStartEnd"
-                      stroke="rgba(148,163,184,0.5)"
+                      minTickGap={40}
+                      tickFormatter={(val) => {
+                        if (!val) return '';
+                        const [dd, mm, yyyy] = val.split('-');
+                        const d = new Date(`${yyyy}-${mm}-${dd}`);
+                        if (isNaN(d.getTime())) return val;
+                        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                      }}
+                      dy={10}
                     />
                     <YAxis
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
                       tickLine={false}
                       axisLine={false}
-                      stroke="rgba(148,163,184,0.5)"
                       tickFormatter={(v) => `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`}
-                      width={72}
+                      width={60}
+                      dx={-10}
                     />
-                    <ReferenceLine y={0} stroke="rgba(148,163,184,0.5)" strokeDasharray="4 4" />
+                    <ReferenceLine y={0} stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
                     <Tooltip
+                      labelFormatter={(label) => {
+                        if (!label) return '';
+                        const [dd, mm, yyyy] = label.split('-');
+                        const d = new Date(`${yyyy}-${mm}-${dd}`);
+                        if (isNaN(d.getTime())) return label;
+                        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                      }}
                       formatter={(value, name) => {
-                        // Filter out _raw keys from tooltip
                         if (name.endsWith('_raw')) return null;
                         return [`${parseFloat(value) >= 0 ? '+' : ''}${parseFloat(value).toFixed(2)}%`, name];
                       }}
                       contentStyle={{
-                        background: 'var(--chart-bg, #fff)',
-                        border: '1px solid #e2e8f0',
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        border: 'none',
                         borderRadius: '8px',
+                        color: '#f8fafc',
                         fontSize: '12px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                        padding: '10px 14px'
                       }}
+                      itemStyle={{ color: '#f8fafc', paddingBottom: '4px' }}
+                      labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
                     {fundData.map((fund, i) => (
                       <Line
                         key={fund.schemeCode}
                         type="monotone"
                         dataKey={fund.meta?.scheme_name || fund.schemeCode}
                         stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                        strokeWidth={2}
+                        strokeWidth={2.5}
                         dot={false}
-                        activeDot={{ r: 4 }}
+                        activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
                     ))}
                   </LineChart>
