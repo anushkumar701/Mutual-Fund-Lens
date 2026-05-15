@@ -859,7 +859,15 @@ export default function Compare() {
                         const [dd, mm, yyyy] = val.split('-');
                         const d = new Date(`${yyyy}-${mm}-${dd}`);
                         if (isNaN(d.getTime())) return val;
-                        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                        
+                        // Dynamic formatting based on selected range
+                        if (['1M', '3M', '6M'].includes(range)) {
+                          return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }); // e.g. 15 Jan
+                        } else if (['1Y', '3Y'].includes(range)) {
+                          return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); // e.g. Jan 23
+                        } else {
+                          return d.toLocaleDateString('en-US', { year: 'numeric' }); // e.g. 2023
+                        }
                       }}
                       dy={10}
                     />
