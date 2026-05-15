@@ -538,7 +538,11 @@ export default function Compare() {
     });
   };
 
-  const chartData = buildChartData(fundData, range);
+  let chartData = buildChartData(fundData, range);
+  // Downsample to monthly data for long ranges to make the chart lines smooth and clean
+  if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
+    chartData = toMonthlyData(chartData);
+  }
   // Monthly-only version for table view (one row per month, end-of-month)
   const monthlyChartData = toMonthlyData(chartData);
 
