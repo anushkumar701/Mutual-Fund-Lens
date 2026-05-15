@@ -125,12 +125,13 @@ export default function Screener() {
   const [plan, setPlan] = useState('All');
   const [risk, setRisk] = useState('All');
   const [erMax, setErMax] = useState('All');
-  const [amc, setAmc] = useState('All');
+  const [amc, setAmc] = useState('All AMCs');
   const [showClosed, setShowClosed] = useState(false);
   const [sort, setSort] = useState('az');
   const [page, setPage] = useState(48);
 
-  const clearAll = () => { setSearch(''); setCat('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All'); setShowClosed(false); };
+  const clearAll = () => { setSearch(''); setCat('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All AMCs'); setShowClosed(false); };
+
 
   const topAMCs = useMemo(() => {
     const m = {};
