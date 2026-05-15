@@ -1,139 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════
+   FundLens — Professional Fintech Design System
+   Light: Clean white/slate — like Zerodha/Groww
+   Dark:  Deep navy (#0d1117) — like Bloomberg Terminal
+   ═══════════════════════════════════════════════════════════════ */
+
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
   }
 
+  /* ── Light Mode Background: clean off-white ── */
   body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
+    background-color: #f0f4f8;
+    color: #0f172a;
+    transition: background-color 0.2s, color 0.2s;
   }
 
-  * {
-    @apply box-border;
+  /* ── Dark Mode Background: deep professional navy ── */
+  .dark body {
+    background-color: #0d1117;
+    color: #e6edf3;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Tailwind dark mode override */
+  :root {
+    color-scheme: light;
   }
-  ::-webkit-scrollbar-track {
-    @apply bg-slate-100 dark:bg-slate-800;
+  .dark {
+    color-scheme: dark;
   }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
-  }
+
+  * { box-sizing: border-box; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+  /* ── Selection ── */
+  ::selection { background: #2563eb22; color: #1d4ed8; }
+  .dark ::selection { background: #3b82f620; color: #60a5fa; }
 }
 
 @layer components {
+
+  /* ══ Buttons ══════════════════════════════════════════════════ */
   .btn-primary {
-    @apply bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl px-4 py-2.5 hover:from-blue-500 hover:to-blue-600 hover:shadow-lg hover:shadow-blue-500/25 active:scale-95 transition-all duration-200 font-semibold text-sm border-none;
+    @apply inline-flex items-center justify-center gap-2
+           bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+           text-white font-semibold text-sm
+           px-5 py-2.5 rounded-xl
+           shadow-sm hover:shadow-md hover:shadow-blue-600/20
+           active:scale-[0.97] transition-all duration-150
+           border-none cursor-pointer select-none;
   }
+
   .btn-secondary {
-    @apply border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all duration-200 font-semibold text-sm text-slate-700 dark:text-slate-200;
+    @apply inline-flex items-center justify-center gap-2
+           bg-white dark:bg-slate-800
+           border border-slate-200 dark:border-slate-700
+           text-slate-700 dark:text-slate-200
+           font-semibold text-sm
+           px-5 py-2.5 rounded-xl
+           hover:bg-slate-50 dark:hover:bg-slate-700
+           hover:border-slate-300 dark:hover:border-slate-600
+           active:scale-[0.97] transition-all duration-150
+           cursor-pointer select-none;
   }
+
+  /* ══ Cards ════════════════════════════════════════════════════ */
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/80 transition-all duration-200;
+    @apply bg-white dark:bg-[#161b27]
+           border border-slate-200/80 dark:border-slate-800
+           rounded-2xl
+           shadow-sm
+           transition-all duration-200;
   }
+
   .card-hover {
-    @apply hover:shadow-md hover:-translate-y-0.5;
+    @apply hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-700;
   }
-  .pill {
-    @apply rounded-full text-xs px-3 py-1 font-semibold;
-  }
+
+  /* ══ Inputs ═══════════════════════════════════════════════════ */
   .input-base {
-    @apply w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all text-sm;
+    @apply w-full px-3.5 py-2.5 rounded-xl
+           border border-slate-200 dark:border-slate-700
+           bg-white dark:bg-[#0d1117]
+           text-slate-900 dark:text-slate-100
+           placeholder-slate-400 dark:placeholder-slate-500
+           text-sm font-normal
+           focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+           dark:focus:ring-blue-400/30 dark:focus:border-blue-400
+           transition-all duration-150;
   }
-  .section-title {
-    @apply text-xl font-bold text-slate-900 dark:text-white;
-  }
+
+  /* ══ Pills / Badges ═══════════════════════════════════════════ */
+  .pill { @apply rounded-full text-xs px-3 py-1 font-semibold; }
+
   .badge-positive {
-    @apply bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply bg-emerald-50 dark:bg-emerald-900/20
+           text-emerald-700 dark:text-emerald-400
+           border border-emerald-200/60 dark:border-emerald-800/60
+           px-2 py-0.5 rounded-full text-xs font-semibold;
   }
   .badge-negative {
-    @apply bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply bg-red-50 dark:bg-red-900/20
+           text-red-600 dark:text-red-400
+           border border-red-200/60 dark:border-red-800/60
+           px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .section-title {
+    @apply text-xl font-bold text-slate-900 dark:text-white tracking-tight;
   }
 }
 
-
-/* Animations */
+/* ══ Skeleton Loading ═══════════════════════════════════════════ */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
+  0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
 .skeleton {
   background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
-
 .dark .skeleton {
-  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background: linear-gradient(90deg, #161b27 25%, #1e2736 50%, #161b27 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
+/* ══ Animations ═════════════════════════════════════════════════ */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.animate-fade-in-up { animation: fadeInUp 0.35s ease-out forwards; }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.4s ease-out forwards;
-}
-
-/* Bottom nav safe area */
-.bottom-nav-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-/* Scrollbar hiding for horizontal scroll */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* Range slider styles */
-input[type='range'] {
-  @apply accent-blue-600;
-  cursor: pointer;
-}
-
-/* Chart tooltip — dark mode fix */
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  @apply !bg-white dark:!bg-slate-800 !border-slate-200 dark:!border-slate-700 !rounded-lg !shadow-lg;
-}
-.recharts-default-tooltip {
-  background-color: inherit !important;
-}
-
-/* Toast slide-in animation */
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(110%); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.animate-slide-in-right {
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+.animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-/* Stat pulse ring */
 @keyframes pingOnce {
-  0%   { transform: scale(1); opacity: 0.75; }
+  0%        { transform: scale(1); opacity: 0.75; }
   75%, 100% { transform: scale(1.8); opacity: 0; }
 }
-.ping-once {
-  animation: pingOnce 1s ease-out 1 forwards;
+.ping-once { animation: pingOnce 1s ease-out 1 forwards; }
+
+/* ══ Range Sliders ══════════════════════════════════════════════ */
+input[type='range'] {
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+.dark input[type='range'] { accent-color: #3b82f6; }
+
+/* ══ Recharts Tooltip Fix ════════════════════════════════════════ */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1e2736 !important;
+  border: 1px solid #2d3748 !important;
 }
 
-/* Category border left accent */
-.border-l-accent {
-  border-left-width: 3px;
-}
+/* ══ Scrollbar Hide ══════════════════════════════════════════════ */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* ══ Bottom Nav Safe Area ════════════════════════════════════════ */
+.bottom-nav-safe { padding-bottom: env(safe-area-inset-bottom, 0); }

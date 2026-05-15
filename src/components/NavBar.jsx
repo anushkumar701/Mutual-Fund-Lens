@@ -61,7 +61,7 @@ export default function NavBar() {
   return (
     <>
       {/* Desktop top navbar */}
-      <nav className="hidden md:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm items-center px-6 gap-6">
+      <nav className="hidden md:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800 shadow-sm items-center px-6 gap-6">
         {/* Logo */}
         <NavLink to="/" className="flex items-center gap-2 mr-6">
           <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -84,8 +84,8 @@ export default function NavBar() {
               className={({ isActive }) =>
                 `relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'
                 }`
               }
             >
@@ -116,7 +116,7 @@ export default function NavBar() {
       </nav>
 
       {/* Mobile header (just logo + theme) */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4">
         <NavLink to="/" className="flex items-center gap-2">
           <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <polyline points="3,17 9,11 13,15 21,7" strokeLinecap="round" strokeLinejoin="round" />
@@ -129,7 +129,7 @@ export default function NavBar() {
       </header>
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 bottom-nav-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1117] border-t border-slate-200 dark:border-slate-800 bottom-nav-safe">
         <div className="flex items-stretch">
           {links.map(({ to, label, icon, badgeKey, badgeColor }) => (
             <NavLink

@@ -184,10 +184,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen pb-20 md:pb-8">
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950 pt-24 pb-16 px-4 md:pt-28">
+      <section className="relative overflow-hidden pt-24 pb-16 px-4 md:pt-28">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"/>
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"/>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl"/>
         </div>
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/70 dark:bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-6 border border-slate-200/50 dark:border-white/20 shadow-sm">
@@ -196,9 +195,9 @@ export default function Dashboard() {
               Live data · {loading ? '...' : `${funds.length.toLocaleString('en-IN')}+`} mutual funds
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-slate-900 dark:text-white leading-tight">
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-slate-900 dark:text-white leading-tight tracking-tight">
             Find & Analyse<br/>
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+            <span className="text-blue-600 dark:text-blue-500">
               Any Mutual Fund
             </span>
           </h1>
