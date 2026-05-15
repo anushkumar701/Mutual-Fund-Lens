@@ -11,7 +11,7 @@ import { fetchFundDetail, useFunds } from '../hooks/useFunds';
 import ErrorState from '../components/ErrorState';
 import CategoryPill from '../components/CategoryPill';
 import { formatNAV, formatINR } from '../utils/formatCurrency';
-import { calculateFundMetrics, calculateHistoricalSIP, getSmartTags, calculateCorrelation } from '../utils/metrics';
+import { calculateFundMetrics, calculateHistoricalSIP, getSmartTags, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 
 const CHART_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -1467,63 +1467,116 @@ export default function Compare() {
               <span className="text-2xl">🤖</span>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Our Analysis</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {(() => {
-                // Oldest Fund
-                const oldestFund = [...fundData].sort((a, b) => b.navData.length - a.navData.length)[0];
-                const oldestYears = (oldestFund.navData.length / 252).toFixed(1);
-
-                // Recent Momentum (6M)
-                const momentumFunds = fundData.map(f => {
-                  const data = f.navData;
-                  if (data.length < 126) return { f, perf: -Infinity }; // ~6 months
-                  const latest = parseFloat(data[0].nav);
-                  const sixMonthsAgo = parseFloat(data[125].nav);
-                  return { f, perf: ((latest - sixMonthsAgo) / sixMonthsAgo) * 100 };
-                }).sort((a, b) => b.perf - a.perf);
-                const momentumFund = momentumFunds[0];
-
-                // Most Consistent (lowest variance month-over-month)
-                const consistentFunds = fundData.map(f => {
-                  const monthly = toMonthlyData(f.navData);
-                  let variance = Infinity;
-                  if (monthly.length > 2) {
-                    const returns = [];
-                    for (let i = 0; i < monthly.length - 1; i++) {
-                      returns.push((parseFloat(monthly[i].nav) - parseFloat(monthly[i+1].nav)) / parseFloat(monthly[i+1].nav));
-                    }
-                    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-                    variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+                // Calculate metrics for all funds
+                const fundStats = fundData.map(f => {
+                  const m = calculateFundMetrics(f.navData);
+                  const bw = calculateBestWorstMonth(f.navData);
+                  const latest = parseFloat(f.navData[0].nav);
+                  let perf6m = -Infinity;
+                  if (f.navData.length > 126) {
+                    perf6m = ((latest - parseFloat(f.navData[125].nav)) / parseFloat(f.navData[125].nav)) * 100;
                   }
-                  return { f, var: variance };
-                }).sort((a, b) => a.var - b.var);
-                const consistentFund = consistentFunds[0];
+                  return { f, m, bw, perf6m };
+                });
+
+                // Find winners
+                const momentumWinner = [...fundStats].sort((a, b) => b.perf6m - a.perf6m)[0];
+                const lowestRisk = [...fundStats].filter(x => x.m).sort((a, b) => a.m.maxDrawdown - b.m.maxDrawdown)[0];
+                
+                // Verdict Logic
+                let verdictFund = fundStats[0];
+                let highestScore = -Infinity;
+                fundStats.forEach(stat => {
+                  if (!stat.m) return;
+                  let score = 0;
+                  if (stat.m.return3Y) score += stat.m.return3Y * 2;
+                  if (stat.m.return5Y) score += stat.m.return5Y * 1.5;
+                  if (stat.m.sharpe) score += stat.m.sharpe * 10;
+                  score -= stat.m.maxDrawdown; // penalize risk
+                  
+                  if (score > highestScore) {
+                    highestScore = score;
+                    verdictFund = stat;
+                  }
+                });
 
                 return (
                   <>
-                    <div className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+                    <div className="card p-5 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border-indigo-200 dark:border-indigo-800 lg:col-span-2">
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">🏛️</span>
-                        <h3 className="font-bold text-amber-900 dark:text-amber-400">Oldest Fund</h3>
+                        <span className="text-xl">🏆</span>
+                        <h3 className="font-bold text-indigo-900 dark:text-indigo-400">FundLens Verdict</h3>
                       </div>
-                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{oldestFund.meta?.scheme_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Has the longest history with <span className="font-bold tabular-nums">{oldestYears} years</span> of data.</p>
+                      <p className="font-semibold text-slate-900 dark:text-white text-lg mb-1 line-clamp-2">
+                        {verdictFund.f.meta?.scheme_name}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Based on our multi-factor analysis (Returns, Volatility, Sharpe Ratio, and Drawdowns), this fund provides the best risk-adjusted performance.
+                      </p>
                     </div>
+
                     <div className="card p-5 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xl">🚀</span>
-                        <h3 className="font-bold text-emerald-900 dark:text-emerald-400">Recent Momentum</h3>
+                        <h3 className="font-bold text-emerald-900 dark:text-emerald-400">High Momentum</h3>
                       </div>
-                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{momentumFund.f.meta?.scheme_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Best growth in the last 6 months (<span className="font-bold tabular-nums">{momentumFund.perf.toFixed(1)}%</span>).</p>
+                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{momentumWinner.f.meta?.scheme_name}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">Strongest recent growth (<span className="font-bold tabular-nums">{momentumWinner.perf6m.toFixed(1)}%</span> in 6M).</p>
                     </div>
-                    <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+
+                    <div className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xl">🛡️</span>
-                        <h3 className="font-bold text-blue-900 dark:text-blue-400">Most Consistent</h3>
+                        <h3 className="font-bold text-amber-900 dark:text-amber-400">Capital Protection</h3>
                       </div>
-                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{consistentFund.f.meta?.scheme_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Lowest month-to-month variance (most stable returns).</p>
+                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{lowestRisk?.f.meta?.scheme_name || 'N/A'}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">Lowest historical maximum drawdown (<span className="font-bold tabular-nums">{lowestRisk?.m?.maxDrawdown.toFixed(1)}%</span>).</p>
+                    </div>
+
+                    {/* Best/Worst Month Tracking table */}
+                    <div className="card p-5 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700 lg:col-span-4 mt-2">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xl">📊</span>
+                        <h3 className="font-bold text-slate-900 dark:text-white">Stress Test: Best & Worst Months</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="text-xs text-slate-500 uppercase bg-slate-100 dark:bg-slate-800 rounded">
+                            <tr>
+                              <th className="px-4 py-2 font-semibold">Fund</th>
+                              <th className="px-4 py-2 font-semibold text-emerald-600 dark:text-emerald-400">Best Month</th>
+                              <th className="px-4 py-2 font-semibold text-red-600 dark:text-red-400">Worst Month</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                            {fundStats.map((stat, i) => (
+                              <tr key={stat.f.schemeCode} className="hover:bg-white dark:hover:bg-slate-800/40">
+                                <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                                  {stat.f.meta?.scheme_name?.split(' ').slice(0, 5).join(' ')}
+                                </td>
+                                <td className="px-4 py-3 tabular-nums">
+                                  {stat.bw && stat.bw.best ? (
+                                    <div className="flex flex-col">
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{stat.bw.best.returnPct.toFixed(2)}%</span>
+                                      <span className="text-[10px] text-slate-400">{stat.bw.best.month}</span>
+                                    </div>
+                                  ) : '—'}
+                                </td>
+                                <td className="px-4 py-3 tabular-nums">
+                                  {stat.bw && stat.bw.worst ? (
+                                    <div className="flex flex-col">
+                                      <span className="text-red-600 dark:text-red-400 font-bold">{stat.bw.worst.returnPct.toFixed(2)}%</span>
+                                      <span className="text-[10px] text-slate-400">{stat.bw.worst.month}</span>
+                                    </div>
+                                  ) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </>
                 );

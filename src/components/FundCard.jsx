@@ -6,6 +6,7 @@ import CategoryPill from './CategoryPill';
 import GoalTag from './GoalTag';
 import { getGoalForFund, inferCategory } from '../utils/goalFilters';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { fetchFundDetail } from '../hooks/useFunds';
 
 const CATEGORY_BORDERS = {
   Equity: '#3b82f6',
@@ -41,6 +42,15 @@ export default function FundCard({ fund, showCompare = false, showBookmark = fal
   const [details, setDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const toast = useToast();
+
+  // Lazy load details for sparkline
+  useEffect(() => {
+    let mounted = true;
+    fetchFundDetail(codeStr).then(res => {
+      if (mounted) setDetails(res);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [codeStr]);
 
   // ── TYPE FIX: always compare as strings ──────────────────────────────
   const codeStr = String(schemeCode);
@@ -100,8 +110,17 @@ export default function FundCard({ fund, showCompare = false, showBookmark = fal
         {schemeName}
       </h3>
 
-      {/* Goal tag */}
-      {goal && <GoalTag goal={goal} />}
+      {/* Sparkline & Goal Tag */}
+      <div className="flex items-end justify-between mt-1 h-10">
+        <div className="flex-1 mr-4 h-full flex flex-col justify-end">
+          {details && details.data ? (
+            <MiniSparkline data={details.data.slice(0, 30).reverse()} color={accentColor} />
+          ) : (
+            <div className="w-24 h-6 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+          )}
+        </div>
+        {goal && <GoalTag goal={goal} />}
+      </div>
 
       {/* Estimated Min Investments */}
       {(() => {
@@ -223,6 +242,44 @@ export default function FundCard({ fund, showCompare = false, showBookmark = fal
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Mini Sparkline Component ─────────────────────────────────────────────
+function MiniSparkline({ data, color }) {
+  if (!data || data.length < 2) return null;
+
+  const width = 100;
+  const height = 24;
+  
+  const navs = data.map(d => parseFloat(d.nav));
+  const min = Math.min(...navs);
+  const max = Math.max(...navs);
+  const range = max - min || 1;
+
+  const points = navs.map((nav, i) => {
+    const x = (i / (navs.length - 1)) * width;
+    const y = height - ((nav - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const isPositive = navs[navs.length - 1] >= navs[0];
+  const strokeColor = isPositive ? '#10b981' : '#ef4444'; // Green if up, Red if down
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] text-slate-400 font-medium">30D Trend</span>
+      <svg width="100%" height={height} viewBox={`0 -2 ${width} ${height + 4}`} preserveAspectRatio="none" className="overflow-visible">
+        <polyline
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+      </svg>
     </div>
   );
 }
