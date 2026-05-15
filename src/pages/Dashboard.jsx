@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import ErrorState from '../components/ErrorState';
+import FundDetailModal from '../components/FundDetailModal';
 import { inferCategory } from '../utils/goalFilters';
 
 const CAT = {
@@ -51,12 +52,14 @@ function QuickCalc() {
       </div>
       <Link to="/sip" className="btn-primary block text-center text-xs py-2">Full Calculator with Step-Up, FIRE & Tax →</Link>
     </div>
+
   );
 }
 
 export default function Dashboard() {
   const { funds, loading, error, refetch } = useFunds();
   const [watchlist] = useLocalStorage('fundlens_watchlist', []);
+  const [modalFund, setModalFund] = useState(null);
 
   const catStats = useMemo(() => {
     const c = {};
@@ -223,6 +226,14 @@ export default function Dashboard() {
           ))}
         </section>
       </div>
+
+      {modalFund && (
+        <FundDetailModal
+          schemeCode={modalFund.schemeCode}
+          schemeName={modalFund.schemeName}
+          onClose={() => setModalFund(null)}
+        />
+      )}
     </div>
   );
 }
