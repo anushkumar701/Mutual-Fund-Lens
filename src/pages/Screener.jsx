@@ -4,8 +4,9 @@ import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import SkeletonCard from '../components/SkeletonCard';
 import ErrorState from '../components/ErrorState';
+import FundDetailModal from '../components/FundDetailModal';
 import { inferCategory, GOALS, matchesGoal } from '../utils/goalFilters';
-import { extractAMC, getPlanType, getFundType, estimateER, getERBand, filterFunds } from '../utils/fundFilters';
+import { extractAMC, getPlanType, getFundType, estimateER, getERBand } from '../utils/fundFilters';
 
 const CATS = ['All','Equity','Debt','Hybrid','ELSS','Index','Liquid'];
 const ER_BANDS = ['All','Ultra Low (<0.3%)','Low (0.3–0.7%)','Medium (0.7–1.2%)','High (>1.2%)'];
@@ -13,6 +14,27 @@ const FUND_TYPES = ['All','Growth','IDCW/Dividend'];
 const PLAN_TYPES = ['All','Direct','Regular'];
 const RISK_LEVELS = { Equity:'High', ELSS:'High', Hybrid:'Medium', Index:'Medium', Debt:'Low', Liquid:'Very Low', Other:'Medium' };
 const EXP_RETURNS = { Equity:'12–15%', ELSS:'12–15%', Index:'11–13%', Hybrid:'9–12%', Debt:'6–8%', Liquid:'4–6%', Other:'8–12%' };
+
+// Sub-category inference from scheme name
+function getSubCategory(name) {
+  const n = name.toLowerCase();
+  if (n.includes('flexi cap') || n.includes('flexicap') || n.includes('flexible')) return 'Flexi Cap';
+  if (n.includes('small cap') || n.includes('smallcap')) return 'Small Cap';
+  if (n.includes('mid cap') || n.includes('midcap')) return 'Mid Cap';
+  if (n.includes('large & mid') || n.includes('large and mid')) return 'Large & Mid Cap';
+  if (n.includes('large cap') || n.includes('largecap')) return 'Large Cap';
+  if (n.includes('multi cap') || n.includes('multicap')) return 'Multi Cap';
+  if (n.includes('sectoral') || n.includes('thematic')) return 'Sectoral/Thematic';
+  if (n.includes('banking') || n.includes('bank bees')) return 'Banking';
+  if (n.includes('pharma') || n.includes('health')) return 'Pharma/Health';
+  if (n.includes('overnight')) return 'Overnight';
+  if (n.includes('ultra short') || n.includes('ultrashort')) return 'Ultra Short';
+  if (n.includes('short dur') || n.includes('short term')) return 'Short Duration';
+  if (n.includes('gilt')) return 'Gilt';
+  return null;
+}
+
+const SUBCATS = ['All Sub-Category','Flexi Cap','Large Cap','Large & Mid Cap','Mid Cap','Small Cap','Multi Cap','Sectoral/Thematic','Overnight','Ultra Short','Short Duration','Gilt'];
 const SORTS = [
   {v:'az',l:'Name A → Z'},{v:'za',l:'Name Z → A'},
   {v:'er_low',l:'Expense Ratio: Low First'},{v:'er_high',l:'Expense Ratio: High First'},
@@ -29,7 +51,7 @@ const CC = {
   Other:{b:'#94a3b8',bg:'bg-slate-50 dark:bg-slate-800',t:'text-slate-600 dark:text-slate-400'},
 };
 
-function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList }) {
+function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, onViewDetails }) {
   const c = String(fund.schemeCode);
   const cat = inferCategory(fund.schemeName);
   const plan = getPlanType(fund.schemeName);
@@ -56,7 +78,8 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList }
       </div>
       {plan==='Regular'&&<p className="text-[9px] text-orange-600 bg-orange-50 dark:bg-orange-950 px-2 py-1 rounded">⚠️ Regular plan — higher fees than Direct</p>}
       <div className="flex gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-700 mt-auto">
-        <Link to={`/compare?code=${c}`} className="flex-1 text-center text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg transition-all">Analyse →</Link>
+        <button onClick={()=>onViewDetails(fund)} className="flex-1 text-center text-[11px] font-bold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 py-1.5 rounded-lg transition-all">Details 👁</button>
+        <button onClick={()=>{window.location.href=`/compare?code=${c}`}} className="flex-1 text-center text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg transition-all">Analyse →</button>
         <button onClick={()=>setWatchlist(p=>p.map(String).includes(c)?p.filter(x=>String(x)!==c):[...p,c])}
           className={`w-7 h-7 rounded-lg text-xs flex items-center justify-center transition-all ${isWL?'bg-amber-100 dark:bg-amber-900 text-amber-600':'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500'}`}>⭐</button>
         <button onClick={()=>setCompareList(p=>{const s=p.map(String);if(s.includes(c))return p.filter(x=>String(x)!==c);if(p.length>=4)return p;return[...p,c];})}
@@ -74,6 +97,7 @@ export default function Screener() {
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('All');
+  const [subCat, setSubCat] = useState('All Sub-Category');
   const [plan, setPlan] = useState('All');
   const [ft, setFt] = useState('All');
   const [erBand, setErBand] = useState('All');
@@ -82,7 +106,10 @@ export default function Screener() {
   const [selGoals, setSelGoals] = useState([]);
   const [sort, setSort] = useState('az');
   const [pageSize, setPageSize] = useState(60);
+  const [modalFund, setModalFund] = useState(null);
   const toggleGoal = g => setSelGoals(p => p.includes(g) ? p.filter(x=>x!==g) : [...p,g]);
+  const openModal = (fund) => setModalFund(fund);
+  const closeModal = () => setModalFund(null);
 
   const topAMCs = useMemo(() => {
     const m = {};
@@ -101,6 +128,7 @@ export default function Screener() {
     if (search.trim()) { const q=search.toLowerCase(); list=list.filter(f=>f.schemeName.toLowerCase().includes(q)); }
     if (tab!=='watchlist') {
       if (cat!=='All') list=list.filter(f=>inferCategory(f.schemeName)===cat);
+      if (subCat!=='All Sub-Category') list=list.filter(f=>getSubCategory(f.schemeName)===subCat);
       if (plan!=='All') list=list.filter(f=>getPlanType(f.schemeName)===plan);
       if (ft!=='All') list=list.filter(f=>getFundType(f.schemeName)===ft);
       if (erBand!=='All') list=list.filter(f=>getERBand(estimateER(f.schemeName))===erBand);
@@ -116,10 +144,10 @@ export default function Screener() {
       case 'oldest': return [...list].sort((a,b)=>a.schemeCode-b.schemeCode);
       default: return [...list].sort((a,b)=>a.schemeName.localeCompare(b.schemeName));
     }
-  }, [funds, tab, watchlist, search, cat, plan, ft, erBand, amc, risk, selGoals, sort]);
+  }, [funds, tab, watchlist, search, cat, subCat, plan, ft, erBand, amc, risk, selGoals, sort]);
 
-  const activeFilters = [search.trim(),cat!=='All',plan!=='All',ft!=='All',erBand!=='All',amc!=='All',risk!=='All',...selGoals].filter(Boolean).length;
-  const clearAll = () => { setSearch('');setCat('All');setPlan('All');setFt('All');setErBand('All');setAmc('All');setRisk('All');setSelGoals([]); };
+  const activeFilters = [search.trim(),cat!=='All',subCat!=='All Sub-Category',plan!=='All',ft!=='All',erBand!=='All',amc!=='All',risk!=='All',...selGoals].filter(Boolean).length;
+  const clearAll = () => { setSearch('');setCat('All');setSubCat('All Sub-Category');setPlan('All');setFt('All');setErBand('All');setAmc('All');setRisk('All');setSelGoals([]); };
 
   return (
     <div className="min-h-screen pb-32 md:pb-8 md:pt-20 pt-16">
@@ -168,6 +196,15 @@ export default function Screener() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Sub-Category */}
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 block">Sub-Category</label>
+                <select value={subCat} onChange={e=>setSubCat(e.target.value)} className="input-base py-2 text-xs sm:w-72">
+                  {SUBCATS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <p className="text-[9px] text-slate-400 mt-1">Flexi Cap = most flexible. Mid/Small Cap = higher risk and return.</p>
               </div>
 
               {/* Row: Plan + Fund Type + Risk */}
@@ -274,7 +311,7 @@ export default function Screener() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filtered.slice(0,pageSize).map(fund=>(
-                  <FundCard key={fund.schemeCode} fund={fund} watchlist={watchlist} setWatchlist={setWatchlist} compareList={compareList} setCompareList={setCompareList}/>
+                  <FundCard key={fund.schemeCode} fund={fund} watchlist={watchlist} setWatchlist={setWatchlist} compareList={compareList} setCompareList={setCompareList} onViewDetails={openModal}/>
                 ))}
               </div>
               {filtered.length>pageSize&&(
@@ -296,6 +333,15 @@ export default function Screener() {
             <button onClick={()=>setCompareList([])} className="text-blue-200 hover:text-white text-xs">✕</button>
           </div>
         </div>
+      )}
+
+      {/* Sub-category filter - added inside filter panel */}
+      {modalFund && (
+        <FundDetailModal
+          schemeCode={modalFund.schemeCode}
+          schemeName={modalFund.schemeName}
+          onClose={closeModal}
+        />
       )}
     </div>
   );
