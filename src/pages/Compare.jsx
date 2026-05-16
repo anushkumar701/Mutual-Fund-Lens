@@ -659,7 +659,7 @@ export default function Compare() {
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Compare up to 4 mutual funds side by side</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {fundData.length > 0 && (
               <>
                 <button onClick={handleCopyLink} className="btn-secondary text-xs px-3 py-2 border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
@@ -684,7 +684,7 @@ export default function Compare() {
 
         {/* Add fund search */}
         <form onSubmit={handleSearchSubmit} className="relative z-20">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z" />
@@ -722,10 +722,10 @@ export default function Compare() {
             <button
               type="submit"
               disabled={compareList.length >= 4 || !searchQuery.trim() || loadingCode}
-              className="btn-primary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed hidden sm:flex"
+              className="btn-primary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {loadingCode ? (
-                <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Loading…</span>
+                <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Loading…</span>
               ) : '+ Add'}
             </button>
           </div>
