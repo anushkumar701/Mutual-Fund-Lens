@@ -1069,24 +1069,10 @@ export default function Compare() {
                           2022: { label: '🔴 Russia-Ukraine war + aggressive rate hikes', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
                           2023: { label: '🟢 Recovery rally, FII inflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
                           2024: { label: '🟡 Election year + US rate uncertainty', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' },
+                          2025: { label: '🟢 Retail-driven resilience despite FII outflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2026: { label: '🔴 High volatility, Geopolitics & FII sell-off', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
                         };
-                        let event = MARKET_EVENTS[year];
-                        
-                        // Automatically infer the "reason" / market sentiment for any future or unmapped years based on average returns
-                        if (!event && defined.length > 0) {
-                          const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
-                          if (avgReturn >= 15) {
-                            event = { label: '🟢 Strong bull market trend', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 5) {
-                            event = { label: '🟢 Positive market sentiment', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 0) {
-                            event = { label: '🟡 Flat / Muted growth', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else if (avgReturn >= -10) {
-                            event = { label: '🟡 Mild market correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else {
-                            event = { label: '🔴 Major market correction', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' };
-                          }
-                        }
+                        const event = MARKET_EVENTS[year];
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
