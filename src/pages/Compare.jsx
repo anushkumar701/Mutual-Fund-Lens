@@ -1076,15 +1076,15 @@ export default function Compare() {
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
-                              <div className="flex flex-col gap-1">
-                                <span className="flex items-center gap-1.5">
+                              <div className="flex flex-col gap-1.5">
+                                <span className="flex items-center gap-2 text-base">
                                   {year}
                                   {year === new Date().getFullYear() && (
-                                    <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded font-semibold">YTD</span>
+                                    <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded font-bold tracking-wide">YTD</span>
                                   )}
                                 </span>
                                 {event && (
-                                  <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full w-fit ${event.color}`}>
+                                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-md w-fit ${event.color}`}>
                                     {event.label}
                                   </span>
                                 )}
