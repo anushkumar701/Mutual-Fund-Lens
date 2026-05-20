@@ -84,7 +84,9 @@ export function calculateGoalSIP(targetAmount, years, annualReturn) {
   const r = annualReturn / 100 / 12;
   const n = years * 12;
   if (r === 0) return Math.ceil(targetAmount / n);
-  const pmt = (targetAmount * r) / (Math.pow(1 + r, n) - 1);
+  // Match the main SIP engine, which compounds each contribution immediately
+  // (annuity-due style monthly investing).
+  const pmt = (targetAmount * r) / ((Math.pow(1 + r, n) - 1) * (1 + r));
   return Math.ceil(pmt);
 }
 
@@ -105,7 +107,7 @@ export function calculateGoalYears(targetAmount, principal, annualReturn) {
 export function calculateELSSTaxSaving(elssAmount, taxSlab) {
   const maxDeduction = 150000;
   const eligible = Math.min(elssAmount, maxDeduction);
-  const taxSaved = Math.round(eligible * (taxSlab / 100));
+  const taxSaved = Math.round(eligible * (taxSlab / 100) * 1.04);
   const effectiveCost = elssAmount - taxSaved;
   return { eligible, taxSaved, effectiveCost };
 }

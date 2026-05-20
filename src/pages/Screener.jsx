@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import SkeletonCard from '../components/SkeletonCard';
@@ -114,14 +114,20 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
 export default function Screener() {
   const { funds, loading, error, refetch } = useFunds();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [watchlist, setWatchlist] = useLocalStorage('fundlens_watchlist', []);
   const [compareList, setCompareList] = useLocalStorage('fundlens_compare', []);
   const [modalFund, setModalFund] = useState(null);
 
+  const initialTab = searchParams.get('tab') === 'watchlist' ? 'watchlist' : 'all';
+  const initialCategory = ['Equity', 'Index', 'Hybrid', 'Debt', 'ELSS', 'Liquid'].includes(searchParams.get('cat'))
+    ? searchParams.get('cat')
+    : 'All';
+
   // Filters
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState('all');
-  const [cat, setCat] = useState('All');
+  const [tab, setTab] = useState(initialTab);
+  const [cat, setCat] = useState(initialCategory);
   const [plan, setPlan] = useState('All');
   const [risk, setRisk] = useState('All');
   const [erMax, setErMax] = useState('All');
