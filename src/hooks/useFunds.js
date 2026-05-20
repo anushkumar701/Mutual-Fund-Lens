@@ -6,6 +6,9 @@ import { get, set } from 'idb-keyval';
 const BASE_URL = 'https://api.mfapi.in/mf';
 let memoryCachedList = null;
 
+const FUND_LIST_CACHE_KEY = 'fundlens_all_funds_v2'; // v2 busts old forever-cached data
+const FUND_LIST_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
 export function useFunds() {
   const [funds, setFunds] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,25 +25,28 @@ export function useFunds() {
         return;
       }
       
-      // 2. Check IndexedDB cache (1 day expiry logic could be added here, keeping it simple for now)
-      const idbCached = await get('fundlens_all_funds');
-      if (idbCached && idbCached.length > 0) {
-        memoryCachedList = idbCached;
-        setFunds(idbCached);
+      // 2. Check IndexedDB cache — 24 hour expiry
+      const idbCached = await get(FUND_LIST_CACHE_KEY);
+      const now = Date.now();
+      if (idbCached && idbCached.ts && (now - idbCached.ts < FUND_LIST_TTL)) {
+        memoryCachedList = idbCached.data;
+        setFunds(idbCached.data);
         setLoading(false);
-        // Fire & forget background update to keep data fresh
-        axios.get(BASE_URL, { timeout: 15000 }).then(res => {
-          memoryCachedList = res.data;
-          set(('fundlens_all_funds'), res.data);
-          setFunds(res.data);
-        }).catch(() => {});
+        // Fire & forget background update if >12h old (keeps data fresh without blocking)
+        if (now - idbCached.ts > FUND_LIST_TTL / 2) {
+          axios.get(BASE_URL, { timeout: 15000 }).then(res => {
+            memoryCachedList = res.data;
+            set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
+            setFunds(res.data);
+          }).catch(() => {});
+        }
         return;
       }
 
       // 3. Network fetch
       const res = await axios.get(BASE_URL, { timeout: 15000 });
       memoryCachedList = res.data;
-      set('fundlens_all_funds', res.data);
+      set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
       setFunds(res.data);
     } catch (err) {
       setError('Unable to load funds. Please try again.');

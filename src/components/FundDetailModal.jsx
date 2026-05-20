@@ -25,7 +25,7 @@ function calcReturn(navData, days) {
   if (!best) return null;
   const old = parseFloat(best.nav);
   if (days > 365) {
-    const yrs = days / 365;
+    const yrs = days / 365.25; // 365.25 accounts for leap years — more accurate CAGR
     return ((Math.pow(latest / old, 1 / yrs) - 1) * 100).toFixed(2);
   }
   return (((latest - old) / old) * 100).toFixed(2);

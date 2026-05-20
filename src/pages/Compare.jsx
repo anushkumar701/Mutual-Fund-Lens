@@ -96,7 +96,11 @@ function get52WeekHL(navData) {
     return new Date(`${yyyy}-${mm}-${dd}`) >= cutoff;
   }).map(d => parseFloat(d.nav));
   if (last52W.length === 0) return null;
-  return { high: Math.max(...last52W), low: Math.min(...last52W) };
+  // Use reduce instead of Math.max spread to avoid call-stack overflow on large arrays
+  return {
+    high: last52W.reduce((a, b) => Math.max(a, b), -Infinity),
+    low:  last52W.reduce((a, b) => Math.min(a, b), Infinity),
+  };
 }
 // Monthly win rate: % of months fund gained NAV (consistency metric)
 function getMonthlyWinRate(navData) {
