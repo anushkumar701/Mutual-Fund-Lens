@@ -5,24 +5,45 @@ function parseDate(dateStr) {
   return new Date(`${yyyy}-${mm}-${dd}`);
 }
 
+// Build a sorted ascending array of { ts, nav } for binary search
+function buildSortedNav(navData) {
+  return [...navData].reverse().map(d => ({
+    ts: parseDate(d.date).getTime(),
+    nav: parseFloat(d.nav),
+  }));
+}
+
+// Binary search: find index of closest timestamp in sorted ascending array
+function binarySearchClosest(sorted, targetTs) {
+  let lo = 0, hi = sorted.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid].ts < targetTs) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+    return lo - 1;
+  }
+  return lo;
+}
+
 export function calculateFundMetrics(navData) {
   if (!navData || navData.length === 0) return null;
 
   const latestNav = parseFloat(navData[0].nav);
   const latestDate = parseDate(navData[0].date);
 
+  // Pre-sort once — O(n log n) — then binary search for each period — O(log n)
+  const sorted = buildSortedNav(navData);
+
   const getNavAgo = (years) => {
     const targetDate = new Date(latestDate);
     targetDate.setFullYear(targetDate.getFullYear() - years);
-    let closestNav = null;
-    let minDiff = Infinity;
-    for (const d of navData) {
-      const date = parseDate(d.date);
-      const diff = Math.abs(date - targetDate);
-      if (diff < minDiff) { minDiff = diff; closestNav = parseFloat(d.nav); }
-    }
-    if (minDiff > 30 * 24 * 60 * 60 * 1000) return null;
-    return closestNav;
+    const targetTs = targetDate.getTime();
+    const idx = binarySearchClosest(sorted, targetTs);
+    const diff = Math.abs(sorted[idx].ts - targetTs);
+    if (diff > 30 * 24 * 60 * 60 * 1000) return null;
+    return sorted[idx].nav;
   };
 
   const calcCAGR = (pastNav, years) => {
@@ -70,12 +91,13 @@ function getDailyReturns(navData) {
   return returns;
 }
 
-// Volatility: Annualized Std Dev of daily returns
+// Volatility: Annualized Std Dev of daily returns (sample variance with Bessel's correction)
 export function calculateVolatility(navData) {
   const returns = getDailyReturns(navData);
   if (returns.length < 30) return null;
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+  // Use (n-1) for sample variance — statistically correct
+  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (returns.length - 1);
   return Math.sqrt(variance) * Math.sqrt(252) * 100;
 }
 
@@ -164,7 +186,7 @@ export function getSmartTags(metrics) {
   return tags;
 }
 
-// Historical SIP with XIRR approximation using binary search
+// Historical SIP — O(n log n) with binary search (was O(n²))
 export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   if (!navData || navData.length === 0) return null;
   const latestNav = parseFloat(navData[0].nav);
@@ -174,18 +196,19 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   const oldestDate = parseDate(navData[navData.length - 1].date);
   if (oldestDate > targetStartDate) return null;
 
+  // Pre-sort ascending once — O(n log n)
+  const sorted = buildSortedNav(navData);
+
   let totalInvested = 0, totalUnits = 0;
   const n = years * 12;
 
   for (let m = 0; m < n; m++) {
     const sipDate = new Date(latestDate);
     sipDate.setMonth(sipDate.getMonth() - m);
-    let closestNav = null, minDiff = Infinity;
-    for (const d of navData) {
-      const date = parseDate(d.date);
-      const diff = Math.abs(date - sipDate);
-      if (diff < minDiff) { minDiff = diff; closestNav = parseFloat(d.nav); }
-    }
+    const targetTs = sipDate.getTime();
+    // Binary search — O(log n) per iteration instead of O(n)
+    const idx = binarySearchClosest(sorted, targetTs);
+    const closestNav = sorted[idx]?.nav;
     if (closestNav) { totalInvested += monthlyAmount; totalUnits += monthlyAmount / closestNav; }
   }
 

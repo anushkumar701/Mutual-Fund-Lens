@@ -407,6 +407,15 @@ export default function Compare() {
 
   // Load funds from compareList
   const errorTimerRef = useRef(null);
+  const loadingCodesRef = useRef(new Set());
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
 
   const showError = (msg) => {
     setFetchError(msg);
@@ -415,30 +424,42 @@ export default function Compare() {
   };
 
   const loadFund = useCallback(async (code) => {
-    if (fundData.find((f) => f.schemeCode === code)) return;
-    setLoadingCode(code);
+    const codeStr = String(code);
+    if (fundData.find((f) => f.schemeCode === codeStr) || loadingCodesRef.current.has(codeStr)) return;
+
+    loadingCodesRef.current.add(codeStr);
+    setLoadingCode(codeStr);
     setFetchError('');
     let timerId = setTimeout(() => {
       toast('Fetching live data, please hold on...', 'info', 4000);
     }, 5000);
     try {
-      const data = await fetchFundDetail(code);
-      setFundData((prev) => [
-        ...prev.filter((f) => f.schemeCode !== code),
-        { schemeCode: code, meta: data.meta, navData: data.data },
-      ]);
+      const data = await fetchFundDetail(codeStr);
+      if (!isMountedRef.current) return;
+
+      setFundData((prev) => {
+        const nextFund = { schemeCode: codeStr, meta: data.meta, navData: data.data };
+        return prev.some((f) => f.schemeCode === codeStr)
+          ? prev.map((f) => (f.schemeCode === codeStr ? nextFund : f))
+          : [...prev, nextFund];
+      });
       setRecentList((prev) => {
-        const list = prev.filter((c) => c !== code);
-        return [code, ...list].slice(0, 6);
+        const list = prev.filter((c) => c !== codeStr);
+        return [codeStr, ...list].slice(0, 6);
       });
       setFetchError(''); // clear error on success
     } catch {
-      showError(`Scheme code "${code}" not found. Enter numeric codes only (e.g. 122639).`);
+      if (isMountedRef.current) {
+        showError(`Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`);
+      }
     } finally {
       clearTimeout(timerId);
-      setLoadingCode(null);
+      loadingCodesRef.current.delete(codeStr);
+      if (isMountedRef.current) {
+        setLoadingCode(null);
+      }
     }
-  }, [fundData, toast]);
+  }, [fundData, toast, setRecentList]);
 
   // Load from URL param
   useEffect(() => {
@@ -464,7 +485,7 @@ export default function Compare() {
         loadFund(code);
       }
     });
-  }, [compareList]);
+  }, [compareList, fundData, loadFund]);
 
   const handleAddCode = (code) => {
     if (compareList.length >= 4) {

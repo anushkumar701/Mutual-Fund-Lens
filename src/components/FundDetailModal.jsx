@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { fetchFundDetail } from '../hooks/useFunds';
 
 function fmt(n) {
   if (!n || isNaN(n)) return '—';
@@ -42,11 +43,13 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const isCmp = compareList.map(String).includes(codeStr);
 
   useEffect(() => {
-    setLoading(true); setError(false);
-    fetch(`https://api.mfapi.in/mf/${schemeCode}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
+    let mounted = true;
+    setLoading(true);
+    setError(false);
+    fetchFundDetail(schemeCode)
+      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
+      .catch(() => { if (mounted) { setError(true); setLoading(false); } });
+    return () => { mounted = false; };
   }, [schemeCode]);
 
   const toggleWL = () => setWatchlist(p => p.map(String).includes(codeStr) ? p.filter(c => String(c) !== codeStr) : [...p, codeStr]);
