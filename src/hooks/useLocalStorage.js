@@ -1,5 +1,5 @@
 // hooks/useLocalStorage.js
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -10,6 +10,17 @@ export function useLocalStorage(key, initialValue) {
       return initialValue;
     }
   });
+
+  // Sync across browser tabs
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === key && e.newValue !== null) {
+        try { setStoredValue(JSON.parse(e.newValue)); } catch {}
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [key]);
 
   const setValue = (value) => {
     try {
