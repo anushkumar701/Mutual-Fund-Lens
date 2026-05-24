@@ -1,7 +1,6 @@
 // components/SIPSlider.jsx
 import { useState } from 'react';
 
-// eslint-disable-next-line react/prop-types
 export default function SIPSlider({
   id, label, value, onChange, min, max, step = 1, prefix = '', suffix = '', formatFn,
 }) {

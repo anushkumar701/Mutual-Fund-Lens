@@ -115,15 +115,21 @@ export function calculateSharpeRatio(annualReturn, volatility, riskFreeRate = 6.
 
 /**
  * Sortino Ratio = (Annual Return - Risk Free Rate) / Downside Deviation
- * Only penalizes negative returns (downside risk)
+ * Downside deviation uses ALL returns in denominator (not just negative ones),
+ * and measures deviations below zero (MAR = 0), as per standard finance practice.
  */
 export function calculateSortinoRatio(navData, annualReturn, riskFreeRate = 6.5) {
   if (!navData || annualReturn === null) return null;
   const returns = getDailyReturns(navData);
   if (returns.length < 30) return null;
-  const downsideReturns = returns.filter(r => r < 0);
-  if (downsideReturns.length === 0) return null;
-  const downsideVariance = downsideReturns.reduce((a, b) => a + b * b, 0) / downsideReturns.length;
+  // Minimum Acceptable Return (MAR) per day — using 0 (no loss tolerance)
+  const MAR = 0;
+  // Sum of squared deviations below MAR, divided by TOTAL observations (not just downside days)
+  const downsideVariance = returns.reduce((acc, r) => {
+    const below = Math.min(r - MAR, 0);
+    return acc + below * below;
+  }, 0) / returns.length;
+  if (downsideVariance === 0) return null;
   const downsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(252) * 100;
   if (downsideDeviation === 0) return null;
   return parseFloat(((annualReturn - riskFreeRate) / downsideDeviation).toFixed(2));
@@ -236,7 +242,16 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
     if (!isFinite(xirr) || xirr < -50 || xirr > 200) xirr = null;
   } catch { xirr = null; }
 
-  return { invested: totalInvested, currentValue, profit, absoluteReturn, xirr };
+  return {
+    invested: totalInvested,
+    currentValue,
+    profit,
+    absoluteReturn,
+    // Note: xirr is an approximation using the annuity formula, not a true XIRR
+    // (which would require solving NPV = 0 with actual dated cashflows).
+    // Labelled as "est. XIRR" in UI to be transparent.
+    xirr,
+  };
 }
 
 // Best and Worst Month Tracking

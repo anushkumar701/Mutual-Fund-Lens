@@ -2,10 +2,28 @@
 import { Component } from 'react';
 
 export default class ErrorBoundary extends Component {
-  state = { hasError: false, error: null };
+  state = { hasError: false, error: null, eventId: null };
 
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    // Log to console for local debugging
+    console.error('[ErrorBoundary] Uncaught React error:', error, errorInfo);
+
+    // Log to Sentry if available (loaded asynchronously in main.jsx)
+    try {
+      import('@sentry/react').then((Sentry) => {
+        const eventId = Sentry.captureException(error, {
+          extra: {
+            componentStack: errorInfo?.componentStack,
+            errorBoundary: this.constructor.name,
+          },
+        });
+        this.setState({ eventId });
+      }).catch(() => {/* Sentry not configured — safe to ignore */});
+    } catch {/* no-op */}
   }
 
   render() {
@@ -18,13 +36,24 @@ export default class ErrorBoundary extends Component {
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto">
               An unexpected error occurred. Please reload the page to continue.
             </p>
+            {this.state.eventId && (
+              <p className="text-xs text-slate-400 mt-2">Error ID: {this.state.eventId}</p>
+            )}
           </div>
-          <button
-            className="btn-primary px-6 py-3"
-            onClick={() => window.location.reload()}
-          >
-            🔄 Reload App
-          </button>
+          <div className="flex gap-3">
+            <button
+              className="btn-primary px-6 py-3"
+              onClick={() => window.location.reload()}
+            >
+              🔄 Reload App
+            </button>
+            <button
+              className="btn-secondary px-6 py-3"
+              onClick={() => this.setState({ hasError: false, error: null, eventId: null })}
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       );
     }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -141,6 +141,9 @@ export default function Screener() {
   const [page, setPage] = useState(48);
 
   const clearAll = () => { setSearch(''); setCat('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All AMCs'); setShowClosed(false); };
+
+  // Reset pagination whenever filters change so users always start at page 1 of results
+  useEffect(() => { setPage(48); }, [debouncedSearch, cat, plan, risk, erMax, amc, showClosed, tab]);
 
 
   const topAMCs = useMemo(() => {

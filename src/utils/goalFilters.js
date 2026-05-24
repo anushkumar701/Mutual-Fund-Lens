@@ -41,11 +41,21 @@ export function getGoalForFund(fund) {
  */
 export function inferCategory(schemeName) {
   const name = (schemeName || '').toLowerCase();
+  // Order matters: more specific categories checked first to prevent misclassification
   if (name.includes('elss') || name.includes('tax saver') || name.includes('tax saving')) return 'ELSS';
   if (name.includes('liquid') || name.includes('overnight') || name.includes('money market')) return 'Liquid';
   if (name.includes('index') || name.includes('nifty') || name.includes('sensex') || name.includes('bse') || name.includes('nse')) return 'Index';
+  // Hybrid MUST come before Debt/Equity — funds like "HDFC Equity & Debt Fund" would otherwise misclassify as Debt
+  if (
+    name.includes('hybrid') ||
+    name.includes('balanced') ||
+    name.includes('arbitrage') ||
+    name.includes('equity savings') ||
+    name.includes('equity and debt') ||
+    name.includes('equity & debt') ||
+    name.includes('multi asset')
+  ) return 'Hybrid';
   if (name.includes('debt') || name.includes('bond') || name.includes('gilt') || name.includes('credit') || name.includes('income') || name.includes('corporate')) return 'Debt';
-  if (name.includes('hybrid') || name.includes('balanced') || name.includes('arbitrage') || name.includes('equity savings')) return 'Hybrid';
   if (name.includes('equity') || name.includes('growth') || name.includes('flexi') || name.includes('large cap') || name.includes('mid cap') || name.includes('small cap') || name.includes('multi cap') || name.includes('bluechip')) return 'Equity';
   return 'Other';
 }
