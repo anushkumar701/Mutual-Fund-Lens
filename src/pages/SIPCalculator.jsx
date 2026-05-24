@@ -61,6 +61,7 @@ export default function SIPCalculator() {
   const [fireInflation, setFireInflation] = useState(6);
 
   const effectiveReturn = Math.max(0, returns - expenseRatio);
+  const effectiveReturnWarning = expenseRatio > 0 && effectiveReturn === 0;
 
   const result = useMemo(() => {
     if (isLumpsum) return calculateLumpsum(amount, years, effectiveReturn);
@@ -212,9 +213,17 @@ export default function SIPCalculator() {
                 suffix="%"
               />
               {expenseRatio > 0 && (
-                <div className="flex items-center justify-between text-xs bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                  <span className="text-amber-700 dark:text-amber-300">⚠️ Effective Return</span>
-                  <span className="font-bold text-amber-700 dark:text-amber-300">{returns}% − {expenseRatio}% = <strong>{effectiveReturn.toFixed(2)}%</strong> p.a.</span>
+                <div className={`flex items-center justify-between text-xs rounded-lg px-3 py-2 ${
+                  effectiveReturnWarning
+                    ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'
+                    : 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800'
+                }`}>
+                  <span className={effectiveReturnWarning ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}>
+                    {effectiveReturnWarning ? '🚫 Expense ratio cancels all returns!' : '⚠️ Effective Return'}
+                  </span>
+                  <span className={`font-bold ${effectiveReturnWarning ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                    {returns}% − {expenseRatio}% = <strong>{effectiveReturn.toFixed(2)}%</strong> p.a.
+                  </span>
                 </div>
               )}
               {!isLumpsum && (
@@ -535,6 +544,7 @@ export default function SIPCalculator() {
         {/* ─ FIRE CALCULATOR ─ */}
         {pageTab === 'fire' && (() => {
           const yearsToFire = Math.max(1, fireRetireAge - fireCurrentAge);
+          const ageError = fireRetireAge <= fireCurrentAge;
           const futureMonthlyExpense = fireMonthlyExpense * Math.pow(1 + fireInflation / 100, yearsToFire);
           const futureAnnualExpense = futureMonthlyExpense * 12;
           const fireCorpus = futureAnnualExpense / (fireWithdrawalRate / 100);
@@ -547,6 +557,11 @@ export default function SIPCalculator() {
           const fmt = v => v >= 10000000 ? `₹${(v/10000000).toFixed(2)} Cr` : v >= 100000 ? `₹${(v/100000).toFixed(1)} L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
           return (
             <div className="space-y-6">
+              {ageError && (
+                <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-300 font-semibold">
+                  ⚠️ Target retire age must be greater than your current age.
+                </div>
+              )}
               <div className="card p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 border-orange-200 dark:border-orange-800">
                 <h2 className="font-bold text-orange-700 dark:text-orange-300 mb-1">🔥 What is FIRE?</h2>
                 <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed"><strong>Financial Independence, Retire Early.</strong> Build a corpus so large that investment returns alone cover all expenses — forever. Classic rule: save 25× your annual expenses (4% withdrawal rate).</p>

@@ -1,5 +1,5 @@
 // components/FundDetailModal.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail } from '../hooks/useFunds';
@@ -52,6 +52,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const [error, setError] = useState(false);
   const [watchlist, setWatchlist] = useLocalStorage('fundlens_watchlist', []);
   const [compareList, setCompareList] = useLocalStorage('fundlens_compare', []);
+  const modalRef = useRef(null);
 
   const codeStr = String(schemeCode);
   const isWL = watchlist.map(String).includes(codeStr);
@@ -67,11 +68,39 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
     return () => { mounted = false; };
   }, [schemeCode]);
 
-  // Keyboard: close on Escape
+  // Lock body scroll while modal is open
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Keyboard: close on Escape + focus trap
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab') return;
+      const modal = modalRef.current;
+      if (!modal) return;
+      const focusable = Array.from(modal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    // Move focus into modal on open
+    const firstFocusable = modalRef.current?.querySelector(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    );
+    firstFocusable?.focus();
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
   const toggleWL = () => setWatchlist(p => p.map(String).includes(codeStr) ? p.filter(c => String(c) !== codeStr) : [...p, codeStr]);
@@ -80,23 +109,30 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const nav = data?.data;
   const meta = data?.meta;
   const latestNAV = nav?.[0];
-  const returns = nav ? {
-    '1M': calcReturn(nav, 30),
-    '3M': calcReturn(nav, 90),
-    '6M': calcReturn(nav, 180),
-    '1Y': calcReturn(nav, 365),
-    '3Y': calcReturn(nav, 1095),
-    '5Y': calcReturn(nav, 1825),
-  } : {};
+
+  const returns = useMemo(() => {
+    if (!nav || nav.length === 0) return {};
+    const sorted = buildSortedForModal(nav);
+    const latestNavVal = parseFloat(latestNAV?.nav || 0);
+    const latestTs = parseNavDate(latestNAV?.date);
+    return {
+      '1M': calcReturn(sorted, latestNavVal, latestTs, 30),
+      '3M': calcReturn(sorted, latestNavVal, latestTs, 90),
+      '6M': calcReturn(sorted, latestNavVal, latestTs, 180),
+      '1Y': calcReturn(sorted, latestNavVal, latestTs, 365),
+      '3Y': calcReturn(sorted, latestNavVal, latestTs, 1095),
+      '5Y': calcReturn(sorted, latestNavVal, latestTs, 1825),
+    };
+  }, [nav, latestNAV]);
 
   // Fund age in years
   const fundAge = nav && nav.length > 1 ? (() => {
-    const parseD = s => { const [dd,mm,yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
-    const oldest = parseD(nav[nav.length - 1].date);
-    const latest = parseD(nav[0].date);
-    return ((latest - oldest) / (1000*60*60*24*365)).toFixed(1);
+    const oldest = parseNavDate(nav[nav.length - 1].date);
+    const latest = parseNavDate(nav[0].date);
+    return ((latest - oldest) / (1000*60*60*24*365.25)).toFixed(1);
   })() : null;
 
+  return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
@@ -107,7 +143,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true"/>
 
       {/* Modal */}
-      <div className="relative w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl">
+      <div ref={modalRef} className="relative w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-start justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">

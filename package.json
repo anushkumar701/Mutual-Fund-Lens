@@ -4,22 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "remix vite:dev",
-    "build": "remix vite:build",
-    "start": "remix-serve ./build/server/index.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run"
   },
   "dependencies": {
-    "@remix-run/node": "^2.17.4",
-    "@remix-run/react": "^2.17.4",
-    "@remix-run/serve": "^2.17.4",
     "@sentry/react": "^10.53.1",
-    "@sentry/replay": "^7.116.0",
     "axios": "^1.16.0",
     "html2canvas": "^1.4.1",
     "idb-keyval": "^6.2.2",
-    "isbot": "^5.1.40",
     "lucide-react": "^1.14.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -28,7 +23,7 @@
     "vite-tsconfig-paths": "^6.1.1"
   },
   "devDependencies": {
-    "@remix-run/dev": "^2.17.4",
+    "@vitejs/plugin-react": "^4.3.4",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitest/ui": "^4.1.7",
@@ -40,7 +35,6 @@
     "happy-dom": "^20.9.0",
     "netlify-cli": "^26.0.2",
     "postcss": "^8.5.14",
-    "puppeteer": "^25.0.4",
     "tailwindcss": "^3.4.19",
     "vite": "^5.4.0",
     "vitest": "^4.1.7"

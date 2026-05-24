@@ -1,5 +1,5 @@
 // pages/Compare.jsx
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine
@@ -7,6 +7,7 @@ import {
 import { useToast } from '../components/Toast';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail, useFunds } from '../hooks/useFunds';
+import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { estimateER } from '../utils/fundFilters';
@@ -152,12 +153,18 @@ export default function Compare() {
     // Otherwise rely on dropdown selection
   };
 
-  const filteredSearch = funds
-    ? funds.filter((f) => 
-        f.schemeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        f.schemeCode.toString().includes(searchQuery)
-      ).slice(0, 10)
-    : [];
+  const debouncedSearchQuery = useDebounce(searchQuery, 250);
+
+  const filteredSearch = useMemo(() => {
+    if (!debouncedSearchQuery.trim() || !funds) return [];
+    const q = debouncedSearchQuery.toLowerCase();
+    return funds
+      .filter((f) =>
+        f.schemeName.toLowerCase().includes(q) ||
+        f.schemeCode.toString().includes(debouncedSearchQuery)
+      )
+      .slice(0, 10);
+  }, [debouncedSearchQuery, funds]);
 
   const removeFund = (code) => {
     setCompareList((prev) => prev.filter((c) => c !== code));
@@ -196,13 +203,16 @@ export default function Compare() {
     });
   };
 
-  let chartData = buildChartData(fundData, range);
-  // Downsample to monthly data for long ranges to make the chart lines smooth and clean
-  if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
-    chartData = toMonthlyData(chartData);
-  }
+  const chartData = useMemo(() => {
+    let data = buildChartData(fundData, range);
+    if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
+      data = toMonthlyData(data);
+    }
+    return data;
+  }, [fundData, range]);
+
   // Annual calendar-year returns for each fund
-  const annualReturns = (() => {
+  const annualReturns = useMemo(() => {
     if (fundData.length === 0) return { years: [], data: {} };
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -240,27 +250,30 @@ export default function Compare() {
     });
     const validYears = allYears.filter(y => Object.keys(data[y] || {}).length > 0);
     return { years: validYears, data };
-  })();
+  }, [fundData]);
 
   // Overlap matrix for ALL fund pairs
-  const overlapMatrix = [];
-  if (fundData.length >= 2) {
-    for (let i = 0; i < fundData.length; i++) {
-      for (let j = i + 1; j < fundData.length; j++) {
-        const corr = calculateCorrelation(fundData[i].navData, fundData[j].navData);
-        if (corr !== null) {
-          const score = Math.max(0, corr * 100);
-          overlapMatrix.push({
-            a: fundData[i].meta?.scheme_name || `Fund ${i + 1}`,
-            b: fundData[j].meta?.scheme_name || `Fund ${j + 1}`,
-            score,
-            quality: score > 80 ? 'High Overlap' : score > 50 ? 'Medium Overlap' : 'Low Overlap ✓',
-            color: score > 80 ? 'text-red-500' : score > 50 ? 'text-amber-500' : 'text-emerald-500',
-          });
+  const overlapMatrix = useMemo(() => {
+    const matrix = [];
+    if (fundData.length >= 2) {
+      for (let i = 0; i < fundData.length; i++) {
+        for (let j = i + 1; j < fundData.length; j++) {
+          const corr = calculateCorrelation(fundData[i].navData, fundData[j].navData);
+          if (corr !== null) {
+            const score = Math.max(0, corr * 100);
+            matrix.push({
+              a: fundData[i].meta?.scheme_name || `Fund ${i + 1}`,
+              b: fundData[j].meta?.scheme_name || `Fund ${j + 1}`,
+              score,
+              quality: score > 80 ? 'High Overlap' : score > 50 ? 'Medium Overlap' : 'Low Overlap ✓',
+              color: score > 80 ? 'text-red-500' : score > 50 ? 'text-amber-500' : 'text-emerald-500',
+            });
+          }
         }
       }
     }
-  }
+    return matrix;
+  }, [fundData]);
 
   // Dynamic time ranges based on minimum fund age
   const minFundAge = fundData.length > 0
@@ -297,15 +310,102 @@ export default function Compare() {
   const sipYearOptions = [1, 3, 5, 7, 10, 15, 20].filter(y => y <= maxSipYears);
   if (sipYearOptions.length === 0) sipYearOptions.push(1);
 
+  // Memoize SIP and Lumpsum calculations for all compared funds
+  const sipResults = useMemo(() => {
+    return fundData.map(fund => {
+      if (!fund.navData || fund.navData.length === 0) return null;
+      if (sipMode === 'sip') {
+        return calculateHistoricalSIP(fund.navData, sipAmount, sipYears);
+      } else {
+        // Lumpsum calculation using actual NAV data (binary search)
+        const parseD = s => { const [dd,mm,yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
+        const latestNav = parseFloat(fund.navData[0].nav);
+        const latestDate = parseD(fund.navData[0].date);
+        const startDate = new Date(latestDate);
+        startDate.setFullYear(startDate.getFullYear() - sipYears);
+        const oldest = parseD(fund.navData[fund.navData.length - 1].date);
+        if (oldest > startDate) return null;
+
+        // Binary search is much faster than loop
+        const sorted = [...fund.navData].reverse()
+          .map(d => ({ ts: parseD(d.date).getTime(), nav: parseFloat(d.nav) }))
+          .filter(d => !isNaN(d.ts) && isFinite(d.nav));
+        if (sorted.length === 0) return null;
+
+        const targetTs = startDate.getTime();
+        let lo = 0, hi = sorted.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (sorted[mid].ts < targetTs) lo = mid + 1;
+          else hi = mid;
+        }
+        if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+          lo = lo - 1;
+        }
+        const startNav = sorted[lo]?.nav;
+        if (!startNav || startNav <= 0) return null;
+
+        const units = sipAmount / startNav;
+        const currentValue = units * latestNav;
+        const profit = currentValue - sipAmount;
+        const absoluteReturn = (profit / sipAmount) * 100;
+        const xirr = parseFloat(((Math.pow(currentValue / sipAmount, 1 / sipYears) - 1) * 100).toFixed(2));
+        return { invested: sipAmount, currentValue, profit, absoluteReturn, xirr };
+      }
+    });
+  }, [fundData, sipMode, sipAmount, sipYears]);
+
   // Calculate the most recent NAV date across all loaded funds
-  const lastRefreshedDate = fundData.length > 0 
-    ? fundData.reduce((latest, f) => {
-        if (!f.navData || f.navData.length === 0) return latest;
-        const [dd, mm, yyyy] = f.navData[0].date.split('-');
-        const current = new Date(`${yyyy}-${mm}-${dd}`);
-        return current > latest ? current : latest;
-      }, new Date('2000-01-01')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    : null;
+  const lastRefreshedDate = useMemo(() => {
+    if (fundData.length === 0) return null;
+    const latest = fundData.reduce((latest, f) => {
+      if (!f.navData || f.navData.length === 0) return latest;
+      const [dd, mm, yyyy] = f.navData[0].date.split('-');
+      const current = new Date(`${yyyy}-${mm}-${dd}`);
+      return current > latest ? current : latest;
+    }, new Date('2000-01-01'));
+    return latest.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, [fundData]);
+
+  // Memoize multi-factor verdict analysis calculations
+  const verdictData = useMemo(() => {
+    if (fundData.length < 2) return null;
+    
+    // Calculate stats for all funds
+    const fundStats = fundData.map(f => {
+      const m = calculateFundMetrics(f.navData);
+      const bw = calculateBestWorstMonth(f.navData);
+      const latest = parseFloat(f.navData[0].nav);
+      let perf6m = -Infinity;
+      if (f.navData.length > 126) {
+        perf6m = ((latest - parseFloat(f.navData[125].nav)) / parseFloat(f.navData[125].nav)) * 100;
+      }
+      return { f, m, bw, perf6m };
+    });
+
+    // Find winners
+    const momentumWinner = [...fundStats].sort((a, b) => b.perf6m - a.perf6m)[0];
+    const lowestRisk = [...fundStats].filter(x => x.m).sort((a, b) => a.m.maxDrawdown - b.m.maxDrawdown)[0];
+
+    // Verdict Logic
+    let verdictFund = fundStats[0];
+    let highestScore = -Infinity;
+    fundStats.forEach(stat => {
+      if (!stat.m) return;
+      let score = 0;
+      if (stat.m.return3Y) score += stat.m.return3Y * 2;
+      if (stat.m.return5Y) score += stat.m.return5Y * 1.5;
+      if (stat.m.sharpe) score += stat.m.sharpe * 10;
+      score -= stat.m.maxDrawdown; // penalize risk
+
+      if (score > highestScore) {
+        highestScore = score;
+        verdictFund = stat;
+      }
+    });
+
+    return { fundStats, momentumWinner, lowestRisk, verdictFund };
+  }, [fundData]);
 
   return (
     <div className="min-h-screen pb-24 md:pb-8 md:pt-20 pt-16">
@@ -1012,31 +1112,7 @@ export default function Compare() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {fundData.map((fund, i) => {
-                  const sipResult = sipMode === 'sip'
-                    ? calculateHistoricalSIP(fund.navData, sipAmount, sipYears)
-                    : (() => {
-                        // Lumpsum calculation using actual NAV data
-                        if (!fund.navData || fund.navData.length === 0) return null;
-                        const parseD = s => { const [dd,mm,yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
-                        const latestNav = parseFloat(fund.navData[0].nav);
-                        const latestDate = parseD(fund.navData[0].date);
-                        const startDate = new Date(latestDate);
-                        startDate.setFullYear(startDate.getFullYear() - sipYears);
-                        const oldest = parseD(fund.navData[fund.navData.length - 1].date);
-                        if (oldest > startDate) return null;
-                        let startNav = null, minDiff = Infinity;
-                        for (const d of fund.navData) {
-                          const diff = Math.abs(parseD(d.date) - startDate);
-                          if (diff < minDiff) { minDiff = diff; startNav = parseFloat(d.nav); }
-                        }
-                        if (!startNav) return null;
-                        const units = sipAmount / startNav;
-                        const currentValue = units * latestNav;
-                        const profit = currentValue - sipAmount;
-                        const absoluteReturn = (profit / sipAmount) * 100;
-                        const xirr = parseFloat(((Math.pow(currentValue / sipAmount, 1 / sipYears) - 1) * 100).toFixed(2));
-                        return { invested: sipAmount, currentValue, profit, absoluteReturn, xirr };
-                      })();
+                  const sipResult = sipResults[i];
 
                   const codeStr = String(fund.schemeCode);
                   const defaultTER = estimateER(fund.meta?.scheme_name);
@@ -1164,126 +1240,87 @@ export default function Compare() {
         )}
 
         {/* Best Fund Verdict (Our Analysis) */}
-        {fundData.length >= 2 && (
+        {fundData.length >= 2 && verdictData && (
           <div className="mt-12 mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-6">
               <span className="text-2xl">🤖</span>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Our Analysis</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(() => {
-                // Calculate metrics for all funds
-                const fundStats = fundData.map(f => {
-                  const m = calculateFundMetrics(f.navData);
-                  const bw = calculateBestWorstMonth(f.navData);
-                  const latest = parseFloat(f.navData[0].nav);
-                  let perf6m = -Infinity;
-                  if (f.navData.length > 126) {
-                    perf6m = ((latest - parseFloat(f.navData[125].nav)) / parseFloat(f.navData[125].nav)) * 100;
-                  }
-                  return { f, m, bw, perf6m };
-                });
+              <div className="card p-5 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border-indigo-200 dark:border-indigo-800 lg:col-span-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">🏆</span>
+                  <h3 className="font-bold text-indigo-900 dark:text-indigo-400">FundLens Verdict</h3>
+                </div>
+                <p className="font-semibold text-slate-900 dark:text-white text-lg mb-1 line-clamp-2">
+                  {verdictData.verdictFund.f.meta?.scheme_name}
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Based on our multi-factor analysis (Returns, Volatility, Sharpe Ratio, and Drawdowns), this fund provides the best risk-adjusted performance.
+                </p>
+              </div>
 
-                // Find winners
-                const momentumWinner = [...fundStats].sort((a, b) => b.perf6m - a.perf6m)[0];
-                const lowestRisk = [...fundStats].filter(x => x.m).sort((a, b) => a.m.maxDrawdown - b.m.maxDrawdown)[0];
-                
-                // Verdict Logic
-                let verdictFund = fundStats[0];
-                let highestScore = -Infinity;
-                fundStats.forEach(stat => {
-                  if (!stat.m) return;
-                  let score = 0;
-                  if (stat.m.return3Y) score += stat.m.return3Y * 2;
-                  if (stat.m.return5Y) score += stat.m.return5Y * 1.5;
-                  if (stat.m.sharpe) score += stat.m.sharpe * 10;
-                  score -= stat.m.maxDrawdown; // penalize risk
-                  
-                  if (score > highestScore) {
-                    highestScore = score;
-                    verdictFund = stat;
-                  }
-                });
+              <div className="card p-5 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">🚀</span>
+                  <h3 className="font-bold text-emerald-900 dark:text-emerald-400">High Momentum</h3>
+                </div>
+                <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{verdictData.momentumWinner.f.meta?.scheme_name}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Strongest recent growth (<span className="font-bold tabular-nums">{verdictData.momentumWinner.perf6m.toFixed(1)}%</span> in 6M).</p>
+              </div>
 
-                return (
-                  <>
-                    <div className="card p-5 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border-indigo-200 dark:border-indigo-800 lg:col-span-2">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">🏆</span>
-                        <h3 className="font-bold text-indigo-900 dark:text-indigo-400">FundLens Verdict</h3>
-                      </div>
-                      <p className="font-semibold text-slate-900 dark:text-white text-lg mb-1 line-clamp-2">
-                        {verdictFund.f.meta?.scheme_name}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Based on our multi-factor analysis (Returns, Volatility, Sharpe Ratio, and Drawdowns), this fund provides the best risk-adjusted performance.
-                      </p>
-                    </div>
+              <div className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">🛡️</span>
+                  <h3 className="font-bold text-amber-900 dark:text-amber-400">Capital Protection</h3>
+                </div>
+                <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{verdictData.lowestRisk?.f.meta?.scheme_name || 'N/A'}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Lowest historical maximum drawdown (<span className="font-bold tabular-nums">{verdictData.lowestRisk?.m?.maxDrawdown.toFixed(1)}%</span>).</p>
+              </div>
 
-                    <div className="card p-5 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">🚀</span>
-                        <h3 className="font-bold text-emerald-900 dark:text-emerald-400">High Momentum</h3>
-                      </div>
-                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{momentumWinner.f.meta?.scheme_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Strongest recent growth (<span className="font-bold tabular-nums">{momentumWinner.perf6m.toFixed(1)}%</span> in 6M).</p>
-                    </div>
-
-                    <div className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">🛡️</span>
-                        <h3 className="font-bold text-amber-900 dark:text-amber-400">Capital Protection</h3>
-                      </div>
-                      <p className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-2">{lowestRisk?.f.meta?.scheme_name || 'N/A'}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Lowest historical maximum drawdown (<span className="font-bold tabular-nums">{lowestRisk?.m?.maxDrawdown.toFixed(1)}%</span>).</p>
-                    </div>
-
-                    {/* Best/Worst Month Tracking table */}
-                    <div className="card p-5 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700 lg:col-span-4 mt-2">
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-xl">📊</span>
-                        <h3 className="font-bold text-slate-900 dark:text-white">Stress Test: Best & Worst Months</h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="text-xs text-slate-500 uppercase bg-slate-100 dark:bg-slate-800 rounded">
-                            <tr>
-                              <th className="px-4 py-2 font-semibold">Fund</th>
-                              <th className="px-4 py-2 font-semibold text-emerald-600 dark:text-emerald-400">Best Month</th>
-                              <th className="px-4 py-2 font-semibold text-red-600 dark:text-red-400">Worst Month</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                            {fundStats.map((stat, i) => (
-                              <tr key={stat.f.schemeCode} className="hover:bg-white dark:hover:bg-slate-800/40">
-                                <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                                  {stat.f.meta?.scheme_name?.split(' ').slice(0, 5).join(' ')}
-                                </td>
-                                <td className="px-4 py-3 tabular-nums">
-                                  {stat.bw && stat.bw.best ? (
-                                    <div className="flex flex-col">
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{stat.bw.best.returnPct.toFixed(2)}%</span>
-                                      <span className="text-[10px] text-slate-400">{stat.bw.best.month}</span>
-                                    </div>
-                                  ) : '—'}
-                                </td>
-                                <td className="px-4 py-3 tabular-nums">
-                                  {stat.bw && stat.bw.worst ? (
-                                    <div className="flex flex-col">
-                                      <span className="text-red-600 dark:text-red-400 font-bold">{stat.bw.worst.returnPct.toFixed(2)}%</span>
-                                      <span className="text-[10px] text-slate-400">{stat.bw.worst.month}</span>
-                                    </div>
-                                  ) : '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
+              {/* Best/Worst Month Tracking table */}
+              <div className="card p-5 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700 lg:col-span-4 mt-2">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">📊</span>
+                  <h3 className="font-bold text-slate-900 dark:text-white">Stress Test: Best & Worst Months</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-100 dark:bg-slate-800 rounded">
+                      <tr>
+                        <th className="px-4 py-2 font-semibold">Fund</th>
+                        <th className="px-4 py-2 font-semibold text-emerald-600 dark:text-emerald-400">Best Month</th>
+                        <th className="px-4 py-2 font-semibold text-red-600 dark:text-red-400">Worst Month</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {verdictData.fundStats.map((stat, i) => (
+                        <tr key={stat.f.schemeCode} className="hover:bg-white dark:hover:bg-slate-800/40">
+                          <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                            {stat.f.meta?.scheme_name?.split(' ').slice(0, 5).join(' ')}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums">
+                            {stat.bw && stat.bw.best ? (
+                              <div className="flex flex-col">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{stat.bw.best.returnPct.toFixed(2)}%</span>
+                                <span className="text-[10px] text-slate-400">{stat.bw.best.month}</span>
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums">
+                            {stat.bw && stat.bw.worst ? (
+                              <div className="flex flex-col">
+                                <span className="text-red-600 dark:text-red-400 font-bold">{stat.bw.worst.returnPct.toFixed(2)}%</span>
+                                <span className="text-[10px] text-slate-400">{stat.bw.worst.month}</span>
+                              </div>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
             <div className="mt-6 bg-slate-100 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
               <p className="text-xs text-slate-500 dark:text-slate-400 text-center uppercase tracking-wide font-medium">

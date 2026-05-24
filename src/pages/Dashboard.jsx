@@ -1,11 +1,12 @@
 // pages/Dashboard.jsx
 // Future-proof: modular sections, easy to extend
-import { useState, useMemo, useRef, useEffect, lazy } from 'react';
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useDebounce } from '../hooks/useDebounce';
 import ErrorState from '../components/ErrorState';
+import { calculateSIP } from '../utils/sipCalculations';
 const FundDetailModal = lazy(() => import('../components/FundDetailModal'));
 import { inferCategory } from '../utils/goalFilters';
 import { isFundClosed } from '../utils/fundFilters';
@@ -75,6 +76,12 @@ function FundSearchBox({ funds, onSelectFund }) {
       </p>
 
       {/* Dropdown results */}
+      {/* Announce result count to screen readers */}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {open && results.length > 0 ? `${results.length} funds found` :
+         open && debouncedQuery.length >= 2 && results.length === 0 ? 'No funds found' : ''}
+      </span>
+
       {open && results.length > 0 && (
         <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 overflow-hidden">
           <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
@@ -130,8 +137,11 @@ function QuickCalc() {
   const [amt, setAmt] = useState(5000);
   const [yrs, setYrs] = useState(10);
   const [rate, setRate] = useState(12);
-  const mat = Math.round(amt * ((Math.pow(1 + rate / 100 / 12, yrs * 12) - 1) / (rate / 100 / 12)) * (1 + rate / 100 / 12));
-  const inv = amt * yrs * 12;
+  // Use canonical calculateSIP to prevent formula drift with the full SIP calculator
+  const { maturity: mat, invested: inv } = useMemo(
+    () => calculateSIP(amt, yrs, rate),
+    [amt, yrs, rate]
+  );
   const fmt = n => n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(1)} L` : `₹${n.toLocaleString('en-IN')}`;
   return (
     <div className="card p-5 h-full">
@@ -349,11 +359,17 @@ export default function Dashboard() {
 
       {/* ── Fund Detail Modal ── */}
       {modalFund && (
-        <FundDetailModal
-          schemeCode={modalFund.schemeCode}
-          schemeName={modalFund.schemeName}
-          onClose={() => setModalFund(null)}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
+          </div>
+        }>
+          <FundDetailModal
+            schemeCode={modalFund.schemeCode}
+            schemeName={modalFund.schemeName}
+            onClose={() => setModalFund(null)}
+          />
+        </Suspense>
       )}
     </div>
   );
