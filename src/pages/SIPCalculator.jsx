@@ -12,7 +12,7 @@ function ResultCard({ label, value, accent, sub }) {
     <div className={`card p-5 text-center ${accent ? 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950' : ''}`}>
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">{label}</p>
       <p className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{value}</p>
-      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -443,15 +443,15 @@ export default function SIPCalculator() {
               <div className="card p-8 text-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Monthly SIP Required</p>
                 <p className="text-5xl font-black text-blue-600 dark:text-blue-400 tabular-nums">{formatINR(goalSIP)}</p>
-                <p className="text-xs text-slate-400 mt-2">per month for {goalYears} year{goalYears>1?'s':''} at {goalReturn}% p.a.</p>
+                <p className="text-xs text-slate-500 mt-2">per month for {goalYears} year{goalYears>1?'s':''} at {goalReturn}% p.a.</p>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="card p-4 text-center">
-                  <p className="text-xs text-slate-400 mb-1">Total Invested</p>
+                  <p className="text-xs text-slate-500 mb-1">Total Invested</p>
                   <p className="font-bold text-slate-900 dark:text-white">{formatINR(goalTotal)}</p>
                 </div>
                 <div className="card p-4 text-center">
-                  <p className="text-xs text-slate-400 mb-1">Gains</p>
+                  <p className="text-xs text-slate-500 mb-1">Gains</p>
                   <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(Math.max(0, goalTarget - goalTotal))}</p>
                 </div>
                 <div className="card p-4 text-center">
@@ -479,10 +479,12 @@ export default function SIPCalculator() {
               <SIPSlider id="elss-amount" label="Annual ELSS Investment" value={elssAmount} onChange={setElssAmount}
                 min={500} max={150000} step={500} prefix="₹" formatFn={(v) => formatINR(v)} />
               <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Your Tax Slab</p>
-                <div className="flex gap-2 flex-wrap">
+                <p id="tax-slab-label" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Your Tax Slab</p>
+                <div className="flex gap-2 flex-wrap" role="radiogroup" aria-labelledby="tax-slab-label">
                   {[5,10,15,20,25,30].map(slab => (
                     <button key={slab} onClick={() => setTaxSlab(slab)}
+                      role="radio"
+                      aria-checked={taxSlab===slab}
                       className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${taxSlab===slab ? 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900 dark:text-violet-200' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                       {slab}%
                     </button>
@@ -553,20 +555,20 @@ export default function SIPCalculator() {
                 <div className="card p-5 space-y-3">
                   <h3 className="font-bold text-slate-900 dark:text-white">Your FIRE Inputs</h3>
                   {[
-                    ['Monthly Expenses (₹)', fireMonthlyExpense, setFireMonthlyExpense, 5000, 500000, 1000],
-                    ['Current Age', fireCurrentAge, setFireCurrentAge, 18, 65, 1],
-                    ['Target Retire Age', fireRetireAge, setFireRetireAge, 25, 80, 1],
-                    ['Portfolio Return (%)', fireReturnRate, setFireReturnRate, 6, 25, 0.5],
-                    ['Withdrawal Rate (%)', fireWithdrawalRate, setFireWithdrawalRate, 2, 8, 0.5],
-                    ['Inflation Rate (%)', fireInflation, setFireInflation, 3, 12, 0.5],
-                    ['Current Corpus (₹)', fireCurrentCorpus, setFireCurrentCorpus, 0, 100000000, 10000],
-                  ].map(([label, val, setter, min, max, step]) => (
+                    ['Monthly Expenses (₹)', 'fire-monthly-expense', fireMonthlyExpense, setFireMonthlyExpense, 5000, 500000, 1000],
+                    ['Current Age', 'fire-current-age', fireCurrentAge, setFireCurrentAge, 18, 65, 1],
+                    ['Target Retire Age', 'fire-retire-age', fireRetireAge, setFireRetireAge, 25, 80, 1],
+                    ['Portfolio Return (%)', 'fire-return-rate', fireReturnRate, setFireReturnRate, 6, 25, 0.5],
+                    ['Withdrawal Rate (%)', 'fire-withdrawal-rate', fireWithdrawalRate, setFireWithdrawalRate, 2, 8, 0.5],
+                    ['Inflation Rate (%)', 'fire-inflation', fireInflation, setFireInflation, 3, 12, 0.5],
+                    ['Current Corpus (₹)', 'fire-corpus', fireCurrentCorpus, setFireCurrentCorpus, 0, 100000000, 10000],
+                  ].map(([label, id, val, setter, min, max, step]) => (
                     <div key={label}>
                       <div className="flex justify-between mb-1">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{label}</label>
+                        <label htmlFor={id} className="text-xs font-semibold text-slate-700 dark:text-slate-300">{label}</label>
                         <span className="text-xs font-bold text-orange-600 tabular-nums">{label.includes('₹') ? fmt(val) : `${val}${label.includes('%') ? '%' : ''}`}</span>
                       </div>
-                      <input type="range" min={min} max={max} step={step} value={val} onChange={e => setter(Number(e.target.value))} className="w-full accent-orange-500"/>
+                      <input id={id} type="range" min={min} max={max} step={step} value={val} onChange={e => setter(Number(e.target.value))} className="w-full accent-orange-500" aria-label={label}/>
                     </div>
                   ))}
                 </div>

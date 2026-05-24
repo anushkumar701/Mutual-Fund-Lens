@@ -5,9 +5,49 @@ import { get, set } from 'idb-keyval';
 
 const BASE_URL = 'https://api.mfapi.in/mf';
 let memoryCachedList = null;
+let activeListFetchPromise = null;
+const activeDetailFetchPromises = new Map();
 
 const FUND_LIST_CACHE_KEY = 'fundlens_all_funds_v2'; // v2 busts old forever-cached data
 const FUND_LIST_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// Capped Map to prevent memory leaks from long-lived tabs
+class CappedMap extends Map {
+  constructor(maxSize) {
+    super();
+    this.maxSize = maxSize;
+  }
+  set(key, value) {
+    super.set(key, value);
+    if (this.size > this.maxSize) {
+      const firstKey = this.keys().next().value;
+      this.delete(firstKey);
+    }
+    return this;
+  }
+}
+
+// Memory cache for individual details, capped at 50 entries
+const detailsMemoryCache = new CappedMap(50);
+
+// Retry with exponential backoff
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await axios.get(url, { ...options, timeout: 15000 });
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries && (!err.response || err.response.status >= 500)) {
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+      } else {
+        break;
+      }
+    }
+  }
+  throw lastError;
+}
 
 export function useFunds() {
   const [funds, setFunds] = useState([]);
@@ -24,6 +64,14 @@ export function useFunds() {
         setLoading(false);
         return;
       }
+
+      // Deduplicate active fetch requests
+      if (activeListFetchPromise) {
+        const data = await activeListFetchPromise;
+        setFunds(data);
+        setLoading(false);
+        return;
+      }
       
       // 2. Check IndexedDB cache — 24 hour expiry
       const idbCached = await get(FUND_LIST_CACHE_KEY);
@@ -32,24 +80,41 @@ export function useFunds() {
         memoryCachedList = idbCached.data;
         setFunds(idbCached.data);
         setLoading(false);
+        
         // Fire & forget background update if >12h old (keeps data fresh without blocking)
         if (now - idbCached.ts > FUND_LIST_TTL / 2) {
-          axios.get(BASE_URL, { timeout: 15000 }).then(res => {
-            memoryCachedList = res.data;
-            set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
-            setFunds(res.data);
-          }).catch(() => {});
+          if (!activeListFetchPromise) {
+            activeListFetchPromise = fetchWithRetry(BASE_URL).then(res => {
+              memoryCachedList = res.data;
+              set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
+              activeListFetchPromise = null;
+              return res.data;
+            }).catch(() => {
+              activeListFetchPromise = null;
+            });
+          }
         }
         return;
       }
 
-      // 3. Network fetch
-      const res = await axios.get(BASE_URL, { timeout: 15000 });
-      memoryCachedList = res.data;
-      set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
-      setFunds(res.data);
+      // 3. Network fetch with retry
+      activeListFetchPromise = fetchWithRetry(BASE_URL).then(res => {
+        memoryCachedList = res.data;
+        set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data: res.data });
+        activeListFetchPromise = null;
+        return res.data;
+      }).catch((err) => {
+        activeListFetchPromise = null;
+        throw err;
+      });
+
+      const data = await activeListFetchPromise;
+      setFunds(data);
     } catch (err) {
-      setError('Unable to load funds. Please try again.');
+      const isNetworkError = !err.response;
+      setError(isNetworkError
+        ? 'Unable to load funds — network issue. Please check your connection.'
+        : 'Unable to load funds from server. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -62,34 +127,45 @@ export function useFunds() {
   return { funds, loading, error, refetch: fetchFunds };
 }
 
-// Memory cache for individual details
-const detailsMemoryCache = new Map();
-
 export async function fetchFundDetail(schemeCode) {
+  const codeStr = String(schemeCode);
+
   // 1. Check Memory Cache
-  if (detailsMemoryCache.has(schemeCode)) {
-    return detailsMemoryCache.get(schemeCode);
+  if (detailsMemoryCache.has(codeStr)) {
+    return detailsMemoryCache.get(codeStr);
   }
 
-  // 2. Check IndexedDB
-  const idbKey = `fund_detail_${schemeCode}`;
-  const idbCached = await get(idbKey);
-  
-  // Cache valid for 12 hours
-  const now = Date.now();
-  if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
-    detailsMemoryCache.set(schemeCode, idbCached.data);
-    return idbCached.data;
+  // 2. Check ongoing fetch promise
+  if (activeDetailFetchPromises.has(codeStr)) {
+    return activeDetailFetchPromises.get(codeStr);
   }
 
-  // 3. Network Fetch
-  const res = await axios.get(`${BASE_URL}/${schemeCode}`, { timeout: 15000 });
-  const data = res.data;
-  
-  detailsMemoryCache.set(schemeCode, data);
-  set(idbKey, { timestamp: now, data });
-  
-  return data;
+  const promise = (async () => {
+    // 3. Check IndexedDB
+    const idbKey = `fund_detail_${codeStr}`;
+    const idbCached = await get(idbKey);
+    
+    // Cache valid for 12 hours
+    const now = Date.now();
+    if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
+      detailsMemoryCache.set(codeStr, idbCached.data);
+      activeDetailFetchPromises.delete(codeStr);
+      return idbCached.data;
+    }
+
+    // 4. Network Fetch with retry
+    const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
+    const data = res.data;
+    
+    detailsMemoryCache.set(codeStr, data);
+    set(idbKey, { timestamp: now, data });
+    activeDetailFetchPromises.delete(codeStr);
+    
+    return data;
+  })();
+
+  activeDetailFetchPromises.set(codeStr, promise);
+  return promise;
 }
 
 export async function prefetchTopFunds(fundCodes) {

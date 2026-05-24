@@ -1,390 +1,23 @@
 // pages/Compare.jsx
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { useToast } from '../components/Toast';
-import html2canvas from 'html2canvas';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail, useFunds } from '../hooks/useFunds';
-import ErrorState from '../components/ErrorState';
-import CategoryPill from '../components/CategoryPill';
-import { formatNAV, formatINR } from '../utils/formatCurrency';
-import { calculateFundMetrics, calculateHistoricalSIP, getSmartTags, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
-
-const CHART_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
-
-function getFundAgeYears(navData) {
-  if (!navData || navData.length === 0) return 0;
-  const [dd, mm, yyyy] = navData[navData.length - 1].date.split('-');
-  return (Date.now() - new Date(`${yyyy}-${mm}-${dd}`).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-}
-
-function filterByRange(data, range) {
-  const now = new Date();
-  const cutoff = new Date();
-  switch (range) {
-    case '1M':  cutoff.setMonth(now.getMonth() - 1); break;
-    case '3M':  cutoff.setMonth(now.getMonth() - 3); break;
-    case '6M':  cutoff.setMonth(now.getMonth() - 6); break;
-    case '1Y':  cutoff.setFullYear(now.getFullYear() - 1); break;
-    case '3Y':  cutoff.setFullYear(now.getFullYear() - 3); break;
-    case '5Y':  cutoff.setFullYear(now.getFullYear() - 5); break;
-    case '10Y': cutoff.setFullYear(now.getFullYear() - 10); break;
-    case '15Y': cutoff.setFullYear(now.getFullYear() - 15); break;
-    case '20Y': cutoff.setFullYear(now.getFullYear() - 20); break;
-    case '25Y': cutoff.setFullYear(now.getFullYear() - 25); break;
-    case 'MAX': return [...data].reverse(); // all data, oldest first
-    default:    cutoff.setMonth(now.getMonth() - 6);
-  }
-  return data.filter((d) => {
-    const [dd, mm, yyyy] = d.date.split('-');
-    return new Date(`${yyyy}-${mm}-${dd}`) >= cutoff;
-  }).reverse();
-}
-
-function buildChartData(funds, range) {
-  if (!funds.length) return [];
-  // Build map of date → { [schemeName]: nav_percentage }
-  const dateMap = {};
-  funds.forEach((f) => {
-    if (!f.navData) return;
-    const filtered = filterByRange(f.navData, range);
-    if (!filtered.length) return;
-    
-    // filtered is reversed, so [0] is the oldest date in range
-    const baseNav = parseFloat(filtered[0].nav);
-    
-    filtered.forEach((d) => {
-      if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
-      const currentNav = parseFloat(d.nav);
-      // Store percentage change from the start of the period
-      dateMap[d.date][f.meta?.scheme_name || f.schemeCode] = ((currentNav - baseNav) / baseNav) * 100;
-      
-      // Store raw NAV for tooltip if needed
-      dateMap[d.date][`${f.meta?.scheme_name || f.schemeCode}_raw`] = currentNav;
-    });
-  });
-  return Object.values(dateMap).sort((a, b) => {
-    const parse = (s) => { const [dd, mm, yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
-    return parse(a.date) - parse(b.date);
-  });
-}
-
-// Collapse daily data to one row per month (last trading day of each month)
-function toMonthlyData(chartData) {
-  const monthMap = {};
-  chartData.forEach(row => {
-    const [dd, mm, yyyy] = row.date.split('-');
-    const key = `${yyyy}-${mm}`;
-    monthMap[key] = row; // last entry per month wins (data is sorted ascending)
-  });
-  return Object.values(monthMap).sort((a, b) => {
-    const parse = s => { const [dd, mm, yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
-    return parse(a.date) - parse(b.date);
-  });
-}
-
-// 52-week high/low from navData
-function get52WeekHL(navData) {
-  if (!navData || navData.length === 0) return null;
-  const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 1);
-  const last52W = navData.filter(d => {
-    const [dd, mm, yyyy] = d.date.split('-');
-    return new Date(`${yyyy}-${mm}-${dd}`) >= cutoff;
-  }).map(d => parseFloat(d.nav));
-  if (last52W.length === 0) return null;
-  // Use reduce instead of Math.max spread to avoid call-stack overflow on large arrays
-  return {
-    high: last52W.reduce((a, b) => Math.max(a, b), -Infinity),
-    low:  last52W.reduce((a, b) => Math.min(a, b), Infinity),
-  };
-}
-// Monthly win rate: % of months fund gained NAV (consistency metric)
-function getMonthlyWinRate(navData) {
-  if (!navData || navData.length < 24) return null;
-  const monthMap = {};
-  navData.forEach(d => {
-    const [dd, mm, yyyy] = d.date.split('-');
-    const key = `${yyyy}-${mm}`;
-    if (!monthMap[key]) monthMap[key] = parseFloat(d.nav); // first entry per month
-  });
-  const months = Object.keys(monthMap).sort().map(k => monthMap[k]);
-  let wins = 0;
-  for (let i = 1; i < months.length; i++) {
-    if (months[i] > months[i - 1]) wins++;
-  }
-  return months.length > 1 ? Math.round((wins / (months.length - 1)) * 100) : null;
-}
-
-// Guess Expense Ratio based on plan/category keywords in name
-function guessTER(schemeName) {
-  if (!schemeName) return 0;
-  const lower = schemeName.toLowerCase();
-
-  const isPassive = lower.includes('index') || lower.includes('etf') || lower.includes('nifty') || lower.includes('sensex') || lower.includes('bse');
-  const isLiquid = lower.includes('liquid') || lower.includes('overnight') || lower.includes('money market');
-  const isDebt = lower.includes('debt') || lower.includes('bond') || lower.includes('gilt') || lower.includes('credit risk') || lower.includes('duration');
-  const isDirect = lower.includes('direct');
-  const isRegular = lower.includes('regular');
-
-  if (isPassive) {
-    return isDirect ? 0.10 : (isRegular ? 0.35 : 0.20);
-  }
-  if (isLiquid) {
-    return isDirect ? 0.12 : (isRegular ? 0.28 : 0.20);
-  }
-  if (isDebt) {
-    return isDirect ? 0.40 : (isRegular ? 1.05 : 0.65);
-  }
-
-  // Active equity / hybrid
-  return isDirect ? 0.64 : (isRegular ? 1.65 : 1.10);
-}
-
-// Estimate minimum investment since API doesn't provide it
-function guessMinInvestment(schemeName) {
-  if (!schemeName) return { sip: 500, lump: 1000 };
-  const lower = schemeName.toLowerCase();
-  if (lower.includes('elss') || lower.includes('tax')) return { sip: 500, lump: 500 };
-  if (lower.includes('nifty') || lower.includes('index')) return { sip: 100, lump: 500 };
-  if (lower.includes('parag parikh')) return { sip: 1000, lump: 1000 };
-  return { sip: 500, lump: 1000 };
-}
-
-function ComparedFundCard({ fund, color, onRemove }) {
-  const { meta, navData } = fund;
-  const latestNav = navData?.[0]?.nav ? parseFloat(navData[0].nav) : null;
-  const schemeName = meta?.scheme_name || 'Unknown';
-  const hl = get52WeekHL(navData);
-  const hlPosition = hl && latestNav ? Math.min(100, Math.max(0, ((latestNav - hl.low) / (hl.high - hl.low)) * 100)) : null;
-  return (
-    <div className="card p-5 relative border-l-4" style={{ borderLeftColor: color }}>
-      <button
-        onClick={onRemove}
-        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-50 dark:bg-red-900 text-red-500 hover:bg-red-100 flex items-center justify-center text-sm"
-        title="Remove"
-      >
-        ✕
-      </button>
-      <div className="space-y-3 pr-8">
-        <CategoryPill schemeName={schemeName} />
-        <h3 className="font-semibold text-sm text-slate-900 dark:text-white leading-snug">{schemeName}</h3>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="text-slate-400">Latest NAV</span>
-            <div className="font-bold text-slate-900 dark:text-white text-sm tabular-nums">{latestNav ? `₹${latestNav.toFixed(4)}` : '—'}</div>
-          </div>
-          <div>
-            <span className="text-slate-400">Fund Age</span>
-            <div className="font-bold text-slate-900 dark:text-white text-sm">
-              {navData && navData.length > 0 ? `${Math.floor(getFundAgeYears(navData))} yrs` : '—'}
-            </div>
-          </div>
-          <div>
-            <span className="text-slate-400">Fund House</span>
-            <div className="font-semibold text-slate-700 dark:text-slate-300 text-xs line-clamp-1">{meta?.fund_house || '—'}</div>
-          </div>
-          <div>
-            <span className="text-slate-400">Scheme Type</span>
-            <div className="font-semibold text-slate-700 dark:text-slate-300 text-xs line-clamp-1">{meta?.scheme_type || '—'}</div>
-          </div>
-          {/* Estimated Minimum Investments */}
-          {(() => {
-            const minInvest = guessMinInvestment(schemeName);
-            return (
-              <div className="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-700/50 flex justify-between">
-                <div>
-                  <span className="text-slate-400 flex items-center gap-1">Min SIP 
-                    <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-700 rounded-full w-3 h-3 flex items-center justify-center font-bold">
-                      ?
-                      <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                        Estimated minimum SIP amount. Please verify with AMC website.
-                      </span>
-                    </span>
-                  </span>
-                  <div className="font-semibold text-slate-700 dark:text-slate-300 text-xs tabular-nums">₹{minInvest.sip}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400 flex items-center gap-1">Min Lumpsum 
-                    <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-700 rounded-full w-3 h-3 flex items-center justify-center font-bold">
-                      ?
-                      <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-36 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                        Estimated minimum Lumpsum amount. Please verify with AMC website.
-                      </span>
-                    </span>
-                  </span>
-                  <div className="font-semibold text-slate-700 dark:text-slate-300 text-xs tabular-nums">₹{minInvest.lump}</div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-        {/* 52-Week High/Low bar */}
-        {hl && latestNav && (
-          <div className="mt-2">
-            <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-              <span>52W Low: ₹{hl.low.toFixed(2)}</span>
-              <span>52W High: ₹{hl.high.toFixed(2)}</span>
-            </div>
-            <div className="relative h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-red-400 via-amber-400 to-emerald-400" style={{ width: '100%' }} />
-              <div
-                className="absolute top-0 w-2 h-2 bg-white border-2 border-slate-600 dark:border-slate-300 rounded-full -translate-x-1/2"
-                style={{ left: `${hlPosition}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5 text-center">
-              {hlPosition !== null ? `${hlPosition.toFixed(0)}% from 52W low` : ''}
-            </p>
-          </div>
-        )}
-
-        {/* Metrics */}
-        {(() => {
-          const metrics = calculateFundMetrics(navData);
-          if (!metrics) return <div className="text-xs text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">Metrics not available</div>;
-          
-          const score = null; // FundLens Score removed
-          const tags = getSmartTags(metrics);
-          
-          let riskLevel = 'Unknown';
-          let riskDots = '○○○○○';
-          if (metrics.volatility) {
-            if (metrics.volatility < 10) { riskLevel = 'Low'; riskDots = '●○○○○'; }
-            else if (metrics.volatility < 15) { riskLevel = 'Moderate'; riskDots = '●●○○○'; }
-            else if (metrics.volatility < 20) { riskLevel = 'High'; riskDots = '●●●○○'; }
-            else { riskLevel = 'Very High'; riskDots = '●●●●●'; }
-          }
-          
-          return (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-4">
-              {/* Volatility & Risk — FundLens Score removed */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block mb-0.5">Volatility (Ann.)</span>
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {metrics.volatility ? `${metrics.volatility.toFixed(1)}%` : '—'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block mb-0.5">Risk Level</span>
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 justify-end">
-                    <span>{riskLevel}</span>
-                    <span className="text-[10px] tracking-tighter text-blue-500">{riskDots}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tags */}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map(t => (
-                    <span key={t} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold border border-blue-100 dark:border-blue-800">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Performance Grid */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Performance</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-400">1Y Return</span>
-                    <div className={`font-bold text-sm ${metrics.return1Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return1Y !== null ? `${metrics.return1Y.toFixed(2)}%` : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">3Y CAGR</span>
-                    <div className={`font-bold text-sm ${metrics.return3Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return3Y !== null ? `${metrics.return3Y.toFixed(2)}%` : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">5Y CAGR</span>
-                    <div className={`font-bold text-sm ${metrics.return5Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return5Y !== null ? `${metrics.return5Y.toFixed(2)}%` : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Max Drawdown</span>
-                    <div className="font-bold text-sm text-red-600 dark:text-red-400">
-                      {metrics.maxDrawdown > 0 ? `-${metrics.maxDrawdown.toFixed(2)}%` : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 flex items-center gap-1">Sharpe Ratio <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-600 rounded px-1">?
-                      <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                        (1Y Return − 6.5%) ÷ Volatility. Measures risk-adjusted return. Above 1 = Good, above 2 = Excellent.
-                      </span>
-                    </span></span>
-                    <div className={`font-bold text-sm ${metrics.sharpe > 1 ? 'text-emerald-600 dark:text-emerald-400' : metrics.sharpe > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.sharpe !== null && metrics.sharpe !== undefined ? metrics.sharpe : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 flex items-center gap-1">Sortino Ratio 
-                      <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-600 rounded px-1">
-                        ?
-                        <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                          Like Sharpe but only penalizes downside risk. Higher is better.
-                        </span>
-                      </span>
-                    </span>
-                    <div className={`font-bold text-sm ${metrics.sortino > 1 ? 'text-emerald-600 dark:text-emerald-400' : metrics.sortino > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.sortino !== null && metrics.sortino !== undefined ? metrics.sortino : '—'}
-                    </div>
-                  </div>
-                  {/* Win Rate — % of months fund was positive */}
-                  {(() => {
-                    const wr = getMonthlyWinRate(navData);
-                    return wr !== null ? (
-                      <div>
-                        <span className="text-slate-400 flex items-center gap-1">
-                          Win Rate
-                          <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-600 rounded px-1">
-                            ?
-                            <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                              % of months fund posted a gain. &gt;60% = very consistent.
-                            </span>
-                          </span>
-                        </span>
-                        <div className={`font-bold text-sm ${wr >= 60 ? 'text-emerald-600 dark:text-emerald-400' : wr >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {wr}%
-                          <span className="text-[10px] font-normal text-slate-400 ml-1">{wr >= 60 ? '✓ Consistent' : wr >= 50 ? 'Average' : 'Volatile'}</span>
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
-                  {/* 10Y CAGR if available */}
-                  {metrics.return10Y !== null && metrics.return10Y !== undefined && (
-                    <div>
-                      <span className="text-slate-400">10Y CAGR</span>
-                      <div className={`font-bold text-sm ${metrics.return10Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {metrics.return10Y.toFixed(2)}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-}
+import { formatINR } from '../utils/formatCurrency';
+import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
+import { estimateER } from '../utils/fundFilters';
+import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS } from '../utils/chartUtils';
+import ComparedFundCard from '../components/ComparedFundCard';
 
 export default function Compare() {
   const [searchParams] = useSearchParams();
-  const { funds, loading: fundsLoading } = useFunds();
+  const { funds } = useFunds();
   const [compareList, setCompareList] = useLocalStorage('fundlens_compare', []);
-  const [recentList, setRecentList] = useLocalStorage('fundlens_recent', []);
+  const [, setRecentList] = useLocalStorage('fundlens_recent', []);
   const [fundData, setFundData] = useState([]);
   
   // Search state
@@ -404,11 +37,8 @@ export default function Compare() {
   const [sipYears, setSipYears] = useState(3);
   const [sipYearsInput, setSipYearsInput] = useState('3');
   const [sipMode, setSipMode] = useState('sip'); // 'sip' | 'lumpsum'
-  const [sipExpenseRatio, setSipExpenseRatio] = useState(0); // kept for compat
   const [sipFundTER, setSipFundTER] = useState({}); // per-fund TER: { [schemeCode]: 0.5 }
   const setFundTER = (code, val) => setSipFundTER(prev => ({ ...prev, [String(code)]: val }));
-  const [sipDay, setSipDay] = useState(1); // SIP date: 1, 5, 10, 15, 25
-
   // Load funds from compareList
   const errorTimerRef = useRef(null);
   const loadingCodesRef = useRef(new Set());
@@ -427,7 +57,7 @@ export default function Compare() {
     errorTimerRef.current = setTimeout(() => setFetchError(''), 4000);
   };
 
-  const loadFund = useCallback(async (code) => {
+    const loadFund = useCallback(async (code) => {
     const codeStr = String(code);
     if (fundData.find((f) => f.schemeCode === codeStr) || loadingCodesRef.current.has(codeStr)) return;
 
@@ -452,9 +82,12 @@ export default function Compare() {
         return [codeStr, ...list].slice(0, 6);
       });
       setFetchError(''); // clear error on success
-    } catch {
+    } catch (err) {
       if (isMountedRef.current) {
-        showError(`Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`);
+        const msg = err?.response?.status === 404
+          ? `Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`
+          : 'Network error. Please check your connection and try again.';
+        showError(msg);
       }
     } finally {
       clearTimeout(timerId);
@@ -480,7 +113,7 @@ export default function Compare() {
         return Array.from(unique).slice(0, 4);
       });
     }
-  }, [searchParams]);
+  }, [searchParams, setCompareList]);
 
   // Load all codes in compareList
   useEffect(() => {
@@ -540,13 +173,13 @@ export default function Compare() {
     const el = document.getElementById('compare-export-area');
     if (!el) return;
     try {
-      const canvas = await html2canvas(el, { backgroundColor: document.documentElement.classList.contains('dark') ? '#0f172a' : '#f8fafc' });
+      const html2canvasModule = await import('html2canvas');
+      const canvas = await html2canvasModule.default(el, { backgroundColor: document.documentElement.classList.contains('dark') ? '#0f172a' : '#f8fafc' });
       const link = document.createElement('a');
       link.download = `fundlens-comparison-${new Date().toISOString().slice(0, 10)}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-    } catch (e) {
-      console.error('Export failed', e);
+    } catch {
       showError('Failed to generate export image.');
     }
   };
@@ -568,10 +201,6 @@ export default function Compare() {
   if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
     chartData = toMonthlyData(chartData);
   }
-  // Monthly-only version for table view (one row per month, end-of-month)
-  const monthlyChartData = toMonthlyData(chartData);
-
-
   // Annual calendar-year returns for each fund
   const annualReturns = (() => {
     if (fundData.length === 0) return { years: [], data: {} };
@@ -646,10 +275,19 @@ export default function Compare() {
   if (minFundAge >= 20) availableRanges.push('20Y');
   if (minFundAge >= 25) availableRanges.push('25Y');
   if (minFundAge >= 1)  availableRanges.push('MAX');
-  // Ensure selected range is valid
-  if (!availableRanges.includes(range) && availableRanges.length > 0) {
-    // Will auto-correct when range buttons render
-  }
+  // Auto-correct range when funds removed or min age changes
+  useEffect(() => {
+    if (!availableRanges.includes(range) && availableRanges.length > 0) {
+      const ordered = ['1M', '3M', '6M', '1Y', '3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'];
+      for (const r of ordered) {
+        if (availableRanges.includes(r)) {
+          setRange(r);
+          break;
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableRanges.length, range]);
 
   // Max SIP years = minimum fund age across all compared funds (floor)
   const maxSipYears = fundData.length > 0
@@ -716,15 +354,18 @@ export default function Compare() {
               </svg>
               <input
                 type="text"
+                id="compare-search-input"
                 value={searchQuery}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
+                  setSearchQuery(e.target.value.slice(0, 100));
                   setShowDropdown(true);
                 }}
                 onFocus={() => setShowDropdown(true)}
                 placeholder="Search funds by name or code..."
                 className="input-base pl-10"
                 disabled={compareList.length >= 4}
+                maxLength={100}
+                aria-label="Search funds to add to comparison by name or scheme code"
               />
               
               {/* Autocomplete Dropdown */}
@@ -738,7 +379,7 @@ export default function Compare() {
                       className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center"
                     >
                       <span className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-1 pr-4">{f.schemeName}</span>
-                      <span className="text-xs text-slate-400 font-mono">#{f.schemeCode}</span>
+                      <span className="text-xs text-slate-500 font-mono">#{f.schemeCode}</span>
                     </button>
                   ))}
                 </div>
@@ -791,7 +432,7 @@ export default function Compare() {
                   <div className="flex flex-wrap gap-3">
                     {overlapMatrix.map((pair, idx) => (
                       <div key={idx} className="flex-1 min-w-[200px] bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
-                        <p className="text-[10px] text-slate-400 line-clamp-1 mb-0.5">
+                        <p className="text-[10px] text-slate-500 line-clamp-1 mb-0.5">
                           {pair.a.split(' ').slice(0, 3).join(' ')} vs {pair.b.split(' ').slice(0, 3).join(' ')}
                         </p>
                         <div className="flex items-center justify-between">
@@ -831,7 +472,7 @@ export default function Compare() {
                 <div className="flex items-center gap-4">
                   <div>
                     <h2 className="font-bold text-slate-900 dark:text-white text-lg">Relative Performance</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">% growth from the start of the selected period — funds are fairly compared regardless of NAV level</p>
+                    <p className="text-xs text-slate-500 mt-0.5">% growth from the start of the selected period — funds are fairly compared regardless of NAV level</p>
                   </div>
                   <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
                     <button
@@ -989,7 +630,7 @@ export default function Compare() {
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
                           <tr>
                             <th className="px-4 py-3 font-semibold whitespace-nowrap">Period</th>
-                            <th className="px-3 py-3 font-semibold text-slate-400 text-[10px]">Type</th>
+                            <th className="px-3 py-3 font-semibold text-slate-500 text-[10px]">Type</th>
                             {fundData.map((fund, i) => (
                               <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
                                 <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
@@ -997,7 +638,7 @@ export default function Compare() {
                                 </div>
                               </th>
                             ))}
-                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-400">Leader</th>}
+                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-500">Leader</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -1009,7 +650,7 @@ export default function Compare() {
                             return (
                               <tr key={p.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                 <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.label}</td>
-                                <td className="px-3 py-3 text-[10px] text-slate-400">{p.months >= 12 ? 'CAGR' : 'Abs'}</td>
+                                <td className="px-3 py-3 text-[10px] text-slate-500">{p.months >= 12 ? 'CAGR' : 'Abs'}</td>
                                 {rets.map((ret, i) => (
                                   <td key={i} className={`px-4 py-3 font-bold text-sm tabular-nums ${
                                     ret === null ? 'text-slate-300 dark:text-slate-600' :
@@ -1076,7 +717,6 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        const worstVal = defined.length > 0 ? Math.min(...defined) : null;
                         // Market events by year — both bad AND good years explained
                         const MARKET_EVENTS = {
                           2003: { label: '🟢 Post dot-com recovery rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
@@ -1152,17 +792,15 @@ export default function Compare() {
                                 {(() => {
                                   if (defined.length < 2) return <span className="text-slate-300">—</span>;
                                   const diff = Math.max(...defined) - Math.min(...defined);
-                                  const winnerIdx = vals.indexOf(bestVal);
-                                  const loserIdx = vals.indexOf(worstVal);
-                                  return (
-                                    <div className="flex flex-col gap-0.5">
-                                      <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{diff.toFixed(2)}% spread</span>
-                                      {winnerIdx >= 0 && defined.length > 1 && (
-                                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
-                                          🏆 {fundData[winnerIdx]?.meta?.scheme_name?.split(' ')[0] || `F${winnerIdx+1}`}
-                                        </span>
-                                      )}
-                                    </div>
+                                  const winnerIdx = vals.indexOf(bestVal);                  return (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{diff.toFixed(2)}% spread</span>
+                      {winnerIdx >= 0 && defined.length > 1 && (
+                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
+                          🏆 {fundData[winnerIdx]?.meta?.scheme_name?.split(' ')[0] || `F${winnerIdx+1}`}
+                        </span>
+                      )}
+                    </div>
                                   );
                                 })()}
                               </td>
@@ -1268,21 +906,23 @@ export default function Compare() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h2 className="font-bold text-slate-900 dark:text-white text-lg">Real Historical Performance</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Based on actual NAV data — <span className="font-semibold text-emerald-600 dark:text-emerald-400">returns are already net of expense ratio</span>. Max period = youngest fund's age ({maxSipYears} yr).
-                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">                    {`Based on actual NAV data — `}<span className="font-semibold text-emerald-600 dark:text-emerald-400">{`returns are already net of expense ratio`}</span>{`. Max period = youngest fund's age (${maxSipYears} yr).`}</p>
                 </div>
                 <div className="flex flex-wrap gap-3 items-end">
                   {/* SIP / Lumpsum Toggle */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wider">Mode</label>
-                    <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5">
+                    <label id="sip-mode-label" className="text-[10px] text-slate-500 uppercase tracking-wider">Mode</label>
+                    <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5" role="radiogroup" aria-labelledby="sip-mode-label">
                       <button
                         onClick={() => setSipMode('sip')}
+                        role="radio"
+                        aria-checked={sipMode === 'sip'}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${sipMode === 'sip' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                       >SIP</button>
                       <button
                         onClick={() => setSipMode('lumpsum')}
+                        role="radio"
+                        aria-checked={sipMode === 'lumpsum'}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${sipMode === 'lumpsum' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                       >Lumpsum</button>
                     </div>
@@ -1290,11 +930,12 @@ export default function Compare() {
 
                   {/* Amount Input */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wider">{sipMode === 'sip' ? 'Monthly SIP' : 'Lumpsum'}</label>
+                    <label htmlFor="sip-amount-input" className="text-[10px] text-slate-500 uppercase tracking-wider">{sipMode === 'sip' ? 'Monthly SIP' : 'Lumpsum'}</label>
                     <div className="flex items-center gap-1">
                       <span className="text-slate-500 text-sm">₹</span>
                       <input
                         type="text"
+                        id="sip-amount-input"
                         inputMode="numeric"
                         value={sipAmountInput}
                         onChange={(e) => {
@@ -1328,10 +969,11 @@ export default function Compare() {
 
                   {/* Year custom input */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wider">Period <span className="normal-case">(max {maxSipYears}yr)</span></label>
+                    <label htmlFor="sip-years-input" className="text-[10px] text-slate-500 uppercase tracking-wider">Period <span className="normal-case">(max {maxSipYears}yr)</span></label>
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
+                        id="sip-years-input"
                         inputMode="numeric"
                         value={sipYearsInput}
                         onChange={(e) => {
@@ -1348,7 +990,7 @@ export default function Compare() {
                         className="input-base w-16 py-1.5 text-sm text-center"
                         placeholder="3"
                       />
-                      <span className="text-xs text-slate-400">yr</span>
+                      <span className="text-xs text-slate-500">yr</span>
                     </div>
                     <div className="flex gap-1">
                       {[1, 3, 5, 7, 10].filter(y => y <= maxSipYears).map(y => (
@@ -1362,7 +1004,7 @@ export default function Compare() {
 
                   <div className="flex flex-col justify-end">
                     <p className="text-[10px] text-slate-400 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5 max-w-[220px]">
-                      💡 NAV data is <strong>already net of Expense Ratio</strong>. Edit each fund's auto-detected Expense Ratio below to see the gross vs net breakdown.
+                      {`💡 NAV data is `}<strong>{`already net of Expense Ratio`}</strong>{`. Edit each fund's auto-detected Expense Ratio below to see the gross vs net breakdown.`}
                     </p>
                   </div>
                 </div>
@@ -1397,21 +1039,8 @@ export default function Compare() {
                       })();
 
                   const codeStr = String(fund.schemeCode);
-                  const defaultTER = guessTER(fund.meta?.scheme_name);
+                  const defaultTER = estimateER(fund.meta?.scheme_name);
                   const fundTER = sipFundTER[codeStr] ?? defaultTER;
-
-                  // Gross value = what you'd have if the fund had 0% TER
-                  // (NAV is net, so gross XIRR ≈ net XIRR + TER)
-                  let grossValue = null, terCost = null, grossXIRR = null;
-                  if (sipResult && sipResult.xirr !== null && fundTER > 0) {
-                    grossXIRR = sipResult.xirr + fundTER;
-                    const r = grossXIRR / 100 / 12;
-                    const n = sipYears * 12;
-                    grossValue = Math.abs(r) < 1e-10
-                      ? sipAmount * n
-                      : sipAmount * (1 + r) * (Math.pow(1 + r, n) - 1) / r;
-                    terCost = grossValue - sipResult.currentValue;
-                  }
 
                   return (
                     <div key={`sip-${fund.schemeCode}`} className="border border-slate-100 dark:border-slate-700 rounded-xl p-4 relative overflow-hidden">
@@ -1422,14 +1051,15 @@ export default function Compare() {
 
                       {/* Per-fund TER input */}
                       <div className="flex items-center gap-1.5 mb-3 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1.5">
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">Expense Ratio:</span>
-                        <input
-                          type="number" min="0" max="3" step="0.01"
-                          value={fundTER}
-                          onChange={(e) => setFundTER(codeStr, Math.max(0, Math.min(3, Number(e.target.value))))}
-                          className="w-14 text-xs font-bold text-center bg-transparent border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300"
-                          placeholder="0.5"
-                        />
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">Expense Ratio:</span>                          <input
+                            type="number" min="0" max="3" step="0.01"
+                            id={`ter-input-${codeStr}`}
+                            value={fundTER}
+                            onChange={(e) => setFundTER(codeStr, Math.max(0, Math.min(3, Number(e.target.value))))}
+                            className="w-14 text-xs font-bold text-center bg-transparent border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300"
+                            placeholder="0.5"
+                            aria-label={`Expense ratio for ${fund.meta?.scheme_name || fund.schemeCode}`}
+                          />
                         <span className="text-[10px] text-slate-400">% p.a.</span>
                       </div>
 
@@ -1512,7 +1142,7 @@ export default function Compare() {
                             <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100 dark:border-slate-700">
                               <span className="text-slate-500 flex items-center gap-1">XIRR (net) <span className="relative group cursor-help text-[9px] bg-slate-200 dark:bg-slate-600 rounded px-1">?
                                 <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                                  Annualised return (XIRR) calculated from real NAV data. Already net of this fund's expense ratio.
+                                  {`Annualised return (XIRR) calculated from real NAV data. Already net of this fund's expense ratio.`}
                                 </span>
                               </span></span>
                               <span className={`font-bold text-sm ${sipResult.xirr >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>

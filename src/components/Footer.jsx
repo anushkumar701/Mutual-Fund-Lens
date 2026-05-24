@@ -17,7 +17,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              India's beginner-friendly mutual fund analysis platform. For information purposes only.
+              India&apos;s beginner-friendly mutual fund analysis platform. For information purposes only.
             </p>
           </div>
 
@@ -64,8 +64,8 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-slate-100 dark:border-slate-800 pt-4 flex items-center justify-between">
-          <p className="text-xs text-slate-400 dark:text-slate-500">© 2026 FundLens. Built for learning. Not SEBI registered.</p>
-          <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-500">© 2026 FundLens. Built for learning. Not SEBI registered.</p>
+          <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-500">
             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
             Live data from mfapi.in
           </div>

@@ -1,23 +1,24 @@
 // pages/Dashboard.jsx
 // Future-proof: modular sections, easy to extend
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useDebounce } from '../hooks/useDebounce';
 import ErrorState from '../components/ErrorState';
-import FundDetailModal from '../components/FundDetailModal';
+const FundDetailModal = lazy(() => import('../components/FundDetailModal'));
 import { inferCategory } from '../utils/goalFilters';
 import { isFundClosed } from '../utils/fundFilters';
 
 // ─── Category config ───────────────────────────────────────────
 const CAT_CFG = {
-  Equity: { e:'📈', color:'#3b82f6', desc:'Long-term wealth. Best for 7+ years.' },
-  Debt:   { e:'🏛️', color:'#10b981', desc:'Stable returns. Good for 1–3 years.' },
-  Hybrid: { e:'⚖️', color:'#f59e0b', desc:'Balanced equity & debt exposure.' },
-  ELSS:   { e:'🧾', color:'#8b5cf6', desc:'Tax saving under 80C. 3-yr lock-in.' },
-  Index:  { e:'📊', color:'#6366f1', desc:'Low cost. Tracks Nifty/Sensex.' },
-  Liquid: { e:'💧', color:'#14b8a6', desc:'Like savings account. Emergency fund.' },
-  Other:  { e:'📁', color:'#94a3b8', desc:'Specialty & sector funds.' },
+  Equity: { e:'📈', color:'#1d4ed8', desc:'Long-term wealth. Best for 7+ years.' },
+  Debt:   { e:'🏛️', color:'#047857', desc:'Stable returns. Good for 1–3 years.' },
+  Hybrid: { e:'⚖️', color:'#b45309', desc:'Balanced equity & debt exposure.' },
+  ELSS:   { e:'🧾', color:'#6d28d9', desc:'Tax saving under 80C. 3-yr lock-in.' },
+  Index:  { e:'📊', color:'#4338ca', desc:'Low cost. Tracks Nifty/Sensex.' },
+  Liquid: { e:'💧', color:'#0f766e', desc:'Like savings account. Emergency fund.' },
+  Other:  { e:'📁', color:'#64748b', desc:'Specialty & sector funds.' },
 };
 
 // ─── Fund Search Box ───────────────────────────────────────────
@@ -25,6 +26,7 @@ function FundSearchBox({ funds, onSelectFund }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const debouncedQuery = useDebounce(query, 300);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -34,12 +36,12 @@ function FundSearchBox({ funds, onSelectFund }) {
   }, []);
 
   const results = useMemo(() => {
-    if (!query.trim() || query.length < 2) return [];
-    const q = query.toLowerCase();
+    if (!debouncedQuery.trim() || debouncedQuery.length < 2) return [];
+    const q = debouncedQuery.toLowerCase();
     return funds
       .filter(f => f.schemeName.toLowerCase().includes(q))
       .slice(0, 8);
-  }, [query, funds]);
+  }, [debouncedQuery, funds]);
 
   const handleSelect = (fund) => {
     setQuery('');
@@ -50,22 +52,25 @@ function FundSearchBox({ funds, onSelectFund }) {
   return (
     <div ref={ref} className="relative w-full max-w-2xl mx-auto">
       <div className="relative">
-        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/>
         </svg>
         <input
           type="text"
+          id="fund-search-input"
           value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onChange={e => { setQuery(e.target.value.slice(0, 100)); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search any fund by name or scheme code..."
+          placeholder={'Search any fund by name or scheme code...'}
+          maxLength={100}
+          aria-label="Search mutual funds by name or scheme code"
           className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-sm shadow-sm transition-all"
         />
         {query && (
-          <button onClick={() => { setQuery(''); setOpen(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+          <button onClick={() => { setQuery(''); setOpen(false); }} aria-label="Clear search" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
         )}
       </div>
-      <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 text-center">
+      <p className="text-xs text-slate-600 dark:text-slate-500 mt-2 text-center">
         🔍 Type to search · Click a fund to view details · No page change needed
       </p>
 
@@ -94,7 +99,7 @@ function FundSearchBox({ funds, onSelectFund }) {
                       {closed && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400">CLOSED</span>}
                     </div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{fund.schemeName}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Code #{fund.schemeCode}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Code #{fund.schemeCode}</p>
                   </div>
                   <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0 mt-1">View →</span>
                 </button>
@@ -112,8 +117,8 @@ function FundSearchBox({ funds, onSelectFund }) {
       {open && query.length >= 2 && results.length === 0 && (
         <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl z-50 p-6 text-center">
           <div className="text-3xl mb-2">🔍</div>
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No funds found for "{query}"</p>
-          <p className="text-xs text-slate-400 mt-1">Try a shorter name or use the fund house name</p>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No funds found for &quot;{debouncedQuery}&quot;</p>
+          <p className="text-xs text-slate-500 mt-1">Try a shorter name or use the fund house name</p>
         </div>
       )}
     </div>
@@ -132,22 +137,22 @@ function QuickCalc() {
     <div className="card p-5 h-full">
       <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">🧮 Quick SIP Calculator</h3>
       <div className="grid grid-cols-3 gap-2 mb-4">
-        {[['Monthly ₹', amt, setAmt, 100, 200000], ['Years', yrs, setYrs, 1, 40], ['Return %', rate, setRate, 1, 30]].map(([l, v, s, mn, mx]) => (
+        {[['monthly-amt', 'Monthly ₹', amt, setAmt, 100, 200000], ['sip-years', 'Years', yrs, setYrs, 1, 40], ['return-rate', 'Return %', rate, setRate, 1, 30]].map(([id, l, v, s, mn, mx]) => (
           <div key={l}>
-            <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">{l}</label>
-            <input type="number" value={v} onChange={e => s(Math.max(mn, Math.min(mx, +e.target.value)))}
+            <label htmlFor={id} className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">{l}</label>
+            <input id={id} type="number" value={v} onChange={e => s(Math.max(mn, Math.min(mx, +e.target.value)))}
               className="input-base w-full py-2 text-sm text-center font-bold"/>
           </div>
         ))}
       </div>
       <div className="grid grid-cols-3 gap-2 text-center mb-4">
         <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
-          <div className="text-[10px] text-slate-400 mb-1">You Invest</div>
+          <div className="text-[10px] text-slate-500 mb-1">You Invest</div>
           <div className="font-bold text-sm text-slate-900 dark:text-white">{fmt(inv)}</div>
         </div>
-        <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800">
-          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mb-1">Gains</div>
-          <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400">+{fmt(mat - inv)}</div>
+        <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-xl p-3 border border-emerald-200 dark:border-emerald-800">
+          <div className="text-[10px] text-emerald-700 dark:text-emerald-400 mb-1">Gains</div>
+          <div className="font-bold text-sm text-emerald-700 dark:text-emerald-400">+{fmt(mat - inv)}</div>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 border border-blue-100 dark:border-blue-800">
           <div className="text-[10px] text-blue-600 dark:text-blue-400 mb-1">Total</div>
@@ -212,7 +217,7 @@ export default function Dashboard() {
 
           {loading && (
             <div className="w-full max-w-2xl mx-auto h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
-              <span className="text-slate-400 text-sm">Loading funds...</span>
+              <span className="text-slate-500 text-sm">Loading funds...</span>
             </div>
           )}
 
@@ -222,20 +227,22 @@ export default function Dashboard() {
             <Link to="/sip" className="btn-secondary px-5 py-2.5">🔥 SIP + FIRE Calc</Link>
           </div>
         </div>
-      </section>
+        </section>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
         {error && <ErrorState message={error} onRetry={refetch}/>}
 
         {/* ── Quick Tools Grid ── */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <QuickCalc/>
-          <div className="card p-5 h-full">
-            <h3 className="font-bold text-slate-900 dark:text-white mb-4">🎯 Which Fund for Which Goal?</h3>
+        <section aria-labelledby="quick-tools-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 320px'}}>
+          <h2 id="quick-tools-heading" className="sr-only">Quick Tools</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <QuickCalc/>
+            <div className="card p-5 h-full">
+              <h3 className="font-bold text-slate-900 dark:text-white mb-4">🎯 Which Fund for Which Goal?</h3>
             <div className="space-y-3">
               {[
-                { goal: 'Emergency Fund', type: 'Liquid Fund', horizon: '0–6 months', risk: 'Very Low', color: 'text-teal-600 dark:text-teal-400' },
-                { goal: 'Short-term Goal', type: 'Debt Fund', horizon: '1–3 years', risk: 'Low', color: 'text-emerald-600 dark:text-emerald-400' },
+                { goal: 'Emergency Fund', type: 'Liquid Fund', horizon: '0–6 months', risk: 'Very Low', color: 'text-teal-700 dark:text-teal-400' },
+                { goal: 'Short-term Goal', type: 'Debt Fund', horizon: '1–3 years', risk: 'Low', color: 'text-emerald-700 dark:text-emerald-400' },
                 { goal: 'Save Tax (80C)', type: 'ELSS Fund', horizon: '3+ years (lock-in)', risk: 'Moderate', color: 'text-purple-600 dark:text-purple-400' },
                 { goal: 'Long-term Wealth', type: 'Equity Fund', horizon: '7+ years', risk: 'High', color: 'text-blue-600 dark:text-blue-400' },
                 { goal: 'FIRE / Retirement', type: 'Index Fund', horizon: '15+ years', risk: 'Moderate', color: 'text-indigo-600 dark:text-indigo-400' },
@@ -243,7 +250,7 @@ export default function Dashboard() {
                 <div key={item.goal} className="flex items-center justify-between text-xs py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
                   <div>
                     <div className="font-semibold text-slate-800 dark:text-slate-200">{item.goal}</div>
-                    <div className="text-slate-400 mt-0.5">{item.horizon} · Risk: {item.risk}</div>
+                    <div className="text-slate-500 mt-0.5">{item.horizon} · Risk: {item.risk}</div>
                   </div>
                   <span className={`font-bold ${item.color}`}>{item.type}</span>
                 </div>
@@ -252,16 +259,17 @@ export default function Dashboard() {
             <Link to="/screener" className="btn-secondary w-full text-center text-xs py-2 mt-4 block">
               Find Funds by Goal →
             </Link>
+            </div>
           </div>
         </section>
 
         {/* ── Browse by Category ── */}
         {!loading && !error && (
-          <section>
+          <section style={{contentVisibility:'auto', containIntrinsicSize:'auto 280px'}}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">Browse by Category</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Click any category to explore in Screener</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">Click any category to explore in Screener</p>
               </div>
               <Link to="/screener" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">View All →</Link>
             </div>
@@ -274,7 +282,7 @@ export default function Dashboard() {
                     className="card p-4 text-center hover:shadow-md hover:-translate-y-0.5 transition-all group">
                     <div className="text-2xl mb-2">{cfg.e}</div>
                     <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">{cat}</div>
-                    <div className="text-[10px] text-slate-400 leading-snug mb-2 hidden sm:block">{cfg.desc}</div>
+                    <div className="text-[10px] text-slate-500 leading-snug mb-2 hidden sm:block">{cfg.desc}</div>
                     <div className="text-[11px] font-bold" style={{color: cfg.color}}>
                       {count.toLocaleString('en-IN')} funds
                     </div>
@@ -287,7 +295,7 @@ export default function Dashboard() {
 
         {/* ── Watchlist ── */}
         {!loading && watchlistFunds.length > 0 && (
-          <section>
+          <section style={{contentVisibility:'auto', containIntrinsicSize:'auto 260px'}}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">⭐ My Watchlist</h2>
               <Link to="/screener?tab=watchlist" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
@@ -322,7 +330,7 @@ export default function Dashboard() {
         )}
 
         {/* ── 3 CTA cards ── */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" style={{contentVisibility:'auto', containIntrinsicSize:'auto 200px'}}>
           {[
             { t: 'Fund Screener', d: 'Advanced filters to find the right fund for you.', cta: 'Find Funds →', to: '/screener', g: 'from-blue-600 to-blue-700' },
             { t: 'Compare Funds', d: 'Compare up to 4 funds side by side.', cta: 'Compare →', to: '/compare', g: 'from-emerald-600 to-teal-600' },

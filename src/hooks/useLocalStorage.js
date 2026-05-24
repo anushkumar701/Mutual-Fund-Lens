@@ -15,7 +15,9 @@ export function useLocalStorage(key, initialValue) {
   useEffect(() => {
     const handler = (e) => {
       if (e.key === key && e.newValue !== null) {
-        try { setStoredValue(JSON.parse(e.newValue)); } catch {}
+        try { setStoredValue(JSON.parse(e.newValue)); } catch {
+          // Ignore invalid JSON from other tabs
+        }
       }
     };
     window.addEventListener('storage', handler);
@@ -29,8 +31,9 @@ export function useLocalStorage(key, initialValue) {
         localStorage.setItem(key, JSON.stringify(valueToStore));
         return valueToStore;
       });
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Silently ignore storage errors (e.g. private browsing quota exceeded).
+      // The in-memory state remains valid for the session.
     }
   };
 

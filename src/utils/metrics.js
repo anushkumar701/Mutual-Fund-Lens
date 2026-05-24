@@ -1,16 +1,19 @@
 // utils/metrics.js
 
 function parseDate(dateStr) {
-  const [dd, mm, yyyy] = dateStr.split('-');
-  return new Date(`${yyyy}-${mm}-${dd}`);
+  if (!dateStr || typeof dateStr !== 'string') return new Date(NaN);
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return new Date(NaN);
+  const [dd, mm, yyyy] = parts;
+  const date = new Date(`${yyyy}-${mm}-${dd}`);
+  return isNaN(date.getTime()) ? new Date(NaN) : date;
 }
 
 // Build a sorted ascending array of { ts, nav } for binary search
 function buildSortedNav(navData) {
-  return [...navData].reverse().map(d => ({
-    ts: parseDate(d.date).getTime(),
-    nav: parseFloat(d.nav),
-  }));
+  return [...navData].reverse()
+    .map(d => ({ ts: parseDate(d.date).getTime(), nav: parseFloat(d.nav) }))
+    .filter(d => !isNaN(d.ts) && isFinite(d.nav));
 }
 
 // Binary search: find index of closest timestamp in sorted ascending array
@@ -243,7 +246,7 @@ export function calculateBestWorstMonth(navData) {
   
   // Group navs by month (navData is sorted newest first)
   navData.forEach(d => {
-    const [dd, mm, yyyy] = d.date.split('-');
+    const [, mm, yyyy] = d.date.split('-');
     const key = `${yyyy}-${mm}`;
     if (!monthMap[key]) monthMap[key] = [];
     monthMap[key].push(parseFloat(d.nav));

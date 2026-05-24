@@ -1,6 +1,7 @@
 // components/SIPSlider.jsx
 import { useState } from 'react';
 
+// eslint-disable-next-line react/prop-types
 export default function SIPSlider({
   id, label, value, onChange, min, max, step = 1, prefix = '', suffix = '', formatFn,
 }) {
@@ -61,7 +62,7 @@ export default function SIPSlider({
           }}
         />
       </div>
-      <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500">
+      <div className="flex justify-between text-xs text-slate-500 dark:text-slate-500">
         <span>{prefix}{Number(min).toLocaleString('en-IN')}{suffix}</span>
         <span className="text-[10px] text-slate-300 dark:text-slate-600">click value to type</span>
         <span>{prefix}{Number(max).toLocaleString('en-IN')}{suffix}</span>
