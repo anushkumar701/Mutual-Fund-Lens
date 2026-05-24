@@ -1,0 +1,76 @@
+{
+  "_charts-25175e12.js": {
+    "file": "assets/charts-25175e12.js",
+    "imports": [
+      "_react-vendor-a3da6677.js"
+    ]
+  },
+  "_components-c7770999.js": {
+    "file": "assets/components-c7770999.js",
+    "imports": [
+      "_react-vendor-a3da6677.js"
+    ]
+  },
+  "_db-4ed993c7.js": {
+    "file": "assets/db-4ed993c7.js"
+  },
+  "_export-4ed993c7.js": {
+    "file": "assets/export-4ed993c7.js"
+  },
+  "_react-vendor-a3da6677.js": {
+    "file": "assets/react-vendor-a3da6677.js"
+  },
+  "_sentry-25175e12.js": {
+    "file": "assets/sentry-25175e12.js",
+    "imports": [
+      "_react-vendor-a3da6677.js"
+    ]
+  },
+  "app/components/BackToTop.jsx": {
+    "file": "assets/BackToTop-eadbf1ed.js",
+    "imports": [
+      "_components-c7770999.js",
+      "_react-vendor-a3da6677.js"
+    ],
+    "isDynamicEntry": true,
+    "src": "app/components/BackToTop.jsx"
+  },
+  "app/components/Footer.jsx": {
+    "file": "assets/Footer-4d3f99d6.js",
+    "imports": [
+      "_components-c7770999.js",
+      "_react-vendor-a3da6677.js"
+    ],
+    "isDynamicEntry": true,
+    "src": "app/components/Footer.jsx"
+  },
+  "app/entry.client.tsx": {
+    "file": "assets/entry.client-4223a814.js",
+    "imports": [
+      "_components-c7770999.js",
+      "_react-vendor-a3da6677.js"
+    ],
+    "isEntry": true,
+    "src": "app/entry.client.tsx"
+  },
+  "app/root.tsx?__remix-build-client-route": {
+    "assets": [
+      "assets/tailwind-91eea3f9.css"
+    ],
+    "dynamicImports": [
+      "app/components/Footer.jsx",
+      "app/components/BackToTop.jsx"
+    ],
+    "file": "assets/root-21cd16ab.js",
+    "imports": [
+      "_components-c7770999.js",
+      "_react-vendor-a3da6677.js"
+    ],
+    "isEntry": true,
+    "src": "app/root.tsx?__remix-build-client-route"
+  },
+  "app/tailwind.css": {
+    "file": "assets/tailwind-91eea3f9.css",
+    "src": "app/tailwind.css"
+  }
+}

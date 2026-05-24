@@ -4,31 +4,46 @@ import { Link } from 'react-router-dom';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail } from '../hooks/useFunds';
 
-function fmt(n) {
-  if (!n || isNaN(n)) return '—';
-  if (n >= 10000000) return `₹${(n/10000000).toFixed(2)} Cr`;
-  if (n >= 100000) return `₹${(n/100000).toFixed(1)} L`;
-  return `₹${Number(n).toLocaleString('en-IN')}`;
+function parseNavDate(s) {
+  const [dd, mm, yyyy] = s.split('-');
+  return new Date(`${yyyy}-${mm}-${dd}`).getTime();
 }
 
-function calcReturn(navData, days) {
-  if (!navData || navData.length < 2) return null;
-  const parseD = s => { const [dd,mm,yyyy] = s.split('-'); return new Date(`${yyyy}-${mm}-${dd}`); };
-  const latest = parseFloat(navData[0].nav);
-  const cutoff = new Date(parseD(navData[0].date));
-  cutoff.setDate(cutoff.getDate() - days);
-  let best = null, bestDiff = Infinity;
-  for (const d of navData) {
-    const diff = Math.abs(parseD(d.date) - cutoff);
-    if (diff < bestDiff) { bestDiff = diff; best = d; }
+// Pre-sort navData ascending by timestamp (called once per modal open)
+function buildSortedForModal(navData) {
+  return navData.map(d => ({ ts: parseNavDate(d.date), nav: parseFloat(d.nav) }))
+    .filter(d => !isNaN(d.ts) && isFinite(d.nav))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+// Binary search for closest date in pre-sorted array — O(log n) vs O(n)
+function binarySearchModal(sorted, targetTs) {
+  let lo = 0, hi = sorted.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid].ts < targetTs) lo = mid + 1;
+    else hi = mid;
   }
-  if (!best) return null;
-  const old = parseFloat(best.nav);
+  if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+    return lo - 1;
+  }
+  return lo;
+}
+
+function calcReturn(sorted, latestNav, latestTs, days) {
+  if (!sorted || sorted.length < 2) return null;
+  const cutoffTs = latestTs - days * 86400000;
+  const idx = binarySearchModal(sorted, cutoffTs);
+  const found = sorted[idx];
+  // Reject if more than 30 days off (fund may not have data that far back)
+  if (Math.abs(found.ts - cutoffTs) > 30 * 86400000) return null;
+  const old = found.nav;
+  if (old <= 0) return null;
   if (days > 365) {
-    const yrs = days / 365.25; // 365.25 accounts for leap years — more accurate CAGR
-    return ((Math.pow(latest / old, 1 / yrs) - 1) * 100).toFixed(2);
+    const yrs = days / 365.25;
+    return ((Math.pow(latestNav / old, 1 / yrs) - 1) * 100).toFixed(2);
   }
-  return (((latest - old) / old) * 100).toFixed(2);
+  return (((latestNav - old) / old) * 100).toFixed(2);
 }
 
 export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
@@ -51,6 +66,13 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
       .catch(() => { if (mounted) { setError(true); setLoading(false); } });
     return () => { mounted = false; };
   }, [schemeCode]);
+
+  // Keyboard: close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   const toggleWL = () => setWatchlist(p => p.map(String).includes(codeStr) ? p.filter(c => String(c) !== codeStr) : [...p, codeStr]);
   const toggleCmp = () => setCompareList(p => { const s = p.map(String); if (s.includes(codeStr)) return p.filter(c => String(c) !== codeStr); if (p.length >= 4) return p; return [...p, codeStr]; });
@@ -75,10 +97,14 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
     return ((latest - oldest) / (1000*60*60*24*365)).toFixed(1);
   })() : null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}/>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true"/>
 
       {/* Modal */}
       <div className="relative w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl">
@@ -86,9 +112,9 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
         <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-start justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">Fund Details</p>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">{schemeName}</h2>
+            <h2 id="modal-title" className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">{schemeName}</h2>
           </div>
-          <button onClick={onClose} className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg font-bold transition-all">×</button>
+          <button onClick={onClose} aria-label="Close fund details" className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg font-bold transition-all">×</button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -111,7 +137,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                   ['Scheme Code', `#${codeStr}`],
                 ].map(([l,v]) => (
                   <div key={l} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">{l}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{l}</p>
                     <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2">{v}</p>
                   </div>
                 ))}
@@ -122,12 +148,12 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                 <div className="col-span-2 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
                   <p className="text-[10px] text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Latest NAV</p>
                   <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">₹{parseFloat(latestNAV?.nav || 0).toFixed(4)}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">as of {latestNAV?.date}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">as of {latestNAV?.date}</p>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 text-center">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Fund Age</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Fund Age</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{fundAge}</p>
-                  <p className="text-[10px] text-slate-400">years old</p>
+                  <p className="text-[10px] text-slate-500">years old</p>
                 </div>
               </div>
 
@@ -140,11 +166,11 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                     const isPos = val !== null && val >= 0;
                     return (
                       <div key={period} className={`rounded-xl p-3 text-center border ${val === null ? 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700' : isPos ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900' : 'bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900'}`}>
-                        <p className="text-[10px] text-slate-400 mb-1">{period}</p>
-                        <p className={`text-sm font-bold ${val === null ? 'text-slate-400' : isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        <p className="text-[10px] text-slate-500 mb-1">{period}</p>
+                        <p className={`text-sm font-bold ${val === null ? 'text-slate-500' : isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                           {val === null ? '—' : `${isPos ? '+' : ''}${val}%`}
                         </p>
-                        <p className="text-[9px] text-slate-400">{period.includes('Y') && parseInt(period) > 1 ? 'CAGR' : 'Abs'}</p>
+                        <p className="text-[9px] text-slate-500">{period.includes('Y') && parseInt(period) > 1 ? 'CAGR' : 'Abs'}</p>
                       </div>
                     );
                   })}
@@ -160,11 +186,16 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
               {/* Actions */}
               <div className="grid grid-cols-3 gap-3 pt-2">
                 <button onClick={toggleWL}
+                  aria-label={isWL ? 'Remove from watchlist' : 'Add to watchlist'}
+                  aria-pressed={isWL}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isWL ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-950 border border-slate-200 dark:border-slate-700'}`}>
                   {isWL ? '⭐ Saved' : '⭐ Watchlist'}
                 </button>
                 <button onClick={toggleCmp}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isCmp ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : compareList.length >= 4 ? 'opacity-50 bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-950 border border-slate-200 dark:border-slate-700'}`}>
+                  aria-label={isCmp ? 'Remove from comparison' : compareList.length >= 4 ? 'Compare list is full' : 'Add to comparison'}
+                  aria-pressed={isCmp}
+                  disabled={!isCmp && compareList.length >= 4}
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isCmp ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : compareList.length >= 4 ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-950 border border-slate-200 dark:border-slate-700'}`}>
                   {isCmp ? '⚖️ In Compare' : '⚖️ Compare'}
                 </button>
                 <Link to={`/compare?code=${codeStr}`} onClick={onClose}

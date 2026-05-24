@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useDebounce } from '../hooks/useDebounce';
 import SkeletonCard from '../components/SkeletonCard';
 import ErrorState from '../components/ErrorState';
 import FundDetailModal from '../components/FundDetailModal';
@@ -66,7 +67,7 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
         {/* 3 key stats */}
         <div className="grid grid-cols-3 gap-1.5">
           <div className="text-center bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2">
-            <div className="text-[9px] text-slate-400 mb-0.5">Est. Returns</div>
+            <div className="text-[9px] text-slate-500 mb-0.5">Est. Returns</div>
             <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{AVG_RET[cat]}</div>
           </div>
           <div className={`text-center rounded-xl p-2 ${RISK_COLOR[risk]}`}>
@@ -74,7 +75,7 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
             <div className="text-[11px] font-bold">{risk}</div>
           </div>
           <div className="text-center bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2">
-            <div className="text-[9px] text-slate-400 mb-0.5">Min. Horizon</div>
+            <div className="text-[9px] text-slate-500 mb-0.5">Min. Horizon</div>
             <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{HORIZONS[cat]}</div>
           </div>
         </div>
@@ -100,7 +101,9 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
             className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${isCmp ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'}`}>
             {isCmp ? '✓ In Compare' : '+ Compare'}
           </button>
-          <button onClick={() => setWatchlist(p => p.map(String).includes(code) ? p.filter(x => String(x) !== code) : [...p, code])}
+          <button
+            onClick={() => setWatchlist(p => p.map(String).includes(code) ? p.filter(x => String(x) !== code) : [...p, code])}
+            aria-label={isWL ? 'Remove from watchlist' : 'Add to watchlist'}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm transition-all flex-shrink-0 ${isWL ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500'}`}>
             ⭐
           </button>
@@ -126,6 +129,7 @@ export default function Screener() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 250);
   const [tab, setTab] = useState(initialTab);
   const [cat, setCat] = useState(initialCategory);
   const [plan, setPlan] = useState('All');
@@ -156,8 +160,8 @@ export default function Screener() {
       ? funds.filter(f => watchlist.map(String).includes(String(f.schemeCode)))
       : funds;
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter(f => f.schemeName.toLowerCase().includes(q) || String(f.schemeCode).includes(q));
     }
     if (!showClosed) list = list.filter(f => !isFundClosed(f.schemeName));
@@ -177,7 +181,7 @@ export default function Screener() {
       case 'newest': return [...list].sort((a, b) => b.schemeCode - a.schemeCode);
       default: return [...list].sort((a, b) => a.schemeName.localeCompare(b.schemeName));
     }
-  }, [funds, tab, watchlist, search, showClosed, cat, plan, risk, erMax, amc, sort]);
+  }, [funds, tab, watchlist, debouncedSearch, showClosed, cat, plan, risk, erMax, amc, sort]);
 
   const activeCount = useMemo(() => funds.filter(f => !isFundClosed(f.schemeName)).length, [funds]);
   const activeFilters = [search.trim(), cat !== 'All', plan !== 'All', risk !== 'All', erMax !== 'All', amc !== 'All AMCs', showClosed].filter(Boolean).length;
@@ -218,23 +222,25 @@ export default function Screener() {
 
         {/* Search */}
         <div className="relative">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/>
           </svg>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" id="screener-search-input" value={search} onChange={e => setSearch(e.target.value.slice(0, 100))}
             placeholder="Search by fund name, AMC, or scheme code..."
-            className="input-base pl-11 py-3 w-full text-sm"/>
-          {search && <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">✕</button>}
+            className="input-base pl-11 py-3 w-full text-sm"
+            maxLength={100}
+            aria-label="Search funds by name, AMC, or scheme code"/>
+          {search && <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">✕</button>}
         </div>
 
         {/* ── Filter Panel ── */}
         {tab === 'all' && (
           <div className="card p-5 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 🎛️ Filters
                 {activeFilters > 0 && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{activeFilters} active</span>}
-              </h3>
+              </h2>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} className="rounded accent-red-500"/>
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Show closed funds</span>
@@ -243,10 +249,12 @@ export default function Screener() {
 
             {/* Category */}
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Fund Category</label>
-              <div className="flex gap-2 flex-wrap">
+              <label id="fund-category-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Fund Category</label>
+              <div className="flex gap-2 flex-wrap" role="radiogroup" aria-labelledby="fund-category-label">
                 {['All', 'Equity', 'Index', 'Hybrid', 'Debt', 'ELSS', 'Liquid'].map(c => (
                   <button key={c} onClick={() => setCat(c)}
+                    role="radio"
+                    aria-checked={cat === c}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${cat === c ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
                     {c}{c !== 'All' && !loading ? ` (${(catCounts[c] || 0).toLocaleString('en-IN')})` : ''}
                   </button>
@@ -260,10 +268,12 @@ export default function Screener() {
             {/* Plan + Risk */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Plan Type</label>
-                <div className="flex gap-2">
+                <label id="plan-type-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Plan Type</label>
+                <div className="flex gap-2" role="radiogroup" aria-labelledby="plan-type-label">
                   {['All', 'Direct', 'Regular'].map(p => (
                     <button key={p} onClick={() => setPlan(p)}
+                      role="radio"
+                      aria-checked={plan === p}
                       className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${plan === p ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                       {p === 'Direct' ? '✅ Direct' : p === 'Regular' ? '⚠️ Regular' : 'All'}
                     </button>
@@ -273,10 +283,12 @@ export default function Screener() {
                 {plan === 'Regular' && <p className="text-[10px] text-orange-600 mt-1">Regular plans include distributor commission — costs you more.</p>}
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Risk Appetite</label>
-                <div className="flex gap-2 flex-wrap">
+                <label id="risk-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Risk Appetite</label>
+                <div className="flex gap-2 flex-wrap" role="radiogroup" aria-labelledby="risk-label">
                   {['All', 'Very Low', 'Low', 'Moderate', 'High'].map(r => (
                     <button key={r} onClick={() => setRisk(r)}
+                      role="radio"
+                      aria-checked={risk === r}
                       className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all ${risk === r ? 'bg-slate-800 dark:bg-white text-white dark:text-slate-900 border-slate-800 dark:border-white' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
                       {r}
                     </button>
@@ -288,21 +300,21 @@ export default function Screener() {
             {/* ER + AMC + Sort */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Max Expense Ratio</label>
-                <select value={erMax} onChange={e => setErMax(e.target.value)} className="input-base py-2.5 text-xs w-full">
+                <label htmlFor="max-er-select" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Max Expense Ratio</label>
+                <select id="max-er-select" value={erMax} onChange={e => setErMax(e.target.value)} className="input-base py-2.5 text-xs w-full">
                   {['All', 'Under 0.3%', 'Under 0.5%', 'Under 1%', 'Under 1.5%'].map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">Lower = more returns stay with you</p>
+                <p className="text-[10px] text-slate-500 mt-1">Lower = more returns stay with you</p>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Fund House (AMC)</label>
-                <select value={amc} onChange={e => setAmc(e.target.value)} className="input-base py-2.5 text-xs w-full">
+                <label htmlFor="amc-select" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Fund House (AMC)</label>
+                <select id="amc-select" value={amc} onChange={e => setAmc(e.target.value)} className="input-base py-2.5 text-xs w-full">
                   {topAMCs.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Sort By</label>
-                <select value={sort} onChange={e => setSort(e.target.value)} className="input-base py-2.5 text-xs w-full">
+                <label htmlFor="sort-select" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Sort By</label>
+                <select id="sort-select" value={sort} onChange={e => setSort(e.target.value)} className="input-base py-2.5 text-xs w-full">
                   <option value="az">Name A → Z</option>
                   <option value="za">Name Z → A</option>
                   <option value="er_low">Lowest Expense Ratio First</option>
@@ -316,7 +328,7 @@ export default function Screener() {
             {!loading && (
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                 <span className="text-sm font-bold text-slate-900 dark:text-white">{filtered.length.toLocaleString('en-IN')} funds found</span>
-                <span className="text-xs text-slate-400">matching your filters</span>
+                <span className="text-xs text-slate-500">matching your filters</span>
                 {!showClosed && <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full font-semibold">Active only</span>}
               </div>
             )}
@@ -363,7 +375,7 @@ export default function Screener() {
             <button onClick={() => navigate('/compare')} className="bg-white text-blue-600 font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-all">
               Compare Now →
             </button>
-            <button onClick={() => setCompareList([])} className="text-blue-200 hover:text-white text-xs">✕</button>
+            <button onClick={() => setCompareList([])} aria-label="Clear comparison list" className="text-blue-200 hover:text-white text-xs">✕</button>
           </div>
         </div>
       )}
