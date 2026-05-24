@@ -44,8 +44,10 @@ export function calculateFundMetrics(navData) {
     targetDate.setFullYear(targetDate.getFullYear() - years);
     const targetTs = targetDate.getTime();
     const idx = binarySearchClosest(sorted, targetTs);
+    // Tighter tolerance for short periods: 7d for 1Y, 10d for 3Y, 15d for 5Y, 30d for 10Y+
+    const toleranceDays = years <= 1 ? 7 : years <= 3 ? 10 : years <= 5 ? 15 : 30;
     const diff = Math.abs(sorted[idx].ts - targetTs);
-    if (diff > 30 * 24 * 60 * 60 * 1000) return null;
+    if (diff > toleranceDays * 24 * 60 * 60 * 1000) return null;
     return sorted[idx].nav;
   };
 
@@ -70,6 +72,8 @@ export function calculateFundMetrics(navData) {
   const return3Y  = calcCAGR(getNavAgo(3), 3);
   const return5Y  = calcCAGR(getNavAgo(5), 5);
   const return10Y = calcCAGR(getNavAgo(10), 10);
+  // Use longest available return period for Sortino so numerator & denominator cover same timespan
+  const sortinoReturn = return5Y ?? return3Y ?? return1Y;
 
   return {
     return1Y,
@@ -79,7 +83,7 @@ export function calculateFundMetrics(navData) {
     maxDrawdown: maxDrawdown * 100,
     volatility,
     sharpe: calculateSharpeRatio(return1Y, volatility),
-    sortino: calculateSortinoRatio(navData, return1Y),
+    sortino: sortinoReturn !== null ? calculateSortinoRatio(navData, sortinoReturn) : null,
   };
 }
 
@@ -225,19 +229,20 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   const profit = currentValue - totalInvested;
   const absoluteReturn = (profit / totalInvested) * 100;
 
-  // XIRR approximation via binary search on monthly IRR
+  // XIRR approximation via bisection on monthly IRR
+  // Bug-fixed: converge on the RATE interval (not on value match), break correctly
   let xirr = null;
   try {
-    let low = -0.5, high = 2.0;
+    let lo = -0.5, hi = 2.0;
+    let monthlyRate = (lo + hi) / 2;
     for (let iter = 0; iter < 200; iter++) {
-      const r = (low + high) / 2;
-      if (Math.abs(r) < 1e-10) break;
-      const fv = monthlyAmount * (1 + r) * (Math.pow(1 + r, n) - 1) / r;
-      if (Math.abs(fv - currentValue) < 1) { low = r; break; }
-      if (fv > currentValue) high = r;
-      else low = r;
+      monthlyRate = (lo + hi) / 2;
+      if (Math.abs(hi - lo) < 1e-9) break;          // converged on rate
+      if (Math.abs(monthlyRate) < 1e-10) { monthlyRate = 0; break; }
+      const fv = monthlyAmount * (1 + monthlyRate) * (Math.pow(1 + monthlyRate, n) - 1) / monthlyRate;
+      if (fv > currentValue) hi = monthlyRate;
+      else lo = monthlyRate;
     }
-    const monthlyRate = (low + high) / 2;
     xirr = parseFloat(((Math.pow(1 + monthlyRate, 12) - 1) * 100).toFixed(2));
     if (!isFinite(xirr) || xirr < -50 || xirr > 200) xirr = null;
   } catch { xirr = null; }
@@ -258,11 +263,20 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
 export function calculateBestWorstMonth(navData) {
   if (!navData || navData.length < 30) return null;
   const monthMap = {};
-  
+
+  // Exclude the current partial month — it distorts best/worst since it's not a complete month
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
   // Group navs by month (navData is sorted newest first)
   navData.forEach(d => {
-    const [, mm, yyyy] = d.date.split('-');
+    if (!d?.date) return;
+    const parts = d.date.split('-');
+    if (parts.length !== 3) return;
+    const [, mm, yyyy] = parts;
+    if (!mm || !yyyy) return;
     const key = `${yyyy}-${mm}`;
+    if (key === currentMonthKey) return; // skip incomplete current month
     if (!monthMap[key]) monthMap[key] = [];
     monthMap[key].push(parseFloat(d.nav));
   });
@@ -278,7 +292,7 @@ export function calculateBestWorstMonth(navData) {
 
   if (monthReturns.length === 0) return null;
   monthReturns.sort((a, b) => a.returnPct - b.returnPct);
-  
+
   return {
     worst: monthReturns[0],
     best: monthReturns[monthReturns.length - 1]

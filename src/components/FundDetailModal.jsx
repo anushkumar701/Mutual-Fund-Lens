@@ -95,11 +95,12 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
       }
     };
     document.addEventListener('keydown', handleKeyDown);
-    // Move focus into modal on open
+    // Move focus to modal title for correct screen reader context (not ✕ button)
+    const titleEl = modalRef.current?.querySelector('[data-modal-title]');
     const firstFocusable = modalRef.current?.querySelector(
       'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
     );
-    firstFocusable?.focus();
+    (titleEl || firstFocusable)?.focus();
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
@@ -148,7 +149,12 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
         <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-start justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">Fund Details</p>
-            <h2 id="modal-title" className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">{schemeName}</h2>
+            <h2
+              id="modal-title"
+              data-modal-title
+              tabIndex={-1}
+              className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 focus:outline-none"
+            >{schemeName}</h2>
           </div>
           <button onClick={onClose} aria-label="Close fund details" className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg font-bold transition-all">×</button>
         </div>
