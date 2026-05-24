@@ -1,6 +1,6 @@
 // App.jsx
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -13,7 +13,22 @@ const Screener = lazy(() => import('./pages/Screener'));
 const Compare = lazy(() => import('./pages/Compare'));
 const SIPCalculator = lazy(() => import('./pages/SIPCalculator'));
 
-// Theme is applied in index.html <script> to prevent flash — see index.html
+// Per-route titles — updates document.title on every navigation
+const ROUTE_TITLES = {
+  '/':        'FundLens — Mutual Fund Research & Analysis',
+  '/screener':'Fund Screener — Browse 37,000+ Mutual Funds | FundLens',
+  '/compare': 'Compare Funds Side-by-Side | FundLens',
+  '/sip':     'SIP & FIRE Calculator | FundLens',
+};
+
+function PageTitleUpdater() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const title = ROUTE_TITLES[pathname] ?? 'FundLens — Mutual Fund Analysis Platform';
+    document.title = title;
+  }, [pathname]);
+  return null;
+}
 
 export default function App() {
   return (
@@ -27,6 +42,7 @@ export default function App() {
       </a>
       <ToastProvider>
         <BrowserRouter>
+          <PageTitleUpdater />
           <NavBar />
           <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col" role="main" aria-label="Main content">
             <div className="flex-1">

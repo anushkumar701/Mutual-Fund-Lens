@@ -4,6 +4,8 @@ import axios from 'axios';
 import { get, set } from 'idb-keyval';
 
 const BASE_URL = 'https://api.mfapi.in/mf';
+// ⚠️ Module-level singletons — intentionally CLIENT-ONLY (pure SPA, no SSR).
+// Do NOT enable SSR without refactoring these to per-request scope.
 let memoryCachedList = null;
 let activeListFetchPromise = null;
 const activeDetailFetchPromises = new Map();
@@ -11,24 +13,31 @@ const activeDetailFetchPromises = new Map();
 const FUND_LIST_CACHE_KEY = 'fundlens_all_funds_v2'; // v2 busts old forever-cached data
 const FUND_LIST_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-// Capped Map to prevent memory leaks from long-lived tabs
-class CappedMap extends Map {
-  constructor(maxSize) {
-    super();
-    this.maxSize = maxSize;
+/**
+ * Proper LRU CappedMap — evicts the least recently USED entry (not oldest inserted).
+ * On get(), the entry is re-inserted at the tail (most-recent position).
+ */
+class CappedLRU extends Map {
+  constructor(maxSize) { super(); this.maxSize = maxSize; }
+  get(key) {
+    if (!this.has(key)) return undefined;
+    const value = super.get(key);
+    this.delete(key);
+    super.set(key, value); // re-insert at tail = mark as most recently used
+    return value;
   }
   set(key, value) {
+    if (this.has(key)) this.delete(key);
     super.set(key, value);
     if (this.size > this.maxSize) {
-      const firstKey = this.keys().next().value;
-      this.delete(firstKey);
+      this.delete(this.keys().next().value); // evict LRU (head = oldest)
     }
     return this;
   }
 }
 
-// Memory cache for individual details, capped at 50 entries
-const detailsMemoryCache = new CappedMap(50);
+// Memory cache for individual details, capped at 50 entries (LRU eviction)
+const detailsMemoryCache = new CappedLRU(50);
 
 // Retry with exponential backoff
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -168,13 +177,16 @@ export async function fetchFundDetail(schemeCode) {
   return promise;
 }
 
-export async function prefetchTopFunds(fundCodes) {
-  // Silent background fetch for top funds
-  for (const code of fundCodes) {
-    try {
-      await fetchFundDetail(code);
-    } catch (e) {
-      // Ignore errors for prefetching
+export async function prefetchTopFunds(fundCodes, signal) {
+  // Rate-limited: fetch in batches of 3 with 200ms gap — prevents API abuse on mfapi.in
+  const BATCH_SIZE = 3;
+  const BATCH_DELAY_MS = 200;
+  for (let i = 0; i < fundCodes.length; i += BATCH_SIZE) {
+    if (signal?.aborted) break; // respect cancellation from Dashboard unmount
+    const chunk = fundCodes.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(chunk.map(code => fetchFundDetail(code)));
+    if (i + BATCH_SIZE < fundCodes.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 }

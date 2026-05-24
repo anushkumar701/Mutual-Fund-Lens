@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 600,
     sourcemap: false, // never expose source in production
+    ssr: false,       // explicit: this is a pure client-side SPA
     rollupOptions: {
       output: {
         manualChunks: {
@@ -14,7 +15,9 @@ export default defineConfig({
           'charts': ['recharts'],
           'export': ['html2canvas'],
           'db': ['idb-keyval', 'axios'],
-          'sentry': ['@sentry/react'],
+          // Note: sentry is intentionally NOT here — it is dynamically imported
+          // in main.jsx only when VITE_SENTRY_DSN is defined. Putting it in
+          // manualChunks would cause the browser to pre-fetch it for ALL users.
         },
       },
     },

@@ -339,35 +339,37 @@ export default function Screener() {
         )}
 
         {/* ── Results ── */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array(8).fill(0).map((_, i) => <SkeletonCard key={i}/>)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-3">🔍</div>
-            <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">No funds match your filters</p>
-            <p className="text-sm text-slate-400 mb-5">Try removing some filters or search differently</p>
-            <button onClick={clearAll} className="btn-secondary px-5 py-2">Clear All Filters</button>
-          </div>
-        ) : (
-          <>
+        <div aria-live="polite" aria-busy={loading}>
+          {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.slice(0, page).map(fund => (
-                <FundCard key={fund.schemeCode} fund={fund}
-                  watchlist={watchlist} setWatchlist={setWatchlist}
-                  compareList={compareList} setCompareList={setCompareList}
-                  onDetails={setModalFund}/>
-              ))}
+              {Array(8).fill(0).map((_, i) => <SkeletonCard key={i}/>)}
             </div>
-            {filtered.length > page && (
-              <div className="text-center pt-4">
-                <p className="text-xs text-slate-400 mb-2">Showing {Math.min(page, filtered.length)} of {filtered.length.toLocaleString('en-IN')}</p>
-                <button onClick={() => setPage(p => p + 48)} className="btn-secondary px-6 py-2.5">Load More Funds</button>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="text-5xl mb-3">🔍</div>
+              <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">No funds match your filters</p>
+              <p className="text-sm text-slate-400 mb-5">Try removing some filters or search differently</p>
+              <button onClick={clearAll} className="btn-secondary px-5 py-2">Clear All Filters</button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.slice(0, page).map(fund => (
+                  <FundCard key={fund.schemeCode} fund={fund}
+                    watchlist={watchlist} setWatchlist={setWatchlist}
+                    compareList={compareList} setCompareList={setCompareList}
+                    onDetails={setModalFund}/>
+                ))}
               </div>
-            )}
-          </>
-        )}
+              {filtered.length > page && (
+                <div className="text-center pt-4">
+                  <p className="text-xs text-slate-400 mb-2">Showing {Math.min(page, filtered.length)} of {filtered.length.toLocaleString('en-IN')}</p>
+                  <button onClick={() => setPage(p => p + 48)} className="btn-secondary px-6 py-2.5">Load More Funds</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Floating compare banner */}

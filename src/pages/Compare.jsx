@@ -211,7 +211,7 @@ export default function Compare() {
     return data;
   }, [fundData, range]);
 
-  // Annual calendar-year returns for each fund
+  // Annual calendar-year returns — O(n log n) via binary search (was O(n²) linear scan)
   const annualReturns = useMemo(() => {
     if (fundData.length === 0) return { years: [], data: {} };
     const now = new Date();
@@ -228,24 +228,30 @@ export default function Compare() {
     const data = {};
     fundData.forEach(fund => {
       const name = fund.meta?.scheme_name || String(fund.schemeCode);
-      if (!fund.navData) return;
-      allYears.forEach(year => {
-        const startTarget = new Date(`${year}-01-01`);
-        const endTarget = year === currentYear ? now : new Date(`${year}-12-31`);
-        let sNav = null, eNav = null, minSD = Infinity, minED = Infinity;
-        fund.navData.forEach(d => {
+      if (!fund.navData || fund.navData.length === 0) return;
+      // Pre-sort once per fund (O(n log n)) then binary search per year (O(log n))
+      const sorted = [...fund.navData]
+        .reverse()
+        .map(d => {
           const [dd, mm, yy] = d.date.split('-');
-          const dt = new Date(`${yy}-${mm}-${dd}`);
-          const sd = Math.abs(dt - startTarget);
-          const ed = Math.abs(dt - endTarget);
-          if (sd < minSD) { minSD = sd; sNav = parseFloat(d.nav); }
-          if (ed < minED) { minED = ed; eNav = parseFloat(d.nav); }
-        });
+          return { ts: new Date(`${yy}-${mm}-${dd}`).getTime(), nav: parseFloat(d.nav) };
+        })
+        .filter(d => !isNaN(d.ts) && isFinite(d.nav));
+
+      const findNav = (targetDate) => {
+        const targetTs = targetDate.getTime();
+        let lo = 0, hi = sorted.length - 1;
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid].ts < targetTs) lo = mid + 1; else hi = mid; }
+        if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) lo--;
+        const diff = Math.abs(sorted[lo].ts - targetTs);
+        return diff < 20 * 86400000 ? sorted[lo].nav : null;
+      };
+
+      allYears.forEach(year => {
+        const sNav = findNav(new Date(`${year}-01-01`));
+        const eNav = findNav(year === currentYear ? now : new Date(`${year}-12-31`));
         if (!data[year]) data[year] = {};
-        // Only record if start NAV is within 20 days of Jan 1
-        if (sNav && eNav && minSD < 20 * 86400000) {
-          data[year][name] = ((eNav - sNav) / sNav) * 100;
-        }
+        if (sNav && eNav) data[year][name] = ((eNav - sNav) / sNav) * 100;
       });
     });
     const validYears = allYears.filter(y => Object.keys(data[y] || {}).length > 0);

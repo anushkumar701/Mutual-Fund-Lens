@@ -96,6 +96,7 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
         )}
 
         {/* Metrics */}
+        {/* Metrics */}
         {(() => {
           const metrics = calculateFundMetrics(navData);
           if (!metrics) return <div className="text-xs text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">Metrics not available</div>;
@@ -145,19 +146,19 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
                   <div>
                     <span className="text-slate-500">1Y Return</span>
                     <div className={`font-bold text-sm ${metrics.return1Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return1Y !== null ? `${metrics.return1Y.toFixed(2)}%` : '—'}
+                      {metrics.return1Y !== null ? `${metrics.return1Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return1Y).toFixed(2)}%` : '—'}
                     </div>
                   </div>
                   <div>
                     <span className="text-slate-500">3Y CAGR</span>
                     <div className={`font-bold text-sm ${metrics.return3Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return3Y !== null ? `${metrics.return3Y.toFixed(2)}%` : '—'}
+                      {metrics.return3Y !== null ? `${metrics.return3Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return3Y).toFixed(2)}%` : '—'}
                     </div>
                   </div>
                   <div>
                     <span className="text-slate-500">5Y CAGR</span>
                     <div className={`font-bold text-sm ${metrics.return5Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return5Y !== null ? `${metrics.return5Y.toFixed(2)}%` : '—'}
+                      {metrics.return5Y !== null ? `${metrics.return5Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return5Y).toFixed(2)}%` : '—'}
                     </div>
                   </div>
                   <div>
@@ -194,7 +195,7 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
                     <div>
                       <span className="text-slate-400">10Y CAGR</span>
                       <div className={`font-bold text-sm ${metrics.return10Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {metrics.return10Y.toFixed(2)}%
+                        {metrics.return10Y >= 0 ? '▲' : '▼'} {Math.abs(metrics.return10Y).toFixed(2)}%
                       </div>
                     </div>
                   )}

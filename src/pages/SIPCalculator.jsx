@@ -503,6 +503,23 @@ export default function SIPCalculator() {
             </div>
 
             <div className="space-y-4">
+              {/* ⚠️ New Tax Regime Disclaimer — critical: must be shown prominently */}
+              <div className="card p-4 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700">
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-semibold">
+                  ⚠️ Old Tax Regime Only — Section 80C deductions (including ELSS) are{' '}
+                  <strong>not available under the New Tax Regime</strong> (default from FY 2023-24).
+                  If you have opted for the new regime, your tax saving from ELSS is ₹0.
+                  <a
+                    href="https://incometaxindia.gov.in/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline ml-1 text-amber-700 dark:text-amber-300"
+                    aria-label="Income Tax India website for regime information"
+                  >
+                    Learn more →
+                  </a>
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="card p-5 text-center border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950">
                   <p className="text-xs text-slate-400 mb-1">Tax Saved</p>

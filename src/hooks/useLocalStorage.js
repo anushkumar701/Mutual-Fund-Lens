@@ -11,7 +11,7 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
-  // Sync across browser tabs
+  // Sync across browser tabs (storage event only fires for OTHER tabs)
   useEffect(() => {
     const handler = (e) => {
       if (e.key === key && e.newValue !== null) {
@@ -26,14 +26,18 @@ export function useLocalStorage(key, initialValue) {
 
   const setValue = (value) => {
     try {
-      setStoredValue((currentValue) => {
-        const valueToStore = value instanceof Function ? value(currentValue) : value;
-        localStorage.setItem(key, JSON.stringify(valueToStore));
-        return valueToStore;
-      });
+      // Read current persisted value to resolve functional updates correctly
+      let current = initialValue;
+      try { current = JSON.parse(localStorage.getItem(key) ?? 'null') ?? initialValue; } catch { /* ignore */ }
+      const valueToStore = value instanceof Function ? value(current) : value;
+      // Write to storage FIRST (synchronous) — NOT inside the state updater
+      // Prevents React 18 Strict Mode double-invocation from double-writing storage
+      localStorage.setItem(key, JSON.stringify(valueToStore));
+      setStoredValue(valueToStore);
     } catch {
-      // Silently ignore storage errors (e.g. private browsing quota exceeded).
-      // The in-memory state remains valid for the session.
+      // Storage quota exceeded / private mode — fall back to in-memory state only
+      const current = storedValue;
+      setStoredValue(value instanceof Function ? value(current) : value);
     }
   };
 
