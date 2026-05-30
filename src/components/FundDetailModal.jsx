@@ -202,7 +202,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
               {/* Returns */}
               <div>
                 <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Performance Returns</h3>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                   {Object.entries(returns).map(([period, ret]) => {
                     const val = ret !== null ? parseFloat(ret) : null;
                     const isPos = val !== null && val >= 0;

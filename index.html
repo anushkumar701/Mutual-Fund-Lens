@@ -2,7 +2,7 @@
 <html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- Primary Meta -->
     <title>FundLens — Mutual Fund Analysis Platform</title>
@@ -42,19 +42,37 @@
     <link rel="preconnect" href="https://api.mfapi.in" />
     <link rel="dns-prefetch" href="https://api.mfapi.in" />
 
-    <!-- Non-blocking font load: preload → switch to stylesheet on load -->
+    <!--
+      Font: loaded as a blocking stylesheet so the font is available for LCP text.
+      Inter is declared in CSS with font-display:swap so the browser renders text
+      immediately in the fallback font and swaps when Inter loads — zero layout shift
+      because we size-adjust the fallback to match Inter's metrics.
+    -->
     <link
-      rel="preload"
-      as="style"
+      rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
     />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
-    </noscript>
 
-    <!-- Theme flash prevention: loaded as external script (CSP 'self' safe) -->
-    <script src="/theme-flash.js"></script>
+    <!--
+      Theme flash prevention — inlined so it runs synchronously before any paint.
+      The SHA-256 hash of this exact script is whitelisted in the CSP
+      (Content-Security-Policy header in netlify.toml) so no 'unsafe-inline' needed.
+      DO NOT modify whitespace inside this script without regenerating the hash.
+    -->
+    <script>
+(function(){var t=localStorage.getItem('fundlens_theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}})();
+</script>
+
+    <!--
+      Critical CSS: prevent layout shift on LCP heading by pre-declaring font stack.
+      Ensures the heading renders in correct font metrics before Inter loads.
+    -->
+    <style>
+      html { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+      body { margin: 0; background: #f0f4f8; }
+      .dark body { background: #0d1117; }
+      #root { min-height: 100vh; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -144,14 +144,14 @@ function QuickCalc() {
   );
   const fmt = n => n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(1)} L` : `₹${n.toLocaleString('en-IN')}`;
   return (
-    <div className="card p-5 h-full">
-      <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">🧮 Quick SIP Calculator</h3>
+    <div className="card p-4 sm:p-5 h-full">
+      <h3 className="font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">🧮 Quick SIP Calculator</h3>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {[['monthly-amt', 'Monthly ₹', amt, setAmt, 100, 200000], ['sip-years', 'Years', yrs, setYrs, 1, 40], ['return-rate', 'Return %', rate, setRate, 1, 30]].map(([id, l, v, s, mn, mx]) => (
           <div key={l}>
             <label htmlFor={id} className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">{l}</label>
             <input id={id} type="number" value={v} onChange={e => s(Math.max(mn, Math.min(mx, +e.target.value)))}
-              className="input-base w-full py-2 text-sm text-center font-bold"/>
+              className="input-base w-full py-2 text-sm text-center font-bold" inputMode="numeric"/>
           </div>
         ))}
       </div>
@@ -197,9 +197,9 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen pb-20 md:pb-8">
+    <div className="min-h-screen pb-24 md:pb-8">
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden pt-24 pb-16 px-4 md:pt-28">
+      <section className="relative overflow-hidden pt-20 pb-12 px-4 md:pt-28 md:pb-16">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl"/>
         </div>
@@ -210,7 +210,7 @@ export default function Dashboard() {
               Live data · {loading ? '...' : `${funds.length.toLocaleString('en-IN')}+`} mutual funds
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-slate-900 dark:text-white leading-tight tracking-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-4 text-slate-900 dark:text-white leading-tight tracking-tight">
             Find & Analyse<br/>
             <span className="text-blue-600 dark:text-blue-500">
               Any Mutual Fund
@@ -231,10 +231,10 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-            <Link to="/screener" className="btn-primary px-5 py-2.5 shadow-md">🔍 Browse & Filter Funds</Link>
-            <Link to="/compare" className="btn-secondary px-5 py-2.5">⚖️ Compare Funds</Link>
-            <Link to="/sip" className="btn-secondary px-5 py-2.5">🔥 SIP + FIRE Calc</Link>
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-6 w-full max-w-md sm:max-w-none mx-auto">
+            <Link to="/screener" className="btn-primary px-5 py-3 shadow-md w-full sm:w-auto text-center">🔍 Browse & Filter Funds</Link>
+            <Link to="/compare" className="btn-secondary px-5 py-3 w-full sm:w-auto text-center">⚖️ Compare Funds</Link>
+            <Link to="/sip" className="btn-secondary px-5 py-3 w-full sm:w-auto text-center">🔥 SIP + FIRE Calc</Link>
           </div>
         </div>
         </section>
@@ -244,7 +244,7 @@ export default function Dashboard() {
 
         {/* ── Quick Tools Grid ── */}
         <section aria-labelledby="quick-tools-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 320px'}}>
-          <h2 id="quick-tools-heading" className="sr-only">Quick Tools</h2>
+          <h2 id="quick-tools-heading" className="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Tools</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <QuickCalc/>
             <div className="card p-5 h-full">
@@ -275,10 +275,10 @@ export default function Dashboard() {
 
         {/* ── Browse by Category ── */}
         {!loading && !error && (
-          <section style={{contentVisibility:'auto', containIntrinsicSize:'auto 280px'}}>
+          <section aria-labelledby="browse-category-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 280px'}}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Browse by Category</h2>
+                <h2 id="browse-category-heading" className="text-xl font-bold text-slate-900 dark:text-white">Browse by Category</h2>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">Click any category to explore in Screener</p>
               </div>
               <Link to="/screener" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">View All →</Link>
@@ -305,9 +305,9 @@ export default function Dashboard() {
 
         {/* ── Watchlist ── */}
         {!loading && watchlistFunds.length > 0 && (
-          <section style={{contentVisibility:'auto', containIntrinsicSize:'auto 260px'}}>
+          <section aria-labelledby="watchlist-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 260px'}}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">⭐ My Watchlist</h2>
+              <h2 id="watchlist-heading" className="text-xl font-bold text-slate-900 dark:text-white">⭐ My Watchlist</h2>
               <Link to="/screener?tab=watchlist" className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                 View all {watchlist.length} →
               </Link>
@@ -340,7 +340,7 @@ export default function Dashboard() {
         )}
 
         {/* ── 3 CTA cards ── */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" style={{contentVisibility:'auto', containIntrinsicSize:'auto 200px'}}>
+        <section aria-label="Explore FundLens features" className="grid grid-cols-1 sm:grid-cols-3 gap-4" style={{contentVisibility:'auto', containIntrinsicSize:'auto 200px'}}>
           {[
             { t: 'Fund Screener', d: 'Advanced filters to find the right fund for you.', cta: 'Find Funds →', to: '/screener', g: 'from-blue-600 to-blue-700' },
             { t: 'Compare Funds', d: 'Compare up to 4 funds side by side.', cta: 'Compare →', to: '/compare', g: 'from-emerald-600 to-teal-600' },

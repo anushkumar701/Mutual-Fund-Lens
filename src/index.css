@@ -8,9 +8,27 @@
    Dark:  Deep navy (#0d1117) — like Bloomberg Terminal
    ═══════════════════════════════════════════════════════════════ */
 
+/*
+  ── CLS Fix: Size-adjust fallback fonts ─────────────────────────
+  These @font-face rules create "adjusted" versions of the system
+  fallback fonts whose metrics (ascent, descent, line-gap, size)
+  are tuned to match Inter's metrics as closely as possible.
+  The browser uses these when Inter hasn't loaded yet, so the
+  reserved text boxes are the same size → zero layout shift.
+  Values measured with fontpie / capsizecss for Inter 400-800.
+*/
+@font-face {
+  font-family: 'Inter-fallback';
+  src: local('Arial');
+  size-adjust: 107%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 @layer base {
   html {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', 'Inter-fallback', system-ui, -apple-system, sans-serif;
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
   }
@@ -37,6 +55,15 @@
   }
 
   * { box-sizing: border-box; }
+
+  /* ── Mobile touch / tap improvements ── */
+  button, a, [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Smooth scrolling on iOS */
+  * { -webkit-overflow-scrolling: touch; }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -183,6 +210,33 @@ input[type='range'] {
 
 /* ══ Bottom Nav Safe Area ════════════════════════════════════════ */
 .bottom-nav-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+/* ══ Mobile page bottom padding (accounts for bottom nav + safe area) ═══ */
+.page-pb-mobile { padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
+
+/* ══ Touch-friendly min-tap-target ═══════════════════════════════ */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ══ Prevent horizontal scroll bleed on mobile ═══════════════════ */
+.overflow-x-clip { overflow-x: clip; }
+
+/* ══ Mobile chart container — prevents overflowing on narrow screens ═ */
+@media (max-width: 640px) {
+  .recharts-wrapper {
+    max-width: 100% !important;
+    overflow: hidden;
+  }
+  /* Increase nav touch targets on mobile */
+  nav a, nav button {
+    min-height: 44px;
+  }
+}
 
 /* ══ Respect Reduced Motion (Accessibility) ═════════════════════ */
 @media (prefers-reduced-motion: reduce) {

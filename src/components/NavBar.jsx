@@ -119,8 +119,8 @@ export default function NavBar() {
         <ThemeToggle />
       </nav>
 
-      {/* Mobile header (just logo + theme) */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4">
+      {/* Mobile header bar (logo + theme toggle) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4">
         <NavLink to="/" aria-label="FundLens home" className="flex items-center gap-2">
           <svg className="w-6 h-6 text-blue-600" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <polyline points="3,17 9,11 13,15 21,7" strokeLinecap="round" strokeLinejoin="round" />
@@ -130,7 +130,7 @@ export default function NavBar() {
           </span>
         </NavLink>
         <ThemeToggle />
-      </header>
+      </div>
 
       {/* Mobile bottom navigation */}
       <nav aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1117] border-t border-slate-200 dark:border-slate-800 bottom-nav-safe">
@@ -143,24 +143,32 @@ export default function NavBar() {
               id={`mobile-nav-${label.toLowerCase().replace(' ', '-')}`}
               aria-label={label}
               className={({ isActive }) =>
-                `relative flex flex-col items-center justify-center gap-1 flex-1 py-2 text-xs font-medium transition-colors ${
+                `relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[56px] text-[11px] font-medium transition-colors ${
                   isActive
                     ? 'text-blue-600 dark:text-blue-400'
                     : 'text-slate-500 dark:text-slate-400'
                 }`
               }
             >
-              <span className="relative">
-                {icon}
-                {badgeKey && (
-                  <NavBadge storageKey={badgeKey} color={badgeColor || 'bg-blue-500'} />
-                )}
-              </span>
-              <span>{label}</span>
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                  )}
+                  <span className="relative">
+                    {icon}
+                    {badgeKey && (
+                      <NavBadge storageKey={badgeKey} color={badgeColor || 'bg-blue-500'} />
+                    )}
+                  </span>
+                  <span className="leading-none">{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </div>
       </nav>
+
     </>
   );
 }
