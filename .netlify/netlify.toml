@@ -35,8 +35,9 @@ X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
 Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
 Cross-Origin-Opener-Policy = "same-origin"
+Cross-Origin-Resource-Policy = "same-origin"
 Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-Content-Security-Policy = "default-src 'self'; script-src 'self'; connect-src 'self' https://api.mfapi.in https://*.sentry.io https://o*.ingest.sentry.io; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-a62t875KwsFSmJPIGp8u6eruQQF2loT6MCUFSAkIPYM='; connect-src 'self' https://api.mfapi.in https://sentry.io https://ingest.sentry.io https://*.ingest.sentry.io; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
 
 [[headers]]
 for = "/assets/*"
@@ -60,7 +61,7 @@ Cache-Control = "public, max-age=86400"
 for = "/index.html"
 
 [headers.values]
-Cache-Control = "public, max-age=0, must-revalidate"
+Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[headers]]
 for = "/manifest.json"
