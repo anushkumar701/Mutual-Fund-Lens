@@ -1,4 +1,4 @@
-name = "mutual-fund-lens"
+name = "mf-lens"
 compatibility_date = "2024-05-30"
 
 [assets]
