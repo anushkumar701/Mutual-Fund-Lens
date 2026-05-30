@@ -91,10 +91,10 @@ export default function SIPCalculator() {
         </div>
 
         {/* Page Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 w-fit flex-wrap">
-          {[['calc','📈 SIP / Lumpsum'],['goal','🎯 Goal Calculator'],['elss','🧾 ELSS Tax Saver'],['fire','🔥 FIRE Calculator']].map(([id, label]) => (
+        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
+          {[['calc','📈 SIP / Lumpsum'],['goal','🎯 Goal'],['elss','🧾 ELSS Tax'],['fire','🔥 FIRE']].map(([id, label]) => (
             <button key={id} onClick={() => setPageTab(id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${pageTab === id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+              className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${pageTab === id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
               {label}
             </button>
           ))}
@@ -298,7 +298,7 @@ export default function SIPCalculator() {
             {/* Growth Chart */}
             <div className="card p-5">
               <h2 className="font-bold text-slate-900 dark:text-white mb-4">Growth Over Time</h2>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={220} className="sm:!h-[280px]">
                 <AreaChart data={result.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
                   <defs>
                     <linearGradient id="investedGrad" x1="0" y1="0" x2="0" y2="1">

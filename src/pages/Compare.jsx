@@ -418,15 +418,15 @@ export default function Compare() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              Fund Comparison
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Fund Comparison</h1>
               {lastRefreshedDate && (
                 <span className="text-[10px] font-semibold tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                  Last Refreshed: {lastRefreshedDate}
+                  Refreshed: {lastRefreshedDate}
                 </span>
               )}
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Compare up to 4 mutual funds side by side</p>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Compare up to 4 mutual funds side by side</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {fundData.length > 0 && (
@@ -617,7 +617,7 @@ export default function Compare() {
                 </div>
               </div>
               {viewMode === 'chart' ? (
-                <ResponsiveContainer width="100%" height={340}>
+                <ResponsiveContainer width="100%" height={260} className="sm:!h-[340px]">
                   <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.15)" />
                     <XAxis

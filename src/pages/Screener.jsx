@@ -253,12 +253,12 @@ export default function Screener() {
             {/* Category */}
             <div>
               <label id="fund-category-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Fund Category</label>
-              <div className="flex gap-2 flex-wrap" role="radiogroup" aria-labelledby="fund-category-label">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1" role="radiogroup" aria-labelledby="fund-category-label">
                 {['All', 'Equity', 'Index', 'Hybrid', 'Debt', 'ELSS', 'Liquid'].map(c => (
                   <button key={c} onClick={() => setCat(c)}
                     role="radio"
                     aria-checked={cat === c}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${cat === c ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${cat === c ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
                     {c}{c !== 'All' && !loading ? ` (${(catCounts[c] || 0).toLocaleString('en-IN')})` : ''}
                   </button>
                 ))}
@@ -301,7 +301,7 @@ export default function Screener() {
             </div>
 
             {/* ER + AMC + Sort */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="max-er-select" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Max Expense Ratio</label>
                 <select id="max-er-select" value={erMax} onChange={e => setErMax(e.target.value)} className="input-base py-2.5 text-xs w-full">

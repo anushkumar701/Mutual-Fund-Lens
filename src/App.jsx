@@ -43,8 +43,10 @@ export default function App() {
       <ToastProvider>
         <BrowserRouter>
           <PageTitleUpdater />
-          <NavBar />
-          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col" role="main" aria-label="Main content">
+          <header role="banner">
+            <NavBar />
+          </header>
+          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" role="main" aria-label="Main content">
             <div className="flex-1">
               <ErrorBoundary>
                 <Suspense fallback={
