@@ -1,0 +1,5 @@
+name = "mutual-fund-lens"
+compatibility_date = "2024-05-30"
+
+[assets]
+directory = "./dist"
