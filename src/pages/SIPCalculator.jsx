@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import SIPSlider from '../components/SIPSlider';
-import { calculateSIP, calculateLumpsum, adjustForInflation, calculateGoalSIP, calculateELSSTaxSaving } from '../utils/sipCalculations';
+import { calculateSIP, calculateLumpsum, adjustForInflation, calculateGoalSIP, calculateELSSTaxSaving, calculateSWP } from '../utils/sipCalculations';
 import { formatINR } from '../utils/formatCurrency';
 
 function ResultCard({ label, value, accent, sub }) {
@@ -33,6 +33,73 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
+function FIRESlider({ id, label, value, onChange, min, max, step = 1, prefix = '', suffix = '', formatFn }) {
+  const [inputVal, setInputVal] = useState('');
+  const [editing, setEditing] = useState(false);
+  const display = formatFn ? formatFn(value) : `${prefix}${Number(value).toLocaleString('en-IN')}${suffix}`;
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const isDark = document.documentElement.classList.contains('dark');
+
+  const handleInputBlur = () => {
+    setEditing(false);
+    const num = Number(inputVal.replace(/,/g, ''));
+    if (!isNaN(num) && num >= min && num <= max) {
+      onChange(num);
+    }
+    setInputVal('');
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-1">
+          {label}
+        </label>
+        {editing ? (
+          <input
+            autoFocus
+            type="number"
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onBlur={handleInputBlur}
+            onKeyDown={e => { if (e.key === 'Enter') handleInputBlur(); if (e.key === 'Escape') { setEditing(false); setInputVal(''); } }}
+            className="text-xs font-bold tabular-nums text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 border-2 border-orange-400 px-2 py-0.5 rounded-lg w-28 text-right focus:outline-none"
+            placeholder={String(value)}
+          />
+        ) : (
+          <button
+            onClick={() => { setEditing(true); setInputVal(String(value)); }}
+            title="Click to type a value"
+            className="text-xs font-bold tabular-nums text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 hover:bg-orange-100 dark:hover:bg-orange-900 px-3 py-1 rounded-lg transition-all cursor-text border border-transparent hover:border-orange-300"
+          >
+            {display} ✎
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-orange-500"
+          style={{
+            background: `linear-gradient(to right, #ea580c ${pct}%, ${isDark ? '#334155' : '#e2e8f0'} ${pct}%)`,
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
+        <span>{prefix}{Number(min).toLocaleString('en-IN')}{suffix}</span>
+        <span className="text-[9px] text-slate-300 dark:text-slate-600">click value to type</span>
+        <span>{prefix}{Number(max).toLocaleString('en-IN')}{suffix}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function SIPCalculator() {
   const [isLumpsum, setIsLumpsum] = useState(false);
   const [inflationMode, setInflationMode] = useState(false);
@@ -51,6 +118,12 @@ export default function SIPCalculator() {
   // ELSS state
   const [elssAmount, setElssAmount] = useState(150000);
   const [taxSlab, setTaxSlab] = useState(30);
+  // SWP state
+  const [swpInvestment, setSwpInvestment] = useState(1000000);
+  const [swpWithdrawal, setSwpWithdrawal] = useState(10000);
+  const [swpReturn, setSwpReturn] = useState(8);
+  const [swpYears, setSwpYears] = useState(10);
+  const [swpShowTable, setSwpShowTable] = useState(false);
   // FIRE state
   const [fireMonthlyExpense, setFireMonthlyExpense] = useState(50000);
   const [fireCurrentAge, setFireCurrentAge] = useState(28);
@@ -80,6 +153,7 @@ export default function SIPCalculator() {
   const goalSIP = useMemo(() => calculateGoalSIP(goalTarget, goalYears, goalReturn), [goalTarget, goalYears, goalReturn]);
   const goalTotal = goalSIP * goalYears * 12;
   const elssResult = useMemo(() => calculateELSSTaxSaving(elssAmount, taxSlab), [elssAmount, taxSlab]);
+  const swpResult = useMemo(() => calculateSWP(swpInvestment, swpWithdrawal, swpReturn, swpYears), [swpInvestment, swpWithdrawal, swpReturn, swpYears]);
 
   return (
     <div className="min-h-screen pb-24 md:pb-8 md:pt-20 pt-16">
@@ -87,12 +161,12 @@ export default function SIPCalculator() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">SIP Calculator</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Estimate returns, plan your goal, and save tax with ELSS</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Estimate returns, plan your goal, save tax with ELSS, and structure SWP withdrawals</p>
         </div>
 
         {/* Page Tabs */}
         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
-          {[['calc','📈 SIP / Lumpsum'],['goal','🎯 Goal'],['elss','🧾 ELSS Tax'],['fire','🔥 FIRE']].map(([id, label]) => (
+          {[['calc','📈 SIP / Lumpsum'],['swp','💸 SWP'],['goal','🎯 Goal'],['elss','🧾 ELSS Tax'],['fire','🔥 FIRE']].map(([id, label]) => (
             <button key={id} onClick={() => setPageTab(id)}
               className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${pageTab === id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
               {label}
@@ -424,6 +498,242 @@ export default function SIPCalculator() {
         </div>
         )} {/* end pageTab === 'calc' */}
 
+        {/* ─ SYSTEMATIC WITHDRAWAL PLAN (SWP) ─ */}
+        {pageTab === 'swp' && (
+          <div className="grid lg:grid-cols-[420px,1fr] gap-6">
+            {/* Left Column: Controls */}
+            <div className="card p-6 space-y-6">
+              <div>
+                <h2 className="font-bold text-slate-900 dark:text-white mb-1">💸 Systematic Withdrawal Plan (SWP)</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Calculate how much regular income you can withdraw from your lump sum corpus and how long it will last.</p>
+              </div>
+
+              <SIPSlider
+                id="swp-investment"
+                label="Total Investment (Initial Corpus)"
+                value={swpInvestment}
+                onChange={setSwpInvestment}
+                min={50000}
+                max={100000000}
+                step={50000}
+                prefix="₹"
+                formatFn={(v) => formatINR(v)}
+              />
+
+              {/* Quick Presets for Investment */}
+              <div className="flex flex-wrap gap-2">
+                {[500000, 1000000, 5000000, 10000000].map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setSwpInvestment(preset)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                      swpInvestment === preset
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {preset >= 10000000 ? `₹${preset / 10000000}Cr` : `₹${preset / 100000}L`}
+                  </button>
+                ))}
+              </div>
+
+              <SIPSlider
+                id="swp-withdrawal"
+                label="Monthly Withdrawal Amount"
+                value={swpWithdrawal}
+                onChange={setSwpWithdrawal}
+                min={1000}
+                max={1000000}
+                step={1000}
+                prefix="₹"
+                formatFn={(v) => formatINR(v)}
+              />
+
+              {/* Safe Withdrawal Presets (e.g. 0.5%, 0.8%, 1% monthly) */}
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                <span className="font-semibold">Recommended monthly withdrawal: </span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {formatINR(Math.round(swpInvestment * 0.005))} - {formatINR(Math.round(swpInvestment * 0.008))}
+                </span> (0.5% - 0.8% of corpus)
+              </div>
+
+              <SIPSlider
+                id="swp-return"
+                label="Expected Annual Return"
+                value={swpReturn}
+                onChange={setSwpReturn}
+                min={1}
+                max={30}
+                step={0.5}
+                suffix="%"
+              />
+
+              <SIPSlider
+                id="swp-years"
+                label="Withdrawal Duration"
+                value={swpYears}
+                onChange={setSwpYears}
+                min={1}
+                max={40}
+                step={1}
+                suffix=" yr"
+              />
+            </div>
+
+            {/* Right Column: Results */}
+            <div className="space-y-5">
+              {/* Output stats cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <ResultCard label="Total Investment" value={formatINR(swpResult.invested)} />
+                <ResultCard label="Total Withdrawn" value={formatINR(swpResult.totalWithdrawn)} />
+                <ResultCard
+                  label="Final Value (Corpus Remaining)"
+                  value={formatINR(swpResult.finalValue)}
+                  accent={swpResult.finalValue > 0}
+                  sub={swpResult.finalValue === 0 ? "🚫 Corpus exhausted early" : "💼 Portfolio left"}
+                />
+                <ResultCard
+                  label="Total Returns Earned"
+                  value={formatINR(swpResult.totalReturns)}
+                  sub="Accrued interest"
+                />
+              </div>
+
+              {/* Status Alert: Ran out vs Sustainable */}
+              {swpResult.ranOutYear !== null ? (
+                <div className="card p-5 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300">
+                  <div className="flex gap-3 items-start">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                      <p className="font-bold text-sm">Corpus Exhausted Early!</p>
+                      <p className="text-xs mt-1">
+                        At your current withdrawal rate, your initial investment of {formatINR(swpResult.invested)} will last only{' '}
+                        <strong className="text-red-700 dark:text-red-400">
+                          {swpResult.ranOutYear} Year{swpResult.ranOutYear > 1 ? 's' : ''}
+                          {swpResult.ranOutMonth > 0 ? ` & ${swpResult.ranOutMonth} Month${swpResult.ranOutMonth > 1 ? 's' : ''}` : ''}
+                        </strong>.
+                      </p>
+                      <p className="text-xs mt-2 text-slate-500">
+                        💡 Tip: Try lowering your monthly withdrawal amount or choosing a higher return asset allocation to make it sustainable.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="card p-5 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
+                  <div className="flex gap-3 items-start">
+                    <span className="text-2xl">🎉</span>
+                    <div>
+                      <p className="font-bold text-sm">Highly Sustainable Plan!</p>
+                      <p className="text-xs mt-1">
+                        Your corpus successfully lasts the full {swpYears} years and still grows to{' '}
+                        <strong>{formatINR(swpResult.finalValue)}</strong>.
+                      </p>
+                      <p className="text-xs mt-1">
+                        Total wealth withdrawn: <strong>{formatINR(swpResult.totalWithdrawn)}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Area Chart showing balance decline / stability */}
+              <div className="card p-5">
+                <h3 className="font-bold text-slate-900 dark:text-white mb-4">Portfolio Balance & Total Withdrawals</h3>
+                <ResponsiveContainer width="100%" height={220} className="sm:!h-[280px]">
+                  <AreaChart data={swpResult.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="swpBalanceGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="swpWithdrawnGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                    <XAxis
+                      dataKey="year"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `Yr ${v}`}
+                      stroke="rgba(148,163,184,0.5)"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      stroke="rgba(148,163,184,0.5)"
+                      tickFormatter={(v) => {
+                        if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`;
+                        if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`;
+                        return `₹${(v / 1000).toFixed(0)}K`;
+                      }}
+                      width={65}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      name="Remaining Portfolio Value"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fill="url(#swpBalanceGrad)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="withdrawn"
+                      name="Cumulative Withdrawn"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      fill="url(#swpWithdrawnGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Table breakdown */}
+              <div className="card overflow-hidden">
+                <button
+                  onClick={() => setSwpShowTable(!swpShowTable)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">📋 {swpShowTable ? 'Hide SWP Schedule ▲' : 'Show SWP Year-by-Year Schedule ▼'}</span>
+                </button>
+                {swpShowTable && (
+                  <div className="overflow-x-auto border-t border-slate-100 dark:border-slate-700">
+                    <div className="min-w-[500px] max-h-72 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider shadow-sm">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Year</th>
+                            <th className="px-4 py-3 text-right font-semibold">Total Withdrawn So Far (₹)</th>
+                            <th className="px-4 py-3 text-right font-semibold">Interest Earned So Far (₹)</th>
+                            <th className="px-4 py-3 text-right font-semibold">Remaining Balance (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                          {swpResult.yearlyData.map((row) => (
+                            <tr key={row.year} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                              <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-300">Yr {row.year}</td>
+                              <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-400 tabular-nums">{formatINR(row.withdrawn)}</td>
+                              <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-400 tabular-nums">{formatINR(row.returns)}</td>
+                              <td className={`px-4 py-2 text-right font-bold tabular-nums ${row.value === 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>{formatINR(row.value)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─ GOAL CALCULATOR ─ */}
         {pageTab === 'goal' && (
           <div className="grid lg:grid-cols-[420px,1fr] gap-6">
@@ -569,9 +879,41 @@ export default function SIPCalculator() {
           const n = yearsToFire * 12;
           const existingGrowth = fireCurrentCorpus * Math.pow(1 + r, n);
           const remaining = Math.max(0, fireCorpus - existingGrowth);
-          const monthlySIP = remaining > 0 && r > 0 ? remaining * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : remaining / Math.max(n, 1);
+          
+          // Fix S = monthlySIP calculation to ensure division by zero doesn't crash
+          const monthlySIP = remaining > 0 && r > 0 
+            ? remaining * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) 
+            : remaining / Math.max(n, 1);
+            
           const progress = Math.min(100, Math.round((fireCurrentCorpus / fireCorpus) * 100));
           const fmt = v => v >= 10000000 ? `₹${(v/10000000).toFixed(2)} Cr` : v >= 100000 ? `₹${(v/100000).toFixed(1)} L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
+
+          const calculateMilestoneAge = (targetPct) => {
+            const milestoneTarget = fireCorpus * targetPct;
+            if (fireCurrentCorpus >= milestoneTarget) {
+              return { reached: true, age: fireCurrentAge, years: 0 };
+            }
+            const S = monthlySIP;
+            const rateVal = fireReturnRate / 100 / 12;
+            if (rateVal <= 0) {
+              if (S <= 0) return { reached: false, age: null, years: null };
+              const months = (milestoneTarget - fireCurrentCorpus) / S;
+              const yrs = months / 12;
+              return { reached: false, age: Math.round(fireCurrentAge + yrs), years: parseFloat(yrs.toFixed(1)) };
+            }
+            const numerator = milestoneTarget + S * ((1 + rateVal) / rateVal);
+            const denominator = fireCurrentCorpus + S * ((1 + rateVal) / rateVal);
+            if (denominator <= 0) return { reached: false, age: null, years: null };
+            
+            const months = Math.log(numerator / denominator) / Math.log(1 + rateVal);
+            const yrs = months / 12;
+            return {
+              reached: false,
+              age: Math.round(fireCurrentAge + yrs),
+              years: parseFloat(yrs.toFixed(1)),
+            };
+          };
+
           return (
             <div className="space-y-6">
               {ageError && (
@@ -579,77 +921,227 @@ export default function SIPCalculator() {
                   ⚠️ Target retire age must be greater than your current age.
                 </div>
               )}
-              <div className="card p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 border-orange-200 dark:border-orange-800">
-                <h2 className="font-bold text-orange-700 dark:text-orange-300 mb-1">🔥 What is FIRE?</h2>
-                <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed"><strong>Financial Independence, Retire Early.</strong> Build a corpus so large that investment returns alone cover all expenses — forever. Classic rule: save 25× your annual expenses (4% withdrawal rate).</p>
+
+              {/* What is FIRE? intro card */}
+              <div className="card p-5 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/40 border-orange-100 dark:border-orange-900/50">
+                <h2 className="font-bold text-orange-800 dark:text-orange-300 text-base mb-1 flex items-center gap-2">
+                  <span>🔥</span> Financial Independence, Retire Early (FIRE)
+                </h2>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  FIRE is the state where your accumulated investments yield returns that fully cover your cost of living.
+                  Under the classic <strong className="text-orange-700 dark:text-orange-400">4% Rule</strong>, saving 25 times your annual expenses allows you to live off returns indefinitely.
+                </p>
               </div>
+
               <div className="grid lg:grid-cols-[400px,1fr] gap-6">
-                <div className="card p-5 space-y-3">
-                  <h3 className="font-bold text-slate-900 dark:text-white">Your FIRE Inputs</h3>
-                  {[
-                    ['Monthly Expenses (₹)', 'fire-monthly-expense', fireMonthlyExpense, setFireMonthlyExpense, 5000, 500000, 1000],
-                    ['Current Age', 'fire-current-age', fireCurrentAge, setFireCurrentAge, 18, 65, 1],
-                    ['Target Retire Age', 'fire-retire-age', fireRetireAge, setFireRetireAge, 25, 80, 1],
-                    ['Portfolio Return (%)', 'fire-return-rate', fireReturnRate, setFireReturnRate, 6, 25, 0.5],
-                    ['Withdrawal Rate (%)', 'fire-withdrawal-rate', fireWithdrawalRate, setFireWithdrawalRate, 2, 8, 0.5],
-                    ['Inflation Rate (%)', 'fire-inflation', fireInflation, setFireInflation, 3, 12, 0.5],
-                    ['Current Corpus (₹)', 'fire-corpus', fireCurrentCorpus, setFireCurrentCorpus, 0, 100000000, 10000],
-                  ].map(([label, id, val, setter, min, max, step]) => (
-                    <div key={label}>
-                      <div className="flex justify-between mb-1">
-                        <label htmlFor={id} className="text-xs font-semibold text-slate-700 dark:text-slate-300">{label}</label>
-                        <span className="text-xs font-bold text-orange-600 tabular-nums">{label.includes('₹') ? fmt(val) : `${val}${label.includes('%') ? '%' : ''}`}</span>
-                      </div>
-                      <input id={id} type="range" min={min} max={max} step={step} value={val} onChange={e => setter(Number(e.target.value))} className="w-full accent-orange-500" aria-label={label}/>
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-4">
-                  <div className="card p-5 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 border-orange-200 dark:border-orange-800 text-center">
-                    <p className="text-xs text-orange-600 uppercase tracking-wider font-bold mb-1">🔥 Your FIRE Number</p>
-                    <p className="text-4xl font-bold text-orange-700 dark:text-orange-300">{fmt(fireCorpus)}</p>
-                    <p className="text-xs text-orange-600 mt-1">Total corpus needed by age {fireRetireAge}</p>
+                {/* Inputs Column */}
+                <div className="card p-5 space-y-6 border-slate-100 dark:border-slate-800">
+                  <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">Your FIRE Parameters</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Adjust inputs or click on any number to type custom values.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+
+                  <FIRESlider
+                    id="fire-monthly-expense"
+                    label="Current Monthly Expenses"
+                    value={fireMonthlyExpense}
+                    onChange={setFireMonthlyExpense}
+                    min={5000}
+                    max={1000000}
+                    step={1000}
+                    prefix="₹"
+                    formatFn={(v) => formatINR(v)}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FIRESlider
+                      id="fire-current-age"
+                      label="Current Age"
+                      value={fireCurrentAge}
+                      onChange={setFireCurrentAge}
+                      min={15}
+                      max={75}
+                      suffix=" yrs"
+                    />
+                    <FIRESlider
+                      id="fire-retire-age"
+                      label="Target Retire Age"
+                      value={fireRetireAge}
+                      onChange={setFireRetireAge}
+                      min={20}
+                      max={85}
+                      suffix=" yrs"
+                    />
+                  </div>
+
+                  <FIRESlider
+                    id="fire-corpus"
+                    label="Current Saved Corpus"
+                    value={fireCurrentCorpus}
+                    onChange={setFireCurrentCorpus}
+                    min={0}
+                    max={100000000}
+                    step={10000}
+                    prefix="₹"
+                    formatFn={(v) => formatINR(v)}
+                  />
+
+                  <FIRESlider
+                    id="fire-return-rate"
+                    label="Expected Annual Return"
+                    value={fireReturnRate}
+                    onChange={setFireReturnRate}
+                    min={4}
+                    max={25}
+                    step={0.5}
+                    suffix="%"
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FIRESlider
+                      id="fire-withdrawal-rate"
+                      label="Safe Withdrawal Rate"
+                      value={fireWithdrawalRate}
+                      onChange={setFireWithdrawalRate}
+                      min={1}
+                      max={10}
+                      step={0.1}
+                      suffix="%"
+                    />
+                    <FIRESlider
+                      id="fire-inflation"
+                      label="Expected Inflation"
+                      value={fireInflation}
+                      onChange={setFireInflation}
+                      min={1}
+                      max={15}
+                      step={0.5}
+                      suffix="%"
+                    />
+                  </div>
+                </div>
+
+                {/* Outputs Column */}
+                <div className="space-y-5">
+                  {/* FIRE Number Card */}
+                  <div className="card p-6 bg-gradient-to-br from-orange-500 to-red-600 text-white border-none shadow-lg relative overflow-hidden">
+                    {/* Background decorations */}
+                    <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+                    <div className="absolute left-1/3 top-2 w-16 h-16 bg-white/5 rounded-full blur-lg" />
+                    
+                    <p className="text-[10px] tracking-widest font-black uppercase text-orange-100">🔥 Your FIRE Target Number</p>
+                    <p className="text-4xl font-extrabold mt-1 tracking-tight tabular-nums">{fmt(fireCorpus)}</p>
+                    <p className="text-xs text-orange-50 font-medium mt-2 leading-relaxed">
+                      This represents the inflation-adjusted corpus required to sustain a monthly lifestyle of {fmt(futureMonthlyExpense)} at age {fireRetireAge} under a {fireWithdrawalRate}% safe withdrawal rate.
+                    </p>
+                  </div>
+
+                  {/* Summary Metric Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      ['Years to FIRE', `${yearsToFire} yrs`, `Age ${fireCurrentAge} → ${fireRetireAge}`, ''],
-                      ['Monthly SIP Needed', fmt(monthlySIP), 'to reach FIRE', 'text-emerald-600 dark:text-emerald-400'],
-                      ['Future Monthly Spend', fmt(futureMonthlyExpense), `at ${fireInflation}% inflation`, ''],
-                      ['Corpus from SIP', fmt(Math.max(0, fireCorpus - existingGrowth)), 'wealth you will create', 'text-blue-600 dark:text-blue-400'],
-                    ].map(([l,v,sub,cls]) => (
-                      <div key={l} className="card p-4 text-center">
-                        <p className="text-[10px] text-slate-400 mb-1">{l}</p>
-                        <p className={`text-xl font-bold ${cls || 'text-slate-900 dark:text-white'}`}>{v}</p>
-                        <p className="text-[10px] text-slate-400">{sub}</p>
+                      ['Time Remaining', `${yearsToFire} years`, `Age ${fireCurrentAge} to ${fireRetireAge}`, ''],
+                      ['Monthly SIP Needed', fmt(monthlySIP), 'To reach target', 'text-emerald-600 dark:text-emerald-400 font-bold'],
+                      ['Future Monthly Spend', fmt(futureMonthlyExpense), `Adjusted for ${fireInflation}% inflation`, ''],
+                      ['Saved Growth Value', fmt(existingGrowth), 'Current corpus compounded', 'text-blue-600 dark:text-blue-400 font-bold'],
+                    ].map(([label, value, desc, extraClass]) => (
+                      <div key={label} className="card p-4 text-center bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                        <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mb-1">{label}</p>
+                        <p className={`text-base font-extrabold ${extraClass || 'text-slate-900 dark:text-white'}`}>{value}</p>
+                        <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1">{desc}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="card p-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">FIRE Progress</span>
-                      <span className="text-xs font-bold text-orange-600">{progress}%</span>
+
+                  {/* FIRE Progress Gauge */}
+                  <div className="card p-5 border-slate-100 dark:border-slate-800">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">FIRE Completion Progress</span>
+                      <span className="text-xs font-extrabold text-orange-600 dark:text-orange-400">{progress}%</span>
                     </div>
                     <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full" style={{width:`${progress}%`}}/>
+                      <div
+                        className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">{fmt(fireCurrentCorpus)} of {fmt(fireCorpus)} goal</p>
+                    <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 font-medium">
+                      <span>Currently Saved: {fmt(fireCurrentCorpus)}</span>
+                      <span>Target: {fmt(fireCorpus)}</span>
+                    </div>
                   </div>
-                  <div className="card p-4">
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">🗓️ Milestones</h4>
-                    <div className="space-y-2">
-                      {[0.25,0.5,0.75,1.0].map(pct => (
-                        <div key={pct} className="flex justify-between text-xs items-center">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${(progress/100)>=pct?'bg-emerald-500':'bg-slate-200 dark:bg-slate-600'}`}/>
-                            <span className="text-slate-500">{pct*100}% — {fmt(fireCorpus*pct)}</span>
+
+                  {/* Milestones Stepper */}
+                  <div className="card p-5 border-slate-100 dark:border-slate-800">
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-4 flex items-center gap-1.5">
+                      <span>🗓️</span> Retirement Milestones
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      {[0.25, 0.5, 0.75, 1.0].map((pct) => {
+                        const milestoneTarget = fireCorpus * pct;
+                        const isCompleted = fireCurrentCorpus >= milestoneTarget;
+                        const est = calculateMilestoneAge(pct);
+                        return (
+                          <div key={pct} className="relative flex gap-4 items-start pb-4 last:pb-0">
+                            {/* Connector line */}
+                            {pct !== 1.0 && (
+                              <div className="absolute left-3 top-6 bottom-0 w-0.5 bg-slate-100 dark:bg-slate-800" />
+                            )}
+                            
+                            {/* Milestone Marker */}
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black z-10 shadow-sm ${
+                              isCompleted
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-2 border-orange-200 dark:border-orange-800'
+                            }`}>
+                              {isCompleted ? '✓' : `${pct * 100}%`}
+                            </div>
+                            
+                            {/* Milestone Data */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center gap-4">
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  {pct === 0.25 ? '¼ Coast FIRE' : pct === 0.5 ? '½ Half FIRE' : pct === 0.75 ? '¾ Lean FIRE' : 'Full FIRE'} ({fmt(milestoneTarget)})
+                                </span>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                  isCompleted
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                                    : 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400'
+                                }`}>
+                                  {isCompleted ? 'Achieved!' : est.age ? `Est. Age ${est.age}` : '—'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                {isCompleted
+                                  ? 'Milestone cleared!'
+                                  : est.years !== null
+                                    ? `Reachable in ${est.years} years of regular SIP investing`
+                                    : 'Need active monthly investment plan'}
+                              </p>
+                            </div>
                           </div>
-                          <span className="font-semibold">{(progress/100)>=pct?'✅ Done':pct===1?`Age ${fireRetireAge}`:'—'}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="card p-3 bg-blue-50 dark:bg-blue-950 border-blue-100 dark:border-blue-900 text-xs text-blue-700 dark:text-blue-300">
-                    💡 The {fireWithdrawalRate}% withdrawal rate means withdrawing {fmt(futureAnnualExpense)}/year. Your corpus keeps growing — making this sustainable indefinitely.
+
+                  {/* FIRE Varieties Educational Card */}
+                  <div className="card p-5 border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10">
+                    <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-3 uppercase tracking-wider">💡 FIRE Variations Guide</h4>
+                    <div className="grid sm:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                        <p className="font-bold text-orange-600 dark:text-orange-400 text-xs">Lean FIRE</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Retiring on a highly frugal budget that covers only basic survival expenses (utilities, simple food, shelter).</p>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                        <p className="font-bold text-blue-600 dark:text-blue-400 text-xs">Coast FIRE</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Having enough invested early so that even without further savings, it will grow to Full FIRE by standard retirement age.</p>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                        <p className="font-bold text-purple-600 dark:text-purple-400 text-xs">Fat FIRE</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Retiring with an abundant, luxurious budget allowing for premium healthcare, travel, dining, and luxury living.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

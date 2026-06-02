@@ -140,3 +140,77 @@ export function calculateELSSTaxSaving(elssAmount, taxSlab) {
     disclaimer: 'Applicable under Old Tax Regime only. New Tax Regime (default from FY 2023-24) does not allow Section 80C deductions.',
   };
 }
+
+/**
+ * Calculate SWP (Systematic Withdrawal Plan)
+ */
+export function calculateSWP(totalInvestment, withdrawalPerMonth, annualReturn, years) {
+  const principal = Math.max(0, Math.min(Number(totalInvestment) || 0, 1_000_000_000));
+  const withdrawal = Math.max(0, Math.min(Number(withdrawalPerMonth) || 0, 10_000_000));
+  const ret = Math.max(0, Math.min(Number(annualReturn) || 0, 100));
+  const yrs = Math.max(0, Math.min(Math.round(Number(years) || 0), 100));
+
+  if (principal <= 0 || yrs <= 0) {
+    return {
+      invested: 0,
+      totalWithdrawn: 0,
+      finalValue: 0,
+      totalReturns: 0,
+      yearlyData: [],
+      ranOutYear: null,
+      ranOutMonth: null,
+    };
+  }
+
+  const r = ret / 100 / 12;
+  const yearlyData = [];
+  let currentBalance = principal;
+  let totalWithdrawn = 0;
+  let totalReturns = 0;
+  let ranOutYear = null;
+  let ranOutMonth = null;
+  let monthCount = 0;
+
+  for (let y = 1; y <= yrs; y++) {
+    for (let m = 0; m < 12; m++) {
+      monthCount++;
+      if (currentBalance <= 0) {
+        if (ranOutYear === null) {
+          ranOutYear = Math.ceil((monthCount - 1) / 12);
+          ranOutMonth = ((monthCount - 1) % 12) || 12;
+        }
+        currentBalance = 0;
+        continue;
+      }
+      const interestEarned = currentBalance * r;
+      const actualWithdrawal = Math.min(currentBalance + interestEarned, withdrawal);
+      currentBalance = currentBalance + interestEarned - actualWithdrawal;
+      totalWithdrawn += actualWithdrawal;
+      totalReturns += interestEarned;
+
+      if (currentBalance <= 0 && ranOutYear === null) {
+        ranOutYear = Math.ceil(monthCount / 12);
+        ranOutMonth = (monthCount % 12) || 12;
+      }
+    }
+    yearlyData.push({
+      year: y,
+      invested: principal,
+      withdrawn: Math.round(totalWithdrawn),
+      value: Math.round(currentBalance),
+      returns: Math.round(totalReturns),
+    });
+  }
+
+  return {
+    invested: Math.round(principal),
+    totalWithdrawn: Math.round(totalWithdrawn),
+    finalValue: Math.round(currentBalance),
+    totalReturns: Math.round(totalReturns),
+    yearlyData,
+    ranOutYear,
+    ranOutMonth,
+  };
+}
+
+
