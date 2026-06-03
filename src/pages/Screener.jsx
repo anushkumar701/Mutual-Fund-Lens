@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useDebounce } from '../hooks/useDebounce';
 import SkeletonCard from '../components/SkeletonCard';
 import ErrorState from '../components/ErrorState';
-import FundDetailModal from '../components/FundDetailModal';
+const FundDetailModal = lazy(() => import('../components/FundDetailModal'));
 import { inferCategory } from '../utils/goalFilters';
 import { extractAMC, getPlanType, estimateER, isFundClosed } from '../utils/fundFilters';
 
@@ -386,11 +386,17 @@ export default function Screener() {
       )}
 
       {modalFund && (
-        <FundDetailModal
-          schemeCode={modalFund.schemeCode}
-          schemeName={modalFund.schemeName}
-          onClose={() => setModalFund(null)}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
+          </div>
+        }>
+          <FundDetailModal
+            schemeCode={modalFund.schemeCode}
+            schemeName={modalFund.schemeName}
+            onClose={() => setModalFund(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

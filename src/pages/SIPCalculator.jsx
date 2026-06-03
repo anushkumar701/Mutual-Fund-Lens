@@ -38,7 +38,6 @@ function FIRESlider({ id, label, value, onChange, min, max, step = 1, prefix = '
   const [editing, setEditing] = useState(false);
   const display = formatFn ? formatFn(value) : `${prefix}${Number(value).toLocaleString('en-IN')}${suffix}`;
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
-  const isDark = document.documentElement.classList.contains('dark');
 
   const handleInputBlur = () => {
     setEditing(false);
@@ -85,9 +84,9 @@ function FIRESlider({ id, label, value, onChange, min, max, step = 1, prefix = '
           step={step}
           value={value}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-orange-500"
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-orange-500 fire-slider-track"
           style={{
-            background: `linear-gradient(to right, #ea580c ${pct}%, ${isDark ? '#334155' : '#e2e8f0'} ${pct}%)`,
+            '--slider-pct': `${pct}%`,
           }}
         />
       </div>
@@ -211,6 +210,9 @@ export default function SIPCalculator() {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Inflation-Adjusted</span>
                 <button
                   id="inflation-toggle"
+                  role="switch"
+                  aria-checked={inflationMode}
+                  aria-label="Toggle inflation-adjusted returns"
                   onClick={() => setInflationMode(!inflationMode)}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
                     inflationMode ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'
