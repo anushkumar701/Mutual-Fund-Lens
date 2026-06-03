@@ -13,19 +13,21 @@ const Screener = lazy(() => import('./pages/Screener'));
 const Compare = lazy(() => import('./pages/Compare'));
 const SIPCalculator = lazy(() => import('./pages/SIPCalculator'));
 
-// Per-route titles — updates document.title on every navigation
-const ROUTE_TITLES = {
-  '/':        'FundLens — Mutual Fund Research & Analysis',
-  '/screener':'Fund Screener — Browse 37,000+ Mutual Funds | FundLens',
-  '/compare': 'Compare Funds Side-by-Side | FundLens',
-  '/sip':     'SIP & FIRE Calculator | FundLens',
+// Per-route meta — updates document.title and meta description on every navigation
+const ROUTE_META = {
+  '/':        { title: 'FundLens — Mutual Fund Research & Analysis', desc: 'Search, compare, and analyse 37,000+ Indian mutual funds. Free SIP calculator, fund screener, and side-by-side comparison.' },
+  '/screener':{ title: 'Fund Screener — Browse 37,000+ Mutual Funds | FundLens', desc: 'Filter mutual funds by category, risk, expense ratio, and AMC. Find the best Direct plan funds for your goals.' },
+  '/compare': { title: 'Compare Funds Side-by-Side | FundLens', desc: 'Compare up to 4 mutual funds with NAV charts, rolling returns, SIP backtesting, and overlap analysis.' },
+  '/sip':     { title: 'SIP & FIRE Calculator | FundLens', desc: 'Calculate SIP returns with step-up, plan FIRE retirement, estimate ELSS tax savings, and structure SWP withdrawals.' },
 };
 
 function PageTitleUpdater() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const title = ROUTE_TITLES[pathname] ?? 'FundLens — Mutual Fund Analysis Platform';
-    document.title = title;
+    const meta = ROUTE_META[pathname] ?? { title: 'FundLens — Mutual Fund Analysis Platform', desc: 'India\'s beginner-friendly mutual fund analysis and screening platform.' };
+    document.title = meta.title;
+    const descEl = document.querySelector('meta[name="description"]');
+    if (descEl) descEl.setAttribute('content', meta.desc);
   }, [pathname]);
   return null;
 }
@@ -43,10 +45,10 @@ export default function App() {
       <ToastProvider>
         <BrowserRouter>
           <PageTitleUpdater />
-          <header role="banner">
+          <header>
             <NavBar />
           </header>
-          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" role="main" aria-label="Main content">
+          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" aria-label="Main content">
             <div className="flex-1">
               <ErrorBoundary>
                 <Suspense fallback={

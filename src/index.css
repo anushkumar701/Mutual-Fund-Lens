@@ -192,6 +192,20 @@ input[type='range'] {
 }
 .dark input[type='range'] { accent-color: #3b82f6; }
 
+/* Slider track fill via CSS custom property — avoids DOM reads in JS */
+.sip-slider-track {
+  background: linear-gradient(to right, #2563eb var(--slider-pct, 50%), #e2e8f0 var(--slider-pct, 50%));
+}
+.dark .sip-slider-track {
+  background: linear-gradient(to right, #2563eb var(--slider-pct, 50%), #334155 var(--slider-pct, 50%));
+}
+.fire-slider-track {
+  background: linear-gradient(to right, #ea580c var(--slider-pct, 50%), #e2e8f0 var(--slider-pct, 50%));
+}
+.dark .fire-slider-track {
+  background: linear-gradient(to right, #ea580c var(--slider-pct, 50%), #334155 var(--slider-pct, 50%));
+}
+
 /* ══ Recharts Tooltip Fix ════════════════════════════════════════ */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   background-color: #ffffff !important;

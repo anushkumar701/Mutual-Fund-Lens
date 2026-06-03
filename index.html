@@ -43,7 +43,8 @@
     <link rel="dns-prefetch" href="https://api.mfapi.in" />
 
     <!--
-      Font: loaded as a blocking stylesheet so the font is available for LCP text.
+      Font: loaded non-blocking via media-swap pattern.
+      The stylesheet loads as print (non-blocking), then swaps to all media on load.
       Inter is declared in CSS with font-display:swap so the browser renders text
       immediately in the fallback font and swaps when Inter loads — zero layout shift
       because we size-adjust the fallback to match Inter's metrics.
@@ -51,7 +52,12 @@
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    </noscript>
 
     <!--
       Theme flash prevention — inlined so it runs synchronously before any paint.
@@ -73,9 +79,37 @@
       .dark body { background: #0d1117; }
       #root { min-height: 100vh; }
     </style>
+
+    <!-- Structured Data: WebApplication schema for SEO rich results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "FundLens",
+      "url": "https://fundlens.netlify.app/",
+      "description": "India's beginner-friendly mutual fund analysis and screening platform. Compare funds, calculate SIP returns, and invest smarter.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "INR"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "FundLens"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding:2rem;text-align:center;font-family:system-ui,sans-serif">
+        <h1>FundLens — Mutual Fund Analysis Platform</h1>
+        <p>JavaScript is required to use FundLens. Please enable JavaScript in your browser settings.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

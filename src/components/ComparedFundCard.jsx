@@ -1,6 +1,5 @@
 // components/ComparedFundCard.jsx
 import { memo } from 'react';
-import PropTypes from 'prop-types';
 import CategoryPill from './CategoryPill';
 import { getFundAgeYears, get52WeekHL, getMonthlyWinRate, guessMinInvestment } from '../utils/chartUtils';
 import { calculateFundMetrics, getSmartTags } from '../utils/metrics';
@@ -208,22 +207,5 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
     </div>
   );
 });
-
-ComparedFundCard.propTypes = {
-  fund: PropTypes.shape({
-    meta: PropTypes.shape({
-      scheme_name: PropTypes.string,
-      fund_house: PropTypes.string,
-      scheme_type: PropTypes.string,
-    }),
-    navData: PropTypes.arrayOf(PropTypes.shape({
-      nav: PropTypes.string,
-      date: PropTypes.string,
-    })),
-    schemeCode: PropTypes.string,
-  }).isRequired,
-  color: PropTypes.string.isRequired,
-  onRemove: PropTypes.func.isRequired,
-};
 
 export default ComparedFundCard;

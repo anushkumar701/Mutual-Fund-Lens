@@ -8,7 +8,6 @@ export default function SIPSlider({
   const [editing, setEditing] = useState(false);
   const display = formatFn ? formatFn(value) : `${prefix}${Number(value).toLocaleString('en-IN')}${suffix}`;
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
-  const isDark = document.documentElement.classList.contains('dark');
 
   const handleInputBlur = () => {
     setEditing(false);
@@ -55,9 +54,9 @@ export default function SIPSlider({
           step={step}
           value={value}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer"
+          className="w-full h-2 rounded-full appearance-none cursor-pointer sip-slider-track"
           style={{
-            background: `linear-gradient(to right, #2563eb ${pct}%, ${isDark ? '#334155' : '#e2e8f0'} ${pct}%)`,
+            '--slider-pct': `${pct}%`,
           }}
         />
       </div>
