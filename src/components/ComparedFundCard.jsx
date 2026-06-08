@@ -1,6 +1,5 @@
 // components/ComparedFundCard.jsx
-import { memo } from 'react';
-import PropTypes from 'prop-types';
+import { memo, useMemo } from 'react';
 import CategoryPill from './CategoryPill';
 import { getFundAgeYears, get52WeekHL, getMonthlyWinRate, guessMinInvestment } from '../utils/chartUtils';
 import { calculateFundMetrics, getSmartTags } from '../utils/metrics';
@@ -11,6 +10,11 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
   const schemeName = meta?.scheme_name || 'Unknown';
   const hl = get52WeekHL(navData);
   const hlPosition = hl && latestNav ? Math.min(100, Math.max(0, ((latestNav - hl.low) / (hl.high - hl.low)) * 100)) : null;
+
+  // Memoize heavy metric calculations — navData is stable between renders
+  const metrics = useMemo(() => calculateFundMetrics(navData), [navData]);
+  const tags = useMemo(() => getSmartTags(metrics), [metrics]);
+  const winRate = useMemo(() => getMonthlyWinRate(navData), [navData]);
 
   return (
     <div className="card p-5 relative border-l-4" style={{ borderLeftColor: color }}>
@@ -96,134 +100,129 @@ const ComparedFundCard = memo(function ComparedFundCard({ fund, color, onRemove 
         )}
 
         {/* Metrics */}
-        {/* Metrics */}
-        {(() => {
-          const metrics = calculateFundMetrics(navData);
-          if (!metrics) return <div className="text-xs text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">Metrics not available</div>;
+        {!metrics ? (
+          <div className="text-xs text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">Metrics not available</div>
+        ) : (
+          (() => {
+            let riskLevel = 'Unknown';
+            let riskDots = '○○○○○';
+            if (metrics.volatility != null) {
+              if (metrics.volatility < 10) { riskLevel = 'Low'; riskDots = '●○○○○'; }
+              else if (metrics.volatility < 15) { riskLevel = 'Moderate'; riskDots = '●●○○○'; }
+              else if (metrics.volatility < 20) { riskLevel = 'High'; riskDots = '●●●○○'; }
+              else { riskLevel = 'Very High'; riskDots = '●●●●●'; }
+            }
 
-          const tags = getSmartTags(metrics);
+            // Guard null before numeric comparison to avoid coercion bugs
+            const sharpeColor = metrics.sharpe == null
+              ? 'text-slate-500'
+              : metrics.sharpe > 1
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : metrics.sharpe > 0
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400';
 
-          let riskLevel = 'Unknown';
-          let riskDots = '○○○○○';
-          if (metrics.volatility) {
-            if (metrics.volatility < 10) { riskLevel = 'Low'; riskDots = '●○○○○'; }
-            else if (metrics.volatility < 15) { riskLevel = 'Moderate'; riskDots = '●●○○○'; }
-            else if (metrics.volatility < 20) { riskLevel = 'High'; riskDots = '●●●○○'; }
-            else { riskLevel = 'Very High'; riskDots = '●●●●●'; }
-          }
+            const sortinoColor = metrics.sortino == null
+              ? 'text-slate-500'
+              : metrics.sortino > 1
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : metrics.sortino > 0
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400';
 
-          return (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-4">
-              <div className="flex items-center justify-between">
+            return (
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-0.5">Volatility (Ann.)</span>
+                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {metrics.volatility != null ? `${metrics.volatility.toFixed(1)}%` : '—'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-0.5">Risk Level</span>
+                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 justify-end">
+                      <span>{riskLevel}</span>
+                      <span className="text-[10px] tracking-tighter text-blue-500">{riskDots}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map(t => (
+                      <span key={t} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold border border-blue-100 dark:border-blue-800">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-0.5">Volatility (Ann.)</span>
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {metrics.volatility ? `${metrics.volatility.toFixed(1)}%` : '—'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-0.5">Risk Level</span>
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 justify-end">
-                    <span>{riskLevel}</span>
-                    <span className="text-[10px] tracking-tighter text-blue-500">{riskDots}</span>
-                  </div>
-                </div>
-              </div>
-
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map(t => (
-                    <span key={t} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold border border-blue-100 dark:border-blue-800">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div>
-                <h4 className="text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Performance</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-500">1Y Return</span>
-                    <div className={`font-bold text-sm ${metrics.return1Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return1Y !== null ? `${metrics.return1Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return1Y).toFixed(2)}%` : '—'}
+                  <h4 className="text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Performance</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500">1Y Return</span>
+                      <div className={`font-bold text-sm ${metrics.return1Y != null && metrics.return1Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {metrics.return1Y != null ? `${metrics.return1Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return1Y).toFixed(2)}%` : '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">3Y CAGR</span>
-                    <div className={`font-bold text-sm ${metrics.return3Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return3Y !== null ? `${metrics.return3Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return3Y).toFixed(2)}%` : '—'}
+                    <div>
+                      <span className="text-slate-500">3Y CAGR</span>
+                      <div className={`font-bold text-sm ${metrics.return3Y != null && metrics.return3Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {metrics.return3Y != null ? `${metrics.return3Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return3Y).toFixed(2)}%` : '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">5Y CAGR</span>
-                    <div className={`font-bold text-sm ${metrics.return5Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.return5Y !== null ? `${metrics.return5Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return5Y).toFixed(2)}%` : '—'}
+                    <div>
+                      <span className="text-slate-500">5Y CAGR</span>
+                      <div className={`font-bold text-sm ${metrics.return5Y != null && metrics.return5Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {metrics.return5Y != null ? `${metrics.return5Y >= 0 ? '▲' : '▼'} ${Math.abs(metrics.return5Y).toFixed(2)}%` : '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Max Drawdown</span>
-                    <div className="font-bold text-sm text-red-600 dark:text-red-400">
-                      {metrics.maxDrawdown > 0 ? `-${metrics.maxDrawdown.toFixed(2)}%` : '—'}
+                    <div>
+                      <span className="text-slate-500">Max Drawdown</span>
+                      <div className="font-bold text-sm text-red-600 dark:text-red-400">
+                        {metrics.maxDrawdown > 0 ? `-${metrics.maxDrawdown.toFixed(2)}%` : '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 flex items-center gap-1">Sharpe Ratio</span>
-                    <div className={`font-bold text-sm ${metrics.sharpe > 1 ? 'text-emerald-600 dark:text-emerald-400' : metrics.sharpe > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.sharpe !== null && metrics.sharpe !== undefined ? metrics.sharpe : '—'}
+                    <div>
+                      <span className="text-slate-400 flex items-center gap-1">Sharpe Ratio</span>
+                      <div className={`font-bold text-sm ${sharpeColor}`}>
+                        {metrics.sharpe != null ? metrics.sharpe : '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 flex items-center gap-1">Sortino Ratio</span>
-                    <div className={`font-bold text-sm ${metrics.sortino > 1 ? 'text-emerald-600 dark:text-emerald-400' : metrics.sortino > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {metrics.sortino !== null && metrics.sortino !== undefined ? metrics.sortino : '—'}
+                    <div>
+                      <span className="text-slate-400 flex items-center gap-1">Sortino Ratio</span>
+                      <div className={`font-bold text-sm ${sortinoColor}`}>
+                        {metrics.sortino != null ? metrics.sortino : '—'}
+                      </div>
                     </div>
-                  </div>
-                  {(() => {
-                    const wr = getMonthlyWinRate(navData);
-                    return wr !== null ? (
+                    {winRate != null && (
                       <div>
                         <span className="text-slate-400 flex items-center gap-1">Win Rate</span>
-                        <div className={`font-bold text-sm ${wr >= 60 ? 'text-emerald-600 dark:text-emerald-400' : wr >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {wr}%
-                          <span className="text-[10px] font-normal text-slate-400 ml-1">{wr >= 60 ? '✓ Consistent' : wr >= 50 ? 'Average' : 'Volatile'}</span>
+                        <div className={`font-bold text-sm ${winRate >= 60 ? 'text-emerald-600 dark:text-emerald-400' : winRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {winRate}%
+                          <span className="text-[10px] font-normal text-slate-400 ml-1">{winRate >= 60 ? '✓ Consistent' : winRate >= 50 ? 'Average' : 'Volatile'}</span>
                         </div>
                       </div>
-                    ) : null;
-                  })()}
-                  {metrics.return10Y !== null && metrics.return10Y !== undefined && (
-                    <div>
-                      <span className="text-slate-400">10Y CAGR</span>
-                      <div className={`font-bold text-sm ${metrics.return10Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {metrics.return10Y >= 0 ? '▲' : '▼'} {Math.abs(metrics.return10Y).toFixed(2)}%
+                    )}
+                    {metrics.return10Y != null && (
+                      <div>
+                        <span className="text-slate-400">10Y CAGR</span>
+                        <div className={`font-bold text-sm ${metrics.return10Y >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {metrics.return10Y >= 0 ? '▲' : '▼'} {Math.abs(metrics.return10Y).toFixed(2)}%
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()
+        )}
       </div>
     </div>
   );
 });
-
-ComparedFundCard.propTypes = {
-  fund: PropTypes.shape({
-    meta: PropTypes.shape({
-      scheme_name: PropTypes.string,
-      fund_house: PropTypes.string,
-      scheme_type: PropTypes.string,
-    }),
-    navData: PropTypes.arrayOf(PropTypes.shape({
-      nav: PropTypes.string,
-      date: PropTypes.string,
-    })),
-    schemeCode: PropTypes.string,
-  }).isRequired,
-  color: PropTypes.string.isRequired,
-  onRemove: PropTypes.func.isRequired,
-};
 
 export default ComparedFundCard;

@@ -1,13 +1,33 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFunds } from '../hooks/useFunds';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useDebounce } from '../hooks/useDebounce';
 import SkeletonCard from '../components/SkeletonCard';
 import ErrorState from '../components/ErrorState';
-import FundDetailModal from '../components/FundDetailModal';
 import { inferCategory } from '../utils/goalFilters';
 import { extractAMC, getPlanType, estimateER, isFundClosed } from '../utils/fundFilters';
+import { useSparkline } from '../hooks/useSparkline';
+
+// ─── Mini Sparkline SVG ────────────────────────────────────────────
+function MiniSparkline({ navData }) {
+  if (!navData || navData.length < 3) return null;
+  const vals = navData.map(d => parseFloat(d.nav)).filter(v => v > 0);
+  if (vals.length < 3) return null;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const W = 80, H = 28;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * W},${H - ((v - min) / range) * H}`).join(' ');
+  const isUp = vals[vals.length - 1] >= vals[0];
+  return (
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={isUp ? '#10b981' : '#ef4444'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// lazy must be declared after all static imports
+const FundDetailModal = lazy(() => import('../components/FundDetailModal'));
 
 const RISK = { Equity:'High', ELSS:'High', Hybrid:'Moderate', Index:'Moderate', Debt:'Low', Liquid:'Very Low', Other:'Moderate' };
 const RISK_COLOR = { 'Very Low':'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/30', Low:'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30', Moderate:'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30', High:'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30' };
@@ -38,9 +58,10 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
   const isWL = watchlist.map(String).includes(code);
   const isCmp = compareList.map(String).includes(code);
   const borderColor = CAT_COLOR[cat] || '#94a3b8';
+  const { navData, loading: sparkLoading, ref: sparkRef } = useSparkline(fund.schemeCode);
 
   return (
-    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden transition-all hover:shadow-lg ${closed ? 'opacity-70' : ''}`}
+    <div ref={sparkRef} className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden transition-all hover:shadow-lg ${closed ? 'opacity-70' : ''}`}
       style={{ borderTop: `3px solid ${borderColor}` }}>
       {/* Closed banner */}
       {closed && (
@@ -80,6 +101,12 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
           </div>
         </div>
 
+        {/* Sparkline */}
+        <div className="h-8 -mx-1 mb-1">
+          {sparkLoading && <div className="h-full bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />}
+          {!sparkLoading && navData && <MiniSparkline navData={navData} />}
+        </div>
+
         {/* ER + plan tip */}
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-slate-500 dark:text-slate-400">
@@ -115,7 +142,7 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
 
 // ─── Main Screener ───────────────────────────────────────────
 export default function Screener() {
-  const { funds, loading, error, refetch } = useFunds();
+  const { funds, loading, loadingSlow, error, refetch } = useFunds();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [watchlist, setWatchlist] = useLocalStorage('fundlens_watchlist', []);
@@ -142,9 +169,8 @@ export default function Screener() {
 
   const clearAll = () => { setSearch(''); setCat('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All AMCs'); setShowClosed(false); };
 
-  // Reset pagination whenever filters change so users always start at page 1 of results
+  // Reset pagination whenever filters change
   useEffect(() => { setPage(48); }, [debouncedSearch, cat, plan, risk, erMax, amc, showClosed, tab]);
-
 
   const topAMCs = useMemo(() => {
     const m = {};
@@ -341,8 +367,20 @@ export default function Screener() {
         {/* ── Results ── */}
         <div aria-live="polite" aria-busy={loading}>
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Array(8).fill(0).map((_, i) => <SkeletonCard key={i}/>)}
+            <div className="space-y-4">
+              {loadingSlow && (
+                <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-3">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    ⏳ <strong>Taking longer than usual</strong> — mfapi.in may be slow or down. Please wait or try again.
+                  </p>
+                  <button onClick={refetch} className="text-sm font-bold text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900 transition-all whitespace-nowrap">
+                    Retry
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Array(8).fill(0).map((_, i) => <SkeletonCard key={i}/>)}
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-20">
@@ -386,11 +424,17 @@ export default function Screener() {
       )}
 
       {modalFund && (
-        <FundDetailModal
-          schemeCode={modalFund.schemeCode}
-          schemeName={modalFund.schemeName}
-          onClose={() => setModalFund(null)}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
+          </div>
+        }>
+          <FundDetailModal
+            schemeCode={modalFund.schemeCode}
+            schemeName={modalFund.schemeName}
+            onClose={() => setModalFund(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

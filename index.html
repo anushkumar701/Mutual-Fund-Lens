@@ -43,15 +43,20 @@
     <link rel="dns-prefetch" href="https://api.mfapi.in" />
 
     <!--
-      Font: loaded as a blocking stylesheet so the font is available for LCP text.
-      Inter is declared in CSS with font-display:swap so the browser renders text
-      immediately in the fallback font and swaps when Inter loads — zero layout shift
-      because we size-adjust the fallback to match Inter's metrics.
+      Font: loaded as non-render-blocking via preload + onload swap.
+      This eliminates the render-blocking stylesheet penalty from Lighthouse
+      while keeping the font available quickly. The <noscript> fallback
+      ensures no-JS environments still load the font.
     -->
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    </noscript>
 
     <!--
       Theme flash prevention — inlined so it runs synchronously before any paint.
@@ -61,7 +66,7 @@
     -->
     <script>
 (function(){var t=localStorage.getItem('fundlens_theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}})();
-</script>
+    </script>
 
     <!--
       Critical CSS: prevent layout shift on LCP heading by pre-declaring font stack.
@@ -73,6 +78,28 @@
       .dark body { background: #0d1117; }
       #root { min-height: 100vh; }
     </style>
+
+    <!-- JSON-LD Structured Data for SEO rich results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "FundLens",
+      "url": "https://fundlens.netlify.app",
+      "description": "India's beginner-friendly mutual fund analysis and screening platform. Compare funds, calculate SIP returns, and invest smarter.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "INR"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "FundLens"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

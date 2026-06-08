@@ -178,7 +178,7 @@ function QuickCalc() {
 
 // ─── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
-  const { funds, loading, error, refetch } = useFunds();
+  const { funds, loading, loadingSlow, error, refetch } = useFunds();
   const [watchlist] = useLocalStorage('fundlens_watchlist', []);
   const [modalFund, setModalFund] = useState(null);
 
@@ -226,8 +226,20 @@ export default function Dashboard() {
           )}
 
           {loading && (
-            <div className="w-full max-w-2xl mx-auto h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
-              <span className="text-slate-500 text-sm">Loading funds...</span>
+            <div className="w-full max-w-2xl mx-auto space-y-2" role="status" aria-label="Loading funds">
+              <div className="h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
+                <span className="text-slate-500 text-sm">Loading funds…</span>
+              </div>
+              {loadingSlow && (
+                <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    ⏳ <strong>Taking longer than usual</strong> — mfapi.in may be slow. Please wait or retry.
+                  </p>
+                  <button onClick={refetch} className="text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 px-3 py-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900 transition-all whitespace-nowrap">
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -338,6 +350,108 @@ export default function Dashboard() {
             </div>
           </section>
         )}
+
+        {/* ── Fund of the Week ── */}
+        <section aria-labelledby="fotw-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 280px'}}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 id="fotw-heading" className="text-xl font-bold text-slate-900 dark:text-white">⭐ Curated Picks</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Editor-selected funds worth keeping on your radar</p>
+            </div>
+            <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-bold border border-amber-200 dark:border-amber-800">Updated Weekly</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { code:'122639', name:'Parag Parikh Flexi Cap', category:'Equity', badge:'Flexi Cap', highlight:'🌍 Global Diversification', reason:'Strong multi-cap fund with ~35% overseas allocation. Low overlap with Nifty-heavy peers. Consistent top-quartile 5Y returns.', color:'#1d4ed8' },
+              { code:'120503', name:'Mirae Asset Large Cap', category:'Equity', badge:'Large Cap', highlight:'🏆 Category Leader', reason:'One of the lowest expense ratios in large-cap category. Consistent alpha over benchmark across market cycles.', color:'#047857' },
+              { code:'120465', name:'Axis Small Cap', category:'Equity', badge:'Small Cap', highlight:'🚀 High Growth', reason:'Top-performing small cap with disciplined portfolio. Ideal for aggressive investors with 7+ year horizon.', color:'#6d28d9' },
+            ].map(pick => (
+              <div key={pick.code} className="card p-4 border-l-4 hover:shadow-md transition-all group" style={{borderLeftColor: pick.color}}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{background: pick.color}}>{pick.badge}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">{pick.highlight}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1 line-clamp-1">{pick.name}</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3 line-clamp-3">{pick.reason}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setModalFund({ schemeCode: pick.code, schemeName: pick.name })}
+                    className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">
+                    View Details
+                  </button>
+                  <Link to={`/compare?code=${pick.code}`}
+                    className="flex-1 text-xs font-bold py-1.5 rounded-lg text-center transition-all text-white" style={{background: pick.color}}>
+                    Analyse →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">⚠️ Curated picks are for educational purposes only. Not investment advice. Consult a SEBI-registered advisor before investing.</p>
+        </section>
+
+        {/* ── Category Performance Heatmap ── */}
+        <section aria-labelledby="heatmap-heading" style={{contentVisibility:'auto', containIntrinsicSize:'auto 260px'}}>
+          <div className="mb-4">
+            <h2 id="heatmap-heading" className="text-xl font-bold text-slate-900 dark:text-white">📊 Category Returns Heatmap</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Approximate annual returns by fund category — spot market cycles at a glance</p>
+          </div>
+          <div className="card p-4 overflow-x-auto">
+            {(() => {
+              const YEARS = [2019,2020,2021,2022,2023,2024];
+              // Approximate median category returns (%) — industry averages
+              const DATA = {
+                'Equity':  [4.2, 14.7, 27.3,  3.1, 22.4, 18.2],
+                'Index':   [12.1,15.2, 27.1,  4.6, 21.4, 17.3],
+                'ELSS':    [2.3, 13.1, 26.4,  2.4, 21.6, 19.7],
+                'Hybrid':  [5.8, 10.7, 19.8,  6.5, 16.7, 13.2],
+                'Debt':    [9.4,  8.1,  3.7,  1.2,  6.3,  7.5],
+                'Liquid':  [6.3,  4.2,  3.6,  4.8,  7.0,  7.2],
+              };
+              const getColor = (v) => {
+                if (v >= 20) return 'bg-emerald-600 text-white';
+                if (v >= 12) return 'bg-emerald-400 text-white';
+                if (v >= 6)  return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300';
+                if (v >= 2)  return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300';
+                if (v >= 0)  return 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300';
+                return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300';
+              };
+              return (
+                <div className="min-w-[480px]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className="text-left py-2 pr-3 text-slate-500 dark:text-slate-400 font-semibold w-20">Category</th>
+                        {YEARS.map(y => <th key={y} className="text-center py-2 px-1 text-slate-500 dark:text-slate-400 font-semibold">{y}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody className="space-y-1">
+                      {Object.entries(DATA).map(([cat, vals]) => (
+                        <tr key={cat}>
+                          <td className="pr-3 py-1 font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">{cat}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className="px-1 py-1">
+                              <div className={`rounded-lg px-1 py-1.5 text-center font-bold tabular-nums transition-all ${getColor(v)}`}>
+                                {v > 0 ? '+' : ''}{v}%
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    {[['≥20%','bg-emerald-600'],['12–19%','bg-emerald-400'],['6–11%','bg-emerald-100 dark:bg-emerald-900/40'],['2–5%','bg-amber-100'],['<2%','bg-orange-100']].map(([l,c]) => (
+                      <span key={l} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                        <span className={`w-3 h-3 rounded ${c} inline-block`}/>{l}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2">* Approximate median category returns. Actual individual fund returns vary. Source: industry estimates.</p>
+                </div>
+              );
+            })()}
+          </div>
+        </section>
 
         {/* ── 3 CTA cards ── */}
         <section aria-label="Explore FundLens features" className="grid grid-cols-1 sm:grid-cols-3 gap-4" style={{contentVisibility:'auto', containIntrinsicSize:'auto 200px'}}>

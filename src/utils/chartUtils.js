@@ -2,18 +2,48 @@
 // Chart-building helpers extracted from Compare.jsx for reusability and testability
 
 /**
- * Calculate fund age in years from NAV data
+ * Sanitize a string so it can be safely used as a Recharts dataKey.
+ * Recharts parses dataKey values using dot-notation (e.g. "a.b") and bracket
+ * notation internally, so dots, slashes, ampersands, parentheses, and other
+ * special characters in Indian fund names silently break line rendering.
+ */
+export function sanitizeDataKey(name) {
+  if (name == null) return 'fund';
+  // Replace every non-alphanumeric / non-space / non-hyphen char with underscore
+  return String(name)
+    .replace(/[^a-zA-Z0-9 \-_]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    || 'fund';
+}
+
+/**
+ * Calculate fund age in years from NAV data.
  */
 export function getFundAgeYears(navData) {
   if (!navData || navData.length === 0) return 0;
-  const [dd, mm, yyyy] = navData[navData.length - 1].date.split('-');
+  const parts = navData[navData.length - 1].date.split('-');
+  if (parts.length !== 3) return 0;
+  const [dd, mm, yyyy] = parts;
   const parsed = new Date(`${yyyy}-${mm}-${dd}`).getTime();
   if (isNaN(parsed)) return 0;
   return (Date.now() - parsed) / (365.25 * 24 * 60 * 60 * 1000);
 }
 
 /**
- * Filter NAV data to only include entries within the selected range
+ * Parse a DD-MM-YYYY nav date string into a Date object.
+ */
+function parseNavDate(s) {
+  if (!s || typeof s !== 'string') return new Date(NaN);
+  const parts = s.split('-');
+  if (parts.length !== 3) return new Date(NaN);
+  const [dd, mm, yyyy] = parts;
+  return new Date(`${yyyy}-${mm}-${dd}`);
+}
+
+/**
+ * Filter NAV data to only include entries within the selected range.
+ * Returns data in ascending date order (oldest → newest).
  */
 export function filterByRange(data, range) {
   const now = new Date();
@@ -32,66 +62,119 @@ export function filterByRange(data, range) {
     case 'MAX': return [...data].reverse(); // all data, oldest first
     default:    cutoff.setMonth(now.getMonth() - 6);
   }
-  return data.filter((d) => {
-    const [dd, mm, yyyy] = d.date.split('-');
-    return new Date(`${yyyy}-${mm}-${dd}`) >= cutoff;
-  }).reverse();
+  return data
+    .filter((d) => {
+      const dt = parseNavDate(d.date);
+      return !isNaN(dt.getTime()) && dt >= cutoff;
+    })
+    .reverse(); // oldest → newest
 }
 
 /**
- * Build chart-ready data from fund array
- * Returns array of { date, fundName1: pctChange, fundName2: pctChange, ... }
+ * Build chart-ready data from fund array.
+ * Returns array of { date, [sanitizedFundName]: pctChange, ... }
+ *
+ * Fixed issues:
+ *  1. baseNav <= 0 guard — avoids Infinity/NaN that make Recharts skip lines.
+ *  2. sanitizeDataKey  — special chars (/, &, ., (, )) in fund names break
+ *     Recharts internal key parsing → lines disappear silently.
+ *  3. Fallback for short-lived funds — if a fund has no data in the selected
+ *     range, we use all its available data (rebased from its launch) so it
+ *     still appears on the chart rather than being absent.
+ *  4. Per-entry NaN/Infinity filter — bad NAV rows no longer corrupt the series.
  */
 export function buildChartData(funds, range) {
-  if (!funds.length) return [];
+  if (!funds || !funds.length) return [];
+
   const dateMap = {};
+
   funds.forEach((f) => {
-    if (!f.navData) return;
-    const filtered = filterByRange(f.navData, range);
-    if (!filtered.length) return;
+    if (!f.navData || f.navData.length === 0) return;
+
+    let filtered = filterByRange(f.navData, range);
+
+    // Fallback: fund is younger than the selected range — show its full history
+    if (filtered.length === 0) {
+      filtered = [...f.navData].reverse(); // oldest → newest
+    }
+    if (filtered.length === 0) return;
+
     const baseNav = parseFloat(filtered[0].nav);
+    // Guard: skip fund if base NAV is zero, negative, or non-finite (division-by-zero)
+    if (!Number.isFinite(baseNav) || baseNav <= 0) return;
+
+    // Use sanitized name as Recharts dataKey (special chars silently break rendering)
+    const rawKey = f.meta?.scheme_name || String(f.schemeCode);
+    const key = sanitizeDataKey(rawKey);
+
     filtered.forEach((d) => {
-      if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
       const currentNav = parseFloat(d.nav);
-      dateMap[d.date][f.meta?.scheme_name || f.schemeCode] = ((currentNav - baseNav) / baseNav) * 100;
-      dateMap[d.date][`${f.meta?.scheme_name || f.schemeCode}_raw`] = currentNav;
+      if (!Number.isFinite(currentNav) || currentNav <= 0) return; // skip bad rows
+
+      const pct = ((currentNav - baseNav) / baseNav) * 100;
+      if (!Number.isFinite(pct)) return; // final safety net
+
+      if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
+      dateMap[d.date][key] = pct;
+      dateMap[d.date][`${key}_raw`] = currentNav;
     });
   });
+
   const getSortKey = (s) => {
-    const [dd, mm, yyyy] = s.split('-');
+    const parts = s.split('-');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
     return `${yyyy}${mm}${dd}`;
   };
-  return Object.values(dateMap).sort((a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date)));
+
+  return Object.values(dateMap).sort(
+    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  );
 }
 
 /**
- * Collapse daily chart data to monthly (last trading day of each month)
+ * Collapse daily chart data to monthly (last trading day of each month).
+ * Correctly handles DD-MM-YYYY date format.
  */
 export function toMonthlyData(chartData) {
   const monthMap = {};
-  chartData.forEach(row => {
-    const [, mm, yyyy] = row.date.split('-');
+  chartData.forEach((row) => {
+    // row.date is in DD-MM-YYYY format
+    const parts = row.date.split('-');
+    if (parts.length !== 3) return;
+    const [, mm, yyyy] = parts;
     const key = `${yyyy}-${mm}`;
-    monthMap[key] = row; // last entry per month wins (data is sorted ascending)
+    // Last entry per month wins (data is sorted ascending by date)
+    monthMap[key] = row;
   });
+
   const getSortKey = (s) => {
-    const [dd, mm, yyyy] = s.split('-');
+    const parts = s.split('-');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
     return `${yyyy}${mm}${dd}`;
   };
-  return Object.values(monthMap).sort((a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date)));
+
+  return Object.values(monthMap).sort(
+    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  );
 }
 
 /**
- * Compute 52-week high and low from NAV data
+ * Compute 52-week high and low from NAV data.
  */
 export function get52WeekHL(navData) {
   if (!navData || navData.length === 0) return null;
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 1);
-  const last52W = navData.filter(d => {
-    const [dd, mm, yyyy] = d.date.split('-');
-    return new Date(`${yyyy}-${mm}-${dd}`) >= cutoff;
-  }).map(d => parseFloat(d.nav));
+  const last52W = navData
+    .filter((d) => {
+      const dt = parseNavDate(d.date);
+      return !isNaN(dt.getTime()) && dt >= cutoff;
+    })
+    .map((d) => parseFloat(d.nav))
+    .filter((v) => Number.isFinite(v));
+
   if (last52W.length === 0) return null;
   return {
     high: last52W.reduce((a, b) => Math.max(a, b), -Infinity),
@@ -100,17 +183,21 @@ export function get52WeekHL(navData) {
 }
 
 /**
- * Monthly win rate: % of months fund gained NAV
+ * Monthly win rate: % of months the fund gained NAV.
  */
 export function getMonthlyWinRate(navData) {
   if (!navData || navData.length < 24) return null;
   const monthMap = {};
-  navData.forEach(d => {
-    const [, mm, yyyy] = d.date.split('-');
+  navData.forEach((d) => {
+    const parts = d.date.split('-');
+    if (parts.length !== 3) return;
+    const [, mm, yyyy] = parts;
     const key = `${yyyy}-${mm}`;
     if (!monthMap[key]) monthMap[key] = parseFloat(d.nav);
   });
-  const months = Object.keys(monthMap).sort().map(k => monthMap[k]);
+  const months = Object.keys(monthMap)
+    .sort()
+    .map((k) => monthMap[k]);
   let wins = 0;
   for (let i = 1; i < months.length; i++) {
     if (months[i] > months[i - 1]) wins++;
@@ -119,7 +206,7 @@ export function getMonthlyWinRate(navData) {
 }
 
 /**
- * Estimate minimum investment based on scheme name
+ * Estimate minimum investment based on scheme name.
  */
 export function guessMinInvestment(schemeName) {
   if (!schemeName) return { sip: 500, lump: 1000 };

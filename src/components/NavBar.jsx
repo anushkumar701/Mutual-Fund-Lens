@@ -57,6 +57,12 @@ function NavBadge({ storageKey, color }) {
   );
 }
 
+// Slug helper: replaces ALL spaces (not just the first) so multi-word labels
+// like "SIP Calc" produce "sip-calc" instead of "sip calc".
+function toSlug(str) {
+  return str.toLowerCase().replaceAll(' ', '-');
+}
+
 export default function NavBar() {
   const [compareList] = useLocalStorage('fundlens_compare', []);
   const [watchlist] = useLocalStorage('fundlens_watchlist', []);
@@ -83,7 +89,7 @@ export default function NavBar() {
               key={to}
               to={to}
               end={to === '/'}
-              id={`nav-${label.toLowerCase().replace(' ', '-')}`}
+              id={`nav-${toSlug(label)}`}
               aria-label={label}
               className={({ isActive }) =>
                 `relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -140,7 +146,7 @@ export default function NavBar() {
               key={to}
               to={to}
               end={to === '/'}
-              id={`mobile-nav-${label.toLowerCase().replace(' ', '-')}`}
+              id={`mobile-nav-${toSlug(label)}`}
               aria-label={label}
               className={({ isActive }) =>
                 `relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[56px] text-[11px] font-medium transition-colors ${
@@ -168,7 +174,6 @@ export default function NavBar() {
           ))}
         </div>
       </nav>
-
     </>
   );
 }
