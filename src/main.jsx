@@ -15,9 +15,7 @@ if (sentryDsn) {
           Sentry.browserTracingIntegration(),
         ],
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 0.0,
-        // CSP: our connect-src allows ingest.sentry.io (the canonical ingest endpoint).
         // Do NOT set a tunnel here — it would route through our own domain and bypass CSP.
-        // The DSN host (ingest.sentry.io) is whitelisted in netlify.toml connect-src.
         beforeSend(event) {
           // Strip PII from breadcrumb URLs to prevent leaking query strings
           if (event.breadcrumbs?.values) {

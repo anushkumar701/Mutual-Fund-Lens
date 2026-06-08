@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [react()],
   build: {
     chunkSizeWarningLimit: 600,
     // Hidden source maps: uploaded to Sentry but not publicly accessible.

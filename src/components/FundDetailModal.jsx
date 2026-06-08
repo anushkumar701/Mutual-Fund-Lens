@@ -5,14 +5,19 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail } from '../hooks/useFunds';
 
 function parseNavDate(s) {
-  const [dd, mm, yyyy] = s.split('-');
-  return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+  if (!s || typeof s !== 'string') return NaN;
+  const parts = s.split('-');
+  if (parts.length !== 3) return NaN;
+  const [dd, mm, yyyy] = parts;
+  const ts = new Date(`${yyyy}-${mm}-${dd}`).getTime();
+  return isNaN(ts) ? NaN : ts;
 }
 
 // Pre-sort navData ascending by timestamp (called once per modal open)
 function buildSortedForModal(navData) {
-  return navData.map(d => ({ ts: parseNavDate(d.date), nav: parseFloat(d.nav) }))
-    .filter(d => !isNaN(d.ts) && isFinite(d.nav))
+  return navData
+    .map(d => ({ ts: parseNavDate(d.date), nav: parseFloat(d.nav) }))
+    .filter(d => Number.isFinite(d.ts) && Number.isFinite(d.nav) && d.nav > 0)
     .sort((a, b) => a.ts - b.ts);
 }
 
@@ -32,18 +37,24 @@ function binarySearchModal(sorted, targetTs) {
 
 function calcReturn(sorted, latestNav, latestTs, days) {
   if (!sorted || sorted.length < 2) return null;
+  if (!Number.isFinite(latestTs) || !Number.isFinite(latestNav) || latestNav <= 0) return null;
   const cutoffTs = latestTs - days * 86400000;
+  // For very short periods (< 1Y) don't look for data older than the fund itself
+  if (cutoffTs < sorted[0].ts) return null;
   const idx = binarySearchModal(sorted, cutoffTs);
   const found = sorted[idx];
-  // Reject if more than 30 days off (fund may not have data that far back)
-  if (Math.abs(found.ts - cutoffTs) > 30 * 86400000) return null;
+  // Tolerance scales with the period: 30d for short, 45d for long periods
+  const toleranceDays = days <= 365 ? 30 : 45;
+  if (Math.abs(found.ts - cutoffTs) > toleranceDays * 86400000) return null;
   const old = found.nav;
-  if (old <= 0) return null;
+  if (old <= 0 || !Number.isFinite(old)) return null;
   if (days > 365) {
     const yrs = days / 365.25;
-    return ((Math.pow(latestNav / old, 1 / yrs) - 1) * 100).toFixed(2);
+    const cagr = (Math.pow(latestNav / old, 1 / yrs) - 1) * 100;
+    return Number.isFinite(cagr) ? cagr.toFixed(2) : null;
   }
-  return (((latestNav - old) / old) * 100).toFixed(2);
+  const ret = ((latestNav - old) / old) * 100;
+  return Number.isFinite(ret) ? ret.toFixed(2) : null;
 }
 
 export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
@@ -114,8 +125,10 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const returns = useMemo(() => {
     if (!nav || nav.length === 0) return {};
     const sorted = buildSortedForModal(nav);
+    if (sorted.length < 2) return {};
     const latestNavVal = parseFloat(latestNAV?.nav || 0);
     const latestTs = parseNavDate(latestNAV?.date);
+    if (!Number.isFinite(latestTs) || latestNavVal <= 0) return {};
     return {
       '1M': calcReturn(sorted, latestNavVal, latestTs, 30),
       '3M': calcReturn(sorted, latestNavVal, latestTs, 90),

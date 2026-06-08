@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { estimateER } from '../utils/fundFilters';
-import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
 export default function Compare() {
@@ -234,9 +234,13 @@ export default function Compare() {
         .reverse()
         .map(d => {
           const [dd, mm, yy] = d.date.split('-');
-          return { ts: new Date(`${yy}-${mm}-${dd}`).getTime(), nav: parseFloat(d.nav) };
+          const ts = new Date(`${yy}-${mm}-${dd}`).getTime();
+          const nav = parseFloat(d.nav);
+          return { ts, nav };
         })
-        .filter(d => !isNaN(d.ts) && isFinite(d.nav));
+        .filter(d => !isNaN(d.ts) && Number.isFinite(d.nav) && d.nav > 0);
+
+      if (sorted.length === 0) return;
 
       const findNav = (targetDate) => {
         const targetTs = targetDate.getTime();
@@ -251,7 +255,7 @@ export default function Compare() {
         const sNav = findNav(new Date(`${year}-01-01`));
         const eNav = findNav(year === currentYear ? now : new Date(`${year}-12-31`));
         if (!data[year]) data[year] = {};
-        if (sNav && eNav) data[year][name] = ((eNav - sNav) / sNav) * 100;
+        if (sNav && eNav && sNav > 0) data[year][name] = ((eNav - sNav) / sNav) * 100;
       });
     });
     const validYears = allYears.filter(y => Object.keys(data[y] || {}).length > 0);
@@ -431,13 +435,13 @@ export default function Compare() {
           <div className="flex flex-wrap items-center gap-2">
             {fundData.length > 0 && (
               <>
-                <button onClick={handleCopyLink} className="btn-secondary text-xs px-3 py-2 border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
+                <button onClick={handleCopyLink} aria-label="Share comparison link" className="btn-secondary text-xs px-3 py-2 border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
                   🔗 Share Link
                 </button>
-                <button onClick={handleExport} className="btn-secondary text-xs px-3 py-2">
+                <button onClick={handleExport} aria-label="Export comparison as PNG image" className="btn-secondary text-xs px-3 py-2">
                   📸 Export PNG
                 </button>
-                <button id="clear-all-btn" onClick={clearAll} className="btn-secondary text-red-500 border-red-200 dark:border-red-800 text-xs px-3 py-2">
+                <button id="clear-all-btn" onClick={clearAll} aria-label="Clear all compared funds" className="btn-secondary text-red-500 border-red-200 dark:border-red-800 text-xs px-3 py-2">
                   Clear All
                 </button>
               </>
@@ -661,8 +665,11 @@ export default function Compare() {
                         return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
                       }}
                       formatter={(value, name) => {
-                        if (name.endsWith('_raw')) return null;
-                        return [`${parseFloat(value) >= 0 ? '+' : ''}${parseFloat(value).toFixed(2)}%`, name];
+                        // Skip internal _raw keys (used for tooltips only)
+                        if (typeof name === 'string' && name.endsWith('_raw')) return null;
+                        const v = parseFloat(value);
+                        if (!Number.isFinite(v)) return null;
+                        return [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name];
                       }}
                       contentStyle={{
                         backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -677,34 +684,50 @@ export default function Compare() {
                       labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
-                    {fundData.map((fund, i) => (
-                      <Line
-                        key={fund.schemeCode}
-                        type="monotone"
-                        dataKey={fund.meta?.scheme_name || fund.schemeCode}
-                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                        strokeWidth={2.5}
-                        dot={false}
-                        activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
-                      />
-                    ))}
+                    {fundData.map((fund, i) => {
+                      const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
+                      const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
+                      return (
+                        <Line
+                          key={fund.schemeCode}
+                          type="monotone"
+                          dataKey={lineKey}
+                          name={displayName}
+                          stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                          strokeWidth={2.5}
+                          dot={false}
+                          connectNulls={true}
+                          activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                // Period-Returns Summary Table — clean and useful
+                // Period-Returns Summary Table — range-aware
                 (() => {
                   const PERIOD_DEFS = [
-                    { label: '1 Month', months: 1 },
-                    { label: '3 Months', months: 3 },
-                    { label: '6 Months', months: 6 },
-                    { label: '1 Year', months: 12 },
-                    { label: '2 Years', months: 24 },
-                    { label: '3 Years', months: 36 },
-                    { label: '5 Years', months: 60 },
-                    { label: '7 Years', months: 84 },
+                    { label: '1 Month',  months: 1   },
+                    { label: '3 Months', months: 3   },
+                    { label: '6 Months', months: 6   },
+                    { label: '1 Year',   months: 12  },
+                    { label: '2 Years',  months: 24  },
+                    { label: '3 Years',  months: 36  },
+                    { label: '5 Years',  months: 60  },
+                    { label: '7 Years',  months: 84  },
                     { label: '10 Years', months: 120 },
                   ];
-                  // Calculate returns for each fund for each period
+
+                  // Map range button value → months so the table reacts to the selector
+                  // MAX maps to Infinity so every period is visible
+                  const RANGE_TO_MONTHS = {
+                    '1M': 1,   '3M': 3,   '6M': 6,
+                    '1Y': 12,  '3Y': 36,  '5Y': 60,
+                    '10Y': 120, '15Y': 180, '20Y': 240, '25Y': 300,
+                    'MAX': Infinity,
+                  };
+                  const selectedMonths = RANGE_TO_MONTHS[range] ?? Infinity;
+
                   const calcReturn = (navData, months) => {
                     if (!navData || navData.length === 0) return null;
                     const latestNav = parseFloat(navData[0].nav);
@@ -719,17 +742,31 @@ export default function Compare() {
                     }
                     if (!closest || minDiff > 45 * 86400000) return null;
                     const ret = ((latestNav - closest) / closest) * 100;
-                    // For >= 12 months, show CAGR
                     if (months >= 12) {
                       const years = months / 12;
                       return (Math.pow(latestNav / closest, 1 / years) - 1) * 100;
                     }
                     return ret;
                   };
-                  const validPeriods = PERIOD_DEFS.filter(p => {
-                    // Only show period if at least one fund has enough data
-                    return fundData.some(f => calcReturn(f.navData, p.months) !== null);
-                  });
+
+                  // Only show periods within the selected range that have data
+                  const validPeriods = PERIOD_DEFS.filter(p =>
+                    p.months <= selectedMonths &&
+                    fundData.some(f => calcReturn(f.navData, p.months) !== null)
+                  );
+
+                  // Highlighted row: exact match if possible (1M/6M/etc.), else the
+                  // largest visible period (for MAX where no exact match exists)
+                  const highlightMonths = selectedMonths === Infinity
+                    ? (validPeriods.length > 0 ? Math.max(...validPeriods.map(p => p.months)) : null)
+                    : selectedMonths;
+
+                  // Put highlighted row first, then the rest in ascending order
+                  const sorted = [
+                    ...validPeriods.filter(p => p.months === highlightMonths),
+                    ...validPeriods.filter(p => p.months !== highlightMonths),
+                  ];
+
                   return (
                     <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
                       <table className="w-full text-sm text-left">
@@ -740,7 +777,7 @@ export default function Compare() {
                             {fundData.map((fund, i) => (
                               <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
                                 <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
-                                  {fund.meta?.scheme_name?.split(' ').slice(0,3).join(' ') || fund.schemeCode}
+                                  {fund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || fund.schemeCode}
                                 </div>
                               </th>
                             ))}
@@ -748,21 +785,41 @@ export default function Compare() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                          {validPeriods.map(p => {
+                          {sorted.map(p => {
+                            const isSelected = p.months === highlightMonths;
                             const rets = fundData.map(f => calcReturn(f.navData, p.months));
                             const defined = rets.filter(r => r !== null);
                             const bestRet = defined.length > 0 ? Math.max(...defined) : null;
                             const leaderIdx = rets.indexOf(bestRet);
                             return (
-                              <tr key={p.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.label}</td>
-                                <td className="px-3 py-3 text-[10px] text-slate-500">{p.months >= 12 ? 'CAGR' : 'Abs'}</td>
+                              <tr
+                                key={p.label}
+                                className={`transition-all duration-200 ${
+                                  isSelected
+                                    ? 'bg-blue-50 dark:bg-blue-950/50 ring-1 ring-inset ring-blue-200 dark:ring-blue-800'
+                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <td className={`px-4 py-3 font-semibold whitespace-nowrap ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  <div className="flex items-center gap-2">
+                                    {isSelected && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 inline-block animate-pulse" />
+                                    )}
+                                    {p.label}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 text-[10px] text-slate-500">
+                                  {p.months >= 12 ? 'CAGR' : 'Abs'}
+                                </td>
                                 {rets.map((ret, i) => (
                                   <td key={i} className={`px-4 py-3 font-bold text-sm tabular-nums ${
-                                    ret === null ? 'text-slate-300 dark:text-slate-600' :
-                                    ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    <span className={i === leaderIdx && defined.length > 1 ? 'bg-emerald-50 dark:bg-emerald-900/30 px-1 rounded' : ''}>
+                                    ret === null
+                                      ? 'text-slate-300 dark:text-slate-600'
+                                      : ret >= 0
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                  } ${isSelected ? 'text-base' : ''}`}>
+                                    <span className={i === leaderIdx && defined.length > 1 ? 'bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded' : ''}>
                                       {ret === null ? '—' : `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`}
                                     </span>
                                   </td>
@@ -771,7 +828,7 @@ export default function Compare() {
                                   <td className="px-3 py-3 text-[10px]">
                                     {leaderIdx >= 0 && defined.length > 1 ? (
                                       <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                        {fundData[leaderIdx]?.meta?.scheme_name?.split(' ')[0] || `Fund ${leaderIdx+1}`}
+                                        {fundData[leaderIdx]?.meta?.scheme_name?.split(' ')[0] || `Fund ${leaderIdx + 1}`}
                                       </span>
                                     ) : '—'}
                                   </td>
@@ -781,7 +838,14 @@ export default function Compare() {
                           })}
                         </tbody>
                       </table>
-                      <p className="text-[10px] text-slate-400 p-3">Returns for 1Y+ are shown as CAGR (annualised). Highlighted = best performer for that period.</p>
+                      <p className="text-[10px] text-slate-400 p-3 flex flex-wrap gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                          Selected period (matches chart range)
+                        </span>
+                        <span>Returns for 1Y+ are CAGR (annualised).</span>
+                        <span>Highlighted cell = best performer for that period.</span>
+                      </p>
                     </div>
                   );
                 })()

@@ -29,7 +29,6 @@
 @layer base {
   html {
     font-family: 'Inter', 'Inter-fallback', system-ui, -apple-system, sans-serif;
-    scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -191,6 +190,20 @@ input[type='range'] {
   accent-color: #2563eb;
 }
 .dark input[type='range'] { accent-color: #3b82f6; }
+
+/* CSS-driven range slider fill — eliminates JS MutationObserver for dark mode detection */
+.range-slider {
+  background: linear-gradient(to right, #2563eb var(--range-pct, 0%), #e2e8f0 var(--range-pct, 0%));
+}
+.dark .range-slider {
+  background: linear-gradient(to right, #3b82f6 var(--range-pct, 0%), #334155 var(--range-pct, 0%));
+}
+.range-slider-orange {
+  background: linear-gradient(to right, #ea580c var(--range-pct, 0%), #e2e8f0 var(--range-pct, 0%));
+}
+.dark .range-slider-orange {
+  background: linear-gradient(to right, #ea580c var(--range-pct, 0%), #334155 var(--range-pct, 0%));
+}
 
 /* ══ Recharts Tooltip Fix ════════════════════════════════════════ */
 .recharts-tooltip-wrapper .recharts-default-tooltip {

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import NavBar from './components/NavBar';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 const Footer = lazy(() => import('./components/Footer'));
 const BackToTop = lazy(() => import('./components/BackToTop'));
@@ -13,19 +14,56 @@ const Screener = lazy(() => import('./pages/Screener'));
 const Compare = lazy(() => import('./pages/Compare'));
 const SIPCalculator = lazy(() => import('./pages/SIPCalculator'));
 
-// Per-route titles — updates document.title on every navigation
-const ROUTE_TITLES = {
-  '/':        'FundLens — Mutual Fund Research & Analysis',
-  '/screener':'Fund Screener — Browse 37,000+ Mutual Funds | FundLens',
-  '/compare': 'Compare Funds Side-by-Side | FundLens',
-  '/sip':     'SIP & FIRE Calculator | FundLens',
+// Per-route SEO — updates document.title, meta description, and canonical URL
+const ROUTE_SEO = {
+  '/': {
+    title: 'FundLens — Mutual Fund Research & Analysis',
+    description: 'FundLens — India\'s beginner-friendly mutual fund analysis platform. Search 37,000+ funds, compare performance, and plan investments.',
+  },
+  '/screener': {
+    title: 'Fund Screener — Browse 37,000+ Mutual Funds | FundLens',
+    description: 'Filter and browse 37,000+ Indian mutual funds by category, risk, expense ratio, and AMC. Find the right fund for your goals.',
+  },
+  '/compare': {
+    title: 'Compare Funds Side-by-Side | FundLens',
+    description: 'Compare up to 4 mutual funds side-by-side with NAV charts, rolling returns, SIP simulation, and overlap analysis.',
+  },
+  '/sip': {
+    title: 'SIP & FIRE Calculator | FundLens',
+    description: 'Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.',
+  },
 };
 
-function PageTitleUpdater() {
+const BASE_URL = 'https://fundlens.netlify.app';
+
+function PageSEOUpdater() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const title = ROUTE_TITLES[pathname] ?? 'FundLens — Mutual Fund Analysis Platform';
-    document.title = title;
+    const seo = ROUTE_SEO[pathname] ?? {
+      title: 'FundLens — Mutual Fund Analysis Platform',
+      description: 'FundLens — India\'s beginner-friendly mutual fund analysis and screening platform.',
+    };
+
+    // Update title
+    document.title = seo.title;
+
+    // Update meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', seo.description);
+    }
+
+    // Update canonical URL
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      canonical.setAttribute('href', `${BASE_URL}${pathname === '/' ? '/' : pathname}`);
+    }
+
+    // Update Open Graph URL
+    let ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) {
+      ogUrl.setAttribute('content', `${BASE_URL}${pathname === '/' ? '/' : pathname}`);
+    }
   }, [pathname]);
   return null;
 }
@@ -42,11 +80,11 @@ export default function App() {
       </a>
       <ToastProvider>
         <BrowserRouter>
-          <PageTitleUpdater />
-          <header role="banner">
+          <PageSEOUpdater />
+          <header>
             <NavBar />
           </header>
-          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" role="main" aria-label="Main content">
+          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" aria-label="Main content">
             <div className="flex-1">
               <ErrorBoundary>
                 <Suspense fallback={
@@ -68,6 +106,7 @@ export default function App() {
             <Suspense fallback={null}><Footer /></Suspense>
           </main>
           <Suspense fallback={null}><BackToTop /></Suspense>
+          <PWAInstallPrompt />
         </BrowserRouter>
       </ToastProvider>
     </>
