@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "fetch-ter": "node scripts/fetch-ter-data.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.53.1",

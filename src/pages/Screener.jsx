@@ -6,7 +6,8 @@ import { useDebounce } from '../hooks/useDebounce';
 import SkeletonCard from '../components/SkeletonCard';
 import ErrorState from '../components/ErrorState';
 import { inferCategory } from '../utils/goalFilters';
-import { extractAMC, getPlanType, estimateER, isFundClosed } from '../utils/fundFilters';
+import { extractAMC, getPlanType, isFundClosed } from '../utils/fundFilters';
+import { getExpenseRatio, getER } from '../utils/expenseRatio';
 import { useSparkline } from '../hooks/useSparkline';
 
 // ─── Mini Sparkline SVG ────────────────────────────────────────────
@@ -51,7 +52,8 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
   const code = String(fund.schemeCode);
   const cat = inferCategory(fund.schemeName);
   const plan = getPlanType(fund.schemeName);
-  const er = estimateER(fund.schemeName);
+  const erData = getExpenseRatio(fund.schemeName, fund.schemeCode);
+  const er = erData.value;
   const risk = RISK[cat] || 'Moderate';
   const subCat = getSubCat(fund.schemeName);
   const closed = isFundClosed(fund.schemeName);
@@ -110,7 +112,13 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
         {/* ER + plan tip */}
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-slate-500 dark:text-slate-400">
-            Est. Expense Ratio: <strong className={er > 1 ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}>{er}%/yr</strong>
+            Expense Ratio: <strong className={er > 1 ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}>{er !== null ? `${er}%/yr` : 'N/A'}</strong>
+            {er !== null && (
+              <span className={`ml-1 text-[8px] font-bold px-1 py-0.5 rounded ${
+                erData.source === 'amfi' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400' :
+                'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+              }`}>{erData.source === 'amfi' ? 'AMFI' : 'Custom'}</span>
+            )}
           </span>
           {plan === 'Regular' && (
             <span className="text-orange-600 dark:text-orange-400">⚠️ Higher fee</span>
@@ -199,14 +207,14 @@ export default function Screener() {
     if (risk !== 'All') list = list.filter(f => RISK[inferCategory(f.schemeName)] === risk);
     if (erMax !== 'All') {
       const maxER = { 'Under 0.3%': 0.3, 'Under 0.5%': 0.5, 'Under 1%': 1.0, 'Under 1.5%': 1.5 }[erMax];
-      if (maxER) list = list.filter(f => estimateER(f.schemeName) <= maxER);
+      if (maxER) list = list.filter(f => getER(f.schemeName, f.schemeCode) <= maxER);
     }
     if (amc !== 'All AMCs') list = list.filter(f => extractAMC(f.schemeName) === amc);
 
     switch (sort) {
       case 'za': return [...list].sort((a, b) => b.schemeName.localeCompare(a.schemeName));
-      case 'er_low': return [...list].sort((a, b) => estimateER(a.schemeName) - estimateER(b.schemeName));
-      case 'er_high': return [...list].sort((a, b) => estimateER(b.schemeName) - estimateER(a.schemeName));
+      case 'er_low': return [...list].sort((a, b) => getER(a.schemeName, a.schemeCode) - getER(b.schemeName, b.schemeCode));
+      case 'er_high': return [...list].sort((a, b) => getER(b.schemeName, b.schemeCode) - getER(a.schemeName, a.schemeCode));
       case 'newest': return [...list].sort((a, b) => b.schemeCode - a.schemeCode);
       default: return [...list].sort((a, b) => a.schemeName.localeCompare(b.schemeName));
     }

@@ -218,7 +218,6 @@ export default function SIPCalculator() {
   const [taxSellAmount, setTaxSellAmount] = useState(150000);
   const [taxBuyDate, setTaxBuyDate] = useState('2023-01-15');
   const [taxSellDate, setTaxSellDate] = useState('2025-01-15');
-  const [taxSlab, setTaxSlab] = useState(30);
 
   // SIP Date Optimizer state
   const { funds } = useFunds();
@@ -442,31 +441,33 @@ export default function SIPCalculator() {
 
             <div className="card p-5">
               <h2 className="font-bold text-slate-900 dark:text-white mb-4">Growth Over Time</h2>
-              <ResponsiveContainer width="100%" height={220} className="sm:!h-[280px]">
-                <AreaChart data={result.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="investedGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
-                    </linearGradient>
-                    <linearGradient id="returnsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `Yr ${v}`} stroke="rgba(148,163,184,0.5)" />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="rgba(148,163,184,0.5)"
-                    tickFormatter={(v) => { if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`; if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`; return `₹${(v / 1000).toFixed(0)}K`; }} width={65} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
-                  <Area type="monotone" dataKey="baseInvested" stackId="1" name="Base SIP" stroke="#2563eb" strokeWidth={2} fill="#3b82f6" fillOpacity={0.6} />
-                  {!isLumpsum && stepUp > 0 && (
-                    <Area type="monotone" dataKey="stepUpInvested" stackId="1" name="Step-Up Extra" stroke="#8b5cf6" strokeWidth={2} fill="#a78bfa" fillOpacity={0.6} />
-                  )}
-                  <Area type="monotone" dataKey="returns" stackId="1" name="Wealth Generated" stroke="#10b981" strokeWidth={2} fill="#34d399" fillOpacity={0.6} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="chart-height-sm">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={result.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="investedGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="returnsGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                    <XAxis dataKey="year" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `Yr ${v}`} stroke="rgba(148,163,184,0.5)" />
+                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="rgba(148,163,184,0.5)"
+                      tickFormatter={(v) => { if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`; if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`; return `₹${(v / 1000).toFixed(0)}K`; }} width={65} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                    <Area type="monotone" dataKey="baseInvested" stackId="1" name="Base SIP" stroke="#2563eb" strokeWidth={2} fill="#3b82f6" fillOpacity={0.6} />
+                    {!isLumpsum && stepUp > 0 && (
+                      <Area type="monotone" dataKey="stepUpInvested" stackId="1" name="Step-Up Extra" stroke="#8b5cf6" strokeWidth={2} fill="#a78bfa" fillOpacity={0.6} />
+                    )}
+                    <Area type="monotone" dataKey="returns" stackId="1" name="Wealth Generated" stroke="#10b981" strokeWidth={2} fill="#34d399" fillOpacity={0.6} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             <div className="card overflow-hidden">
@@ -579,28 +580,30 @@ export default function SIPCalculator() {
 
               <div className="card p-5">
                 <h3 className="font-bold text-slate-900 dark:text-white mb-4">Portfolio Balance &amp; Total Withdrawals</h3>
-                <ResponsiveContainer width="100%" height={220} className="sm:!h-[280px]">
-                  <AreaChart data={swpResult.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="swpBalanceGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
-                      </linearGradient>
-                      <linearGradient id="swpWithdrawnGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
-                    <XAxis dataKey="year" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `Yr ${v}`} stroke="rgba(148,163,184,0.5)" />
-                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="rgba(148,163,184,0.5)"
-                      tickFormatter={(v) => { if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`; if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`; return `₹${(v / 1000).toFixed(0)}K`; }} width={65} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
-                    <Area type="monotone" dataKey="value" name="Remaining Portfolio Value" stroke="#10b981" strokeWidth={2} fill="url(#swpBalanceGrad)" />
-                    <Area type="monotone" dataKey="withdrawn" name="Cumulative Withdrawn" stroke="#ef4444" strokeWidth={2} fill="url(#swpWithdrawnGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <div className="chart-height-sm">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={swpResult.yearlyData} margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="swpBalanceGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                        </linearGradient>
+                        <linearGradient id="swpWithdrawnGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                      <XAxis dataKey="year" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `Yr ${v}`} stroke="rgba(148,163,184,0.5)" />
+                      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="rgba(148,163,184,0.5)"
+                        tickFormatter={(v) => { if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`; if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`; return `₹${(v / 1000).toFixed(0)}K`; }} width={65} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                      <Area type="monotone" dataKey="value" name="Remaining Portfolio Value" stroke="#10b981" strokeWidth={2} fill="url(#swpBalanceGrad)" />
+                      <Area type="monotone" dataKey="withdrawn" name="Cumulative Withdrawn" stroke="#ef4444" strokeWidth={2} fill="url(#swpWithdrawnGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               <div className="card overflow-hidden">

@@ -1,3 +1,4 @@
+import { getER } from './expenseRatio';
 import { inferCategory } from './goalFilters';
 
 const KNOWN_AMCS = [
@@ -29,18 +30,8 @@ export function getFundType(name) {
   return 'Other';
 }
 
-export function estimateER(name) {
-  const n = name.toLowerCase();
-  const isDirect = n.includes('direct');
-  if (n.includes('liquid') || n.includes('overnight') || n.includes('money market')) return isDirect ? 0.1 : 0.3;
-  if (n.includes('index') || n.includes('nifty') || n.includes('sensex') || n.includes('etf')) return isDirect ? 0.1 : 0.5;
-  if (n.includes('debt') || n.includes('bond') || n.includes('gilt') || n.includes('income')) return isDirect ? 0.4 : 1.0;
-  if (n.includes('elss') || n.includes('tax')) return isDirect ? 0.7 : 1.5;
-  if (n.includes('hybrid') || n.includes('balanced') || n.includes('aggressive') || n.includes('dynamic')) return isDirect ? 0.6 : 1.4;
-  return isDirect ? 0.8 : 1.6;
-}
-
 export function getERBand(er) {
+  if (er === null || er === undefined) return 'Unknown';
   if (er <= 0.3) return 'Ultra Low (<0.3%)';
   if (er <= 0.7) return 'Low (0.3–0.7%)';
   if (er <= 1.2) return 'Medium (0.7–1.2%)';
@@ -56,7 +47,7 @@ export function filterFunds(funds, { search, category, planType, fundType, erBan
   if (category !== 'All') list = list.filter(f => inferCategory(f.schemeName) === category);
   if (planType !== 'All') list = list.filter(f => getPlanType(f.schemeName) === planType);
   if (fundType !== 'All') list = list.filter(f => getFundType(f.schemeName) === fundType);
-  if (erBand !== 'All') list = list.filter(f => getERBand(estimateER(f.schemeName)) === erBand);
+  if (erBand !== 'All') list = list.filter(f => getERBand(getER(f.schemeName, f.schemeCode)) === erBand);
   if (amc !== 'All') list = list.filter(f => extractAMC(f.schemeName) === amc);
   if (goals && goals.length > 0) list = list.filter(f => goals.some(g => matchesGoal(f, g)));
   return list;
