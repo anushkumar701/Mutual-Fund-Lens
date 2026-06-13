@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { fetchFundDetail } from '../hooks/useFunds';
+import { getExpenseRatio, getTERMeta, setUserER, clearUserER } from '../utils/expenseRatio';
+import { getAllPlatformUrls, getUserPlatform, setUserPlatform } from '../utils/platformLinks';
 
 function parseNavDate(s) {
   if (!s || typeof s !== 'string') return NaN;
@@ -68,6 +70,30 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const codeStr = String(schemeCode);
   const isWL = watchlist.map(String).includes(codeStr);
   const isCmp = compareList.map(String).includes(codeStr);
+
+  const [editingER, setEditingER] = useState(false);
+  const [tempER, setTempER] = useState('');
+  const [erState, setERState] = useState(() => getExpenseRatio(schemeName, codeStr));
+
+  useEffect(() => {
+    setERState(getExpenseRatio(schemeName, codeStr));
+    setEditingER(false);
+  }, [schemeName, codeStr]);
+
+  const handleSaveER = (val) => {
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= 5) {
+      setUserER(codeStr, num);
+      setERState({ value: num, source: 'user', label: 'Custom' });
+      setEditingER(false);
+    }
+  };
+
+  const handleClearER = () => {
+    clearUserER(codeStr);
+    setERState(getExpenseRatio(schemeName, codeStr));
+    setEditingER(false);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -210,6 +236,136 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{fundAge}</p>
                   <p className="text-[10px] text-slate-500">years old</p>
                 </div>
+              </div>
+
+              {/* Expense Ratio — accurate from AMFI data */}
+              {(() => {
+                const er = erState;
+                const terMetaInfo = getTERMeta();
+                return (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/40 rounded-xl p-4 border border-orange-100 dark:border-orange-900/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-wider font-bold">Expense Ratio (TER)</span>
+                        {er.value !== null && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            er.source === 'amfi' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' :
+                            'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400'
+                          }`}>
+                            {er.source === 'amfi' ? '✓ AMFI Data' : '✏️ Custom'}
+                          </span>
+                        )}
+                      </div>
+
+                      {editingER ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="5"
+                            value={tempER}
+                            onChange={(e) => setTempER(e.target.value)}
+                            className="w-16 px-1.5 py-0.5 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
+                            placeholder="e.g. 0.3"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleSaveER(tempER)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingER(false)}
+                            className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-[10px] font-bold px-2 py-1 rounded"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xl font-black tabular-nums ${
+                            er.value === null ? 'text-slate-400' :
+                            er.value > 1.5 ? 'text-red-600 dark:text-red-400' :
+                            er.value > 1 ? 'text-orange-600 dark:text-orange-400' :
+                            'text-emerald-600 dark:text-emerald-400'
+                          }`}>
+                            {er.value !== null ? `${er.value}%` : 'N/A'}
+                            {er.value !== null && <span className="text-xs font-medium text-slate-500 ml-1">p.a.</span>}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setTempER(er.value !== null ? String(er.value) : '');
+                              setEditingER(true);
+                            }}
+                            className="text-slate-400 hover:text-blue-500 text-xs transition-colors"
+                            title="Edit Expense Ratio"
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {er.value !== null ? (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {er.value <= 0.5 ? '✅ Excellent — very low fee. More returns stay with you.' :
+                         er.value <= 1.0 ? '👍 Good — competitive expense ratio for this category.' :
+                         er.value <= 1.5 ? '⚠️ Above average — consider switching to a Direct plan to save ~0.5-1%.' :
+                         '🚫 High — significant fee drag. A Direct plan alternative can save you ₹ lakhs over time.'}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        ⚠️ No official data found. Click the pencil icon to set your own expense ratio.
+                      </p>
+                    )}
+
+                    {er.source === 'user' && (
+                      <button
+                        onClick={handleClearER}
+                        className="text-[9px] text-red-500 hover:underline mt-1.5 block font-bold"
+                      >
+                        Reset to AMFI Default
+                      </button>
+                    )}
+
+                    {terMetaInfo && er.source === 'amfi' && (
+                      <p className="text-[9px] text-slate-400 mt-1.5">
+                        Source: AMFI India · Updated: {new Date(terMetaInfo.fetchedAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Platform Invest Links */}
+              <div>
+                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Invest on Your Platform</h3>
+                <div className="flex gap-2 flex-wrap">
+                  {getAllPlatformUrls(schemeName, codeStr).slice(0, 6).map((p) => (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={p.tip}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all text-xs font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      <span>{p.icon}</span>
+                      <span>{p.name}</span>
+                    </a>
+                  ))}
+                </div>
+                {(() => {
+                  const preferred = getUserPlatform();
+                  if (!preferred) return (
+                    <p className="text-[10px] text-slate-400 mt-2">
+                      💡 Tip: Set your default platform in Settings to see a quick "Invest Now" button.
+                    </p>
+                  );
+                  return null;
+                })()}
               </div>
 
               {/* Returns */}

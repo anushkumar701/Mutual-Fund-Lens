@@ -243,12 +243,18 @@ input[type='range'] {
 @media (max-width: 640px) {
   .recharts-wrapper {
     max-width: 100% !important;
-    overflow: hidden;
+    /* Do NOT hide overflow — it clips the chart content on mobile */
   }
   /* Increase nav touch targets on mobile */
   nav a, nav button {
     min-height: 44px;
   }
+}
+
+/* ══ Chart height wrapper — explicit height so Recharts always has a valid dimension ═ */
+.chart-height-sm { height: 260px; }
+@media (min-width: 640px) {
+  .chart-height-sm { height: 340px; }
 }
 
 /* ══ Respect Reduced Motion (Accessibility) ═════════════════════ */
