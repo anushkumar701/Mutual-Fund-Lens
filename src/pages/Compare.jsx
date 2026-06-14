@@ -159,6 +159,8 @@ export default function Compare() {
   // SIP comparison state
   const [sipAmount, setSipAmount] = useState(5000);
   const [sipAmountInput, setSipAmountInput] = useState("5000");
+  const [inflationMode, setInflationMode] = useLocalStorage("fundlens_inflation_mode", false);
+  const [inflationRate, setInflationRate] = useLocalStorage("fundlens_inflation_rate", 6.0);
   const [sipYears, setSipYears] = useState(3);
   const [sipYearsInput, setSipYearsInput] = useState("3");
   const [sipMode, setSipMode] = useState("sip"); // 'sip' | 'lumpsum'
