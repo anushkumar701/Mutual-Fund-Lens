@@ -1401,39 +1401,49 @@ export default function Compare() {
               <button onClick={() => setShowShareCard(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xl leading-none">&times;</button>
             </div>
 
-            {/* The card that gets exported */}
-            <div ref={shareCardRef} className="p-6 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 rounded-b-none">
+            {/* The card that gets exported — inline styles so html2canvas can render the gradient */}
+            <div
+              ref={shareCardRef}
+              style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0c1a3a 50%, #1e1b4b 100%)', padding: '24px', borderRadius: '0 0 0 0' }}
+            >
               {/* Branding */}
-              <div className="flex items-center gap-2 mb-5">
-                <span className="text-blue-400 text-xl font-bold">📈 FundLens</span>
-                <span className="text-slate-500 text-xs">Fund Comparison</span>
-                <span className="ml-auto text-slate-500 text-xs">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <span style={{ color: '#60a5fa', fontSize: '18px', fontWeight: 'bold' }}>📈 FundLens</span>
+                <span style={{ color: '#64748b', fontSize: '11px' }}>Fund Comparison</span>
+                <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: '11px' }}>
+                  {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
               </div>
 
               {/* Fund rows */}
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {fundData.map((fund, i) => {
                   const m = calculateFundMetrics(fund.navData);
+                  const ret1Y  = m?.return1Y  ?? null;
+                  const ret3Y  = m?.return3Y  ?? null;   // ← correct field name
                   return (
-                    <div key={fund.schemeCode} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: activeColors[i % activeColors.length] }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold line-clamp-1">
+                    <div
+                      key={fund.schemeCode}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px 16px', border: '1px solid rgba(255,255,255,0.1)' }}
+                    >
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, backgroundColor: activeColors[i % activeColors.length], display: 'inline-block' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ color: '#fff', fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {fund.meta?.scheme_name || fund.schemeCode}
                         </p>
-                        <p className="text-slate-400 text-[10px]">{fund.meta?.scheme_category}</p>
+                        <p style={{ color: '#94a3b8', fontSize: '10px', marginTop: '2px' }}>{fund.meta?.scheme_category || ''}</p>
                       </div>
-                      <div className="flex gap-4 flex-shrink-0 text-right">
+                      <div style={{ display: 'flex', gap: '16px', flexShrink: 0, textAlign: 'right' }}>
                         <div>
-                          <p className="text-[10px] text-slate-500">1Y Return</p>
-                          <p className={`text-sm font-bold ${m?.return1Y >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {m?.return1Y !== null ? `${m.return1Y >= 0 ? '+' : ''}${m.return1Y.toFixed(1)}%` : 'N/A'}
+                          <p style={{ color: '#64748b', fontSize: '10px' }}>1Y Return</p>
+                          <p style={{ color: ret1Y !== null && ret1Y >= 0 ? '#34d399' : '#f87171', fontSize: '13px', fontWeight: 700 }}>
+                            {ret1Y !== null ? `${ret1Y >= 0 ? '+' : ''}${ret1Y.toFixed(1)}%` : 'N/A'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-slate-500">3Y CAGR</p>
-                          <p className={`text-sm font-bold ${m?.cagr3Y >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {m?.cagr3Y !== null ? `${m.cagr3Y >= 0 ? '+' : ''}${m.cagr3Y.toFixed(1)}%` : 'N/A'}
+                          <p style={{ color: '#64748b', fontSize: '10px' }}>3Y CAGR</p>
+                          <p style={{ color: ret3Y !== null && ret3Y >= 0 ? '#34d399' : '#f87171', fontSize: '13px', fontWeight: 700 }}>
+                            {ret3Y !== null ? `${ret3Y >= 0 ? '+' : ''}${ret3Y.toFixed(1)}%` : 'N/A'}
                           </p>
                         </div>
                       </div>
@@ -1443,8 +1453,8 @@ export default function Compare() {
               </div>
 
               {/* Footer */}
-              <p className="text-slate-600 text-[9px] text-center mt-5">
-                Generated by FundLens · fundlens.app · Historical returns, not a guarantee of future performance
+              <p style={{ color: '#475569', fontSize: '9px', textAlign: 'center', marginTop: '20px' }}>
+                Generated by FundLens · Historical returns, not a guarantee of future performance
               </p>
             </div>
 
