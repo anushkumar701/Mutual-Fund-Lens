@@ -71,7 +71,7 @@ const links = [
   },
   {
     to: "/sip",
-    label: "SIP Calc",
+    label: "Wealth Simulator",
     icon: (
       <svg
         className="w-5 h-5"

@@ -462,8 +462,28 @@ export default function SIPCalculator() {
   const effectiveReturnWarning = expenseRatio > 0 && effectiveReturn === 0;
 
   const result = useMemo(() => {
-    if (isLumpsum) return calculateLumpsum(amount, years, effectiveReturn);
-    return calculateSIP(amount, years, effectiveReturn, stepUp);
+    let baseRes;
+    let fdRes;
+    let ppfRes;
+    
+    if (isLumpsum) {
+      baseRes = calculateLumpsum(amount, years, effectiveReturn);
+      fdRes = calculateLumpsum(amount, years, 6.5);
+      ppfRes = calculateLumpsum(amount, years, 7.1);
+    } else {
+      baseRes = calculateSIP(amount, years, effectiveReturn, stepUp);
+      fdRes = calculateSIP(amount, years, 6.5, stepUp);
+      ppfRes = calculateSIP(amount, years, 7.1, stepUp);
+    }
+
+    // Merge FD and PPF projection data into the main yearlyData array for the chart
+    baseRes.yearlyData = baseRes.yearlyData.map((d, i) => ({
+      ...d,
+      fdValue: fdRes.yearlyData[i]?.value || 0,
+      ppfValue: ppfRes.yearlyData[i]?.value || 0,
+    }));
+    
+    return baseRes;
   }, [isLumpsum, amount, years, effectiveReturn, stepUp]);
 
   const realValue = useMemo(() => {
@@ -494,7 +514,7 @@ export default function SIPCalculator() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            SIP Calculator
+            Wealth Simulator
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Estimate returns, plan your goal, save tax with ELSS, and structure
@@ -852,6 +872,26 @@ export default function SIPCalculator() {
                         strokeWidth={2}
                         fill="#34d399"
                         fillOpacity={0.6}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="ppfValue"
+                        name="PPF (7.1%)"
+                        stroke="#fca5a5"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        fill="transparent"
+                        fillOpacity={0}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="fdValue"
+                        name="FD (6.5%)"
+                        stroke="#94a3b8"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        fill="transparent"
+                        fillOpacity={0}
                       />
                     </AreaChart>
                   </ResponsiveContainer>

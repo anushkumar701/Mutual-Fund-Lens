@@ -39,8 +39,6 @@ const BENCHMARKS = [
   { id: "nifty50", label: "Nifty 50", code: "120716", color: "#a855f7" },
   { id: "sensex", label: "Sensex", code: "118825", color: "#f97316" },
   { id: "midcap150", label: "Nifty Midcap 150", code: "147622", color: "#06b6d4" },
-  { id: "fd", label: "Fixed Deposit (Historical Avg)", isFixed: true, color: "#94a3b8" },
-  { id: "ppf", label: "PPF (Historical Rates)", isFixed: true, color: "#fca5a5" },
 ];
 
 // Dark-mode-aware chart colors — brighter on dark, standard on light
