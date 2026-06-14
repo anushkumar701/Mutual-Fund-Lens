@@ -1019,24 +1019,6 @@ export default function Compare() {
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
                         let event = MARKET_EVENTS[year];
-
-                        // Dynamically determine market sentiment for any unmapped future years based on actual fund performance
-                        if (!event && defined.length > 0) {
-                          const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
-                          if (avgReturn >= 25) {
-                            event = { label: '🟢 Extremely rare boom due to historic positive global events', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 12) {
-                            event = { label: '🟢 Strong economic growth pushed the market up', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 5) {
-                            event = { label: '🟢 Steady business progress led to positive returns', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= -2) {
-                            event = { label: '🟡 Lack of major economic news kept the market flat', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else if (avgReturn >= -12) {
-                            event = { label: '🟡 Economic uncertainties caused investors to pull back slightly', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else {
-                            event = { label: '🔴 A severe global or domestic crisis caused a massive panic sell-off', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
-                          }
-                        }
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
