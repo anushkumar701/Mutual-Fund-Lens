@@ -1375,10 +1375,29 @@ export default function Compare() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col justify-end">
-                    <p className="text-[10px] text-slate-400 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5 max-w-[220px]">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end w-full gap-4 mt-2">
+                    <p className="text-[10px] text-slate-400 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5 max-w-sm">
                       {`💡 NAV data is `}<strong>{`already net of Expense Ratio`}</strong>{`. Edit each fund's auto-detected Expense Ratio below to see the gross vs net breakdown.`}
                     </p>
+
+                    {/* Inflation Adjuster */}
+                    <div className="flex flex-col gap-1 sm:ml-auto">
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider">Inflation Adjuster</label>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <button id="compare-inflation-toggle" onClick={() => setInflationMode(!inflationMode)}
+                          className={`relative w-10 h-5 rounded-full transition-colors ${inflationMode ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${inflationMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
+                        {inflationMode ? (
+                          <div className="flex items-center gap-1 animate-fade-in">
+                            <input type="number" value={inflationRate} onChange={(e) => setInflationRate(Number(e.target.value))} className="input-base w-14 py-0.5 text-xs text-center border-slate-300" min={0} max={20} />
+                            <span className="text-xs text-slate-500 font-medium">%</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">Off</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1442,17 +1461,36 @@ export default function Compare() {
 
                           {/* Current Value */}
                           <div className="flex justify-between items-center text-xs mt-1">
-                            <span className="text-slate-500">Current Value:</span>
+                            <span className="text-slate-500">{inflationMode ? 'Nominal Value:' : 'Current Value:'}</span>
                             <span className="font-bold text-slate-900 dark:text-white text-sm">{formatINR(sipResult.currentValue)}</span>
                           </div>
 
-                          <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100 dark:border-slate-700">
-                            <span className="text-slate-500">Profit (net of ER):</span>
+                          {inflationMode && (
+                            <div className="flex justify-between items-center text-xs bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1.5 rounded mt-1.5 border border-indigo-100 dark:border-indigo-800/50 animate-fade-in">
+                              <span className="text-indigo-700 dark:text-indigo-400 font-medium">Real Purchasing Power:</span>
+                              <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                                {formatINR(sipResult.currentValue / Math.pow(1 + inflationRate / 100, sipYears))}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-center text-xs pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                            <span className="text-slate-500">{inflationMode ? 'Nominal Profit:' : 'Profit (net of ER):'}</span>
                             <span className={`font-bold ${sipResult.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {formatINR(sipResult.profit)}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-xs">
+                          
+                          {inflationMode && (
+                            <div className="flex justify-between items-center text-[11px] mt-1 text-slate-500 animate-fade-in">
+                              <span>Real Profit:</span>
+                              <span className={`font-semibold ${((sipResult.currentValue / Math.pow(1 + inflationRate / 100, sipYears)) - sipResult.invested) >= 0 ? 'text-emerald-600/80 dark:text-emerald-400/80' : 'text-red-600/80 dark:text-red-400/80'}`}>
+                                {formatINR((sipResult.currentValue / Math.pow(1 + inflationRate / 100, sipYears)) - sipResult.invested)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-center text-xs mt-1">
                             <span className="text-slate-500">Abs Return:</span>
                             <span className={`font-bold ${sipResult.absoluteReturn >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {Math.abs(sipResult.absoluteReturn).toFixed(2)}%
