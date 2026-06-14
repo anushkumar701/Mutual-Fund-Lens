@@ -133,67 +133,6 @@ export function buildChartData(funds, range) {
 }
 
 /**
- * Build chart-ready data for SIP mode from fund array.
- * Simulates a monthly SIP of sipAmount and calculates the % profit of the total invested value
- * over time, allowing fair side-by-side comparison.
- */
-export function buildSIPChartData(funds, range, sipAmount = 10000) {
-  if (!funds || !funds.length) return [];
-  const dateMap = {};
-
-  funds.forEach((f) => {
-    if (!f.navData || f.navData.length === 0) return;
-    let filtered = filterByRange(f.navData, range);
-    
-    // Fallback: full history if too young
-    if (filtered.length === 0) filtered = [...f.navData].reverse();
-    if (filtered.length === 0) return;
-
-    const rawKey = f.meta?.scheme_name || String(f.schemeCode);
-    const key = sanitizeDataKey(rawKey);
-
-    let totalUnits = 0;
-    let totalInvested = 0;
-    let currentMonthStr = "";
-
-    filtered.forEach((d) => {
-      const currentNav = parseFloat(d.nav);
-      if (!Number.isFinite(currentNav) || currentNav <= 0) return;
-
-      const parts = d.date.split('-');
-      if (parts.length !== 3) return;
-      const monthStr = `${parts[2]}-${parts[1]}`; // YYYY-MM
-
-      // First trading day seen in a new month triggers the SIP installment
-      if (monthStr !== currentMonthStr) {
-        currentMonthStr = monthStr;
-        totalUnits += sipAmount / currentNav;
-        totalInvested += sipAmount;
-      }
-
-      const currentValue = totalUnits * currentNav;
-      const profitPct = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : 0;
-
-      if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
-      dateMap[d.date][key] = profitPct;
-      dateMap[d.date][`${key}_raw`] = currentValue; // For tooltip to show actual value
-      dateMap[d.date][`${key}_invested`] = totalInvested;
-    });
-  });
-
-  const getSortKey = (s) => {
-    const parts = s.split('-');
-    if (parts.length !== 3) return s;
-    const [dd, mm, yyyy] = parts;
-    return `${yyyy}${mm}${dd}`;
-  };
-
-  return Object.values(dateMap).sort(
-    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
-  );
-}
-
-/**
  * Collapse daily chart data to weekly (last trading day of each ISO week).
  * Correctly handles DD-MM-YYYY date format.
  */
@@ -315,3 +254,83 @@ export function guessMinInvestment(schemeName) {
 
 // Default chart colors for up to 4 funds
 export const CHART_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
+
+/**
+ * Build chart-ready rolling returns data.
+ * For each month-end, calculates the annualized return over the past `periodYears`.
+ */
+export function buildRollingChartData(funds, periodYears) {
+  if (!funds || !funds.length || !periodYears) return [];
+
+  const dateMap = {};
+
+  funds.forEach((f) => {
+    if (!f.navData || f.navData.length === 0) return;
+
+    const rawKey = f.meta?.scheme_name || String(f.schemeCode);
+    const key = sanitizeDataKey(rawKey);
+
+    // Downsample to monthly data to ensure chart renders quickly and isn't overcrowded
+    const monthMap = {};
+    f.navData.forEach(d => {
+      const parts = d.date.split('-');
+      if (parts.length === 3) {
+        monthMap[`${parts[2]}-${parts[1]}`] = d;
+      }
+    });
+
+    const monthlyNavs = Object.values(monthMap).sort((a,b) => {
+       const pa = a.date.split('-'); const pb = b.date.split('-');
+       return new Date(`${pa[2]}-${pa[1]}-${pa[0]}`) - new Date(`${pb[2]}-${pb[1]}-${pb[0]}`);
+    });
+
+    const sorted = monthlyNavs.map(d => {
+       const parts = d.date.split('-');
+       return {
+         ts: new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime(),
+         nav: parseFloat(d.nav),
+         date: d.date
+       };
+    }).filter(d => !isNaN(d.ts) && isFinite(d.nav));
+
+    sorted.forEach((d) => {
+      const targetDate = new Date(d.ts);
+      targetDate.setFullYear(targetDate.getFullYear() - periodYears);
+      const targetTs = targetDate.getTime();
+      
+      let lo = 0, hi = sorted.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid].ts < targetTs) lo = mid + 1;
+        else hi = mid;
+      }
+      if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+        lo = lo - 1;
+      }
+
+      const diffDays = Math.abs(sorted[lo].ts - targetTs) / (24 * 60 * 60 * 1000);
+      // Tolerance of 15 days to allow for weekends/holidays near the target date
+      if (diffDays <= 15) {
+        const pastNav = sorted[lo].nav;
+        const currentNav = d.nav;
+        let cagr;
+        if (periodYears === 1) cagr = ((currentNav / pastNav) - 1) * 100;
+        else cagr = (Math.pow(currentNav / pastNav, 1 / periodYears) - 1) * 100;
+
+        if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
+        dateMap[d.date][key] = parseFloat(cagr.toFixed(2));
+      }
+    });
+  });
+
+  const getSortKey = (s) => {
+    const parts = s.split('-');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}${mm}${dd}`;
+  };
+
+  return Object.values(dateMap).sort(
+    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  );
+}
