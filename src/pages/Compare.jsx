@@ -754,23 +754,16 @@ export default function Compare() {
                     return ret;
                   };
 
-                  // Only show periods within the selected range that have data
+                  // Show all standard periods that have data for any fund
                   const validPeriods = PERIOD_DEFS.filter(p =>
-                    p.months <= selectedMonths &&
                     fundData.some(f => calcReturn(f.navData, p.months) !== null)
                   );
 
-                  // Highlighted row: exact match if possible (1M/6M/etc.), else the
-                  // largest visible period (for MAX where no exact match exists)
-                  const highlightMonths = selectedMonths === Infinity
-                    ? (validPeriods.length > 0 ? Math.max(...validPeriods.map(p => p.months)) : null)
-                    : selectedMonths;
+                  // Highlighted row: exact match if possible
+                  const highlightMonths = selectedMonths;
 
-                  // Put highlighted row first, then the rest in ascending order
-                  const sorted = [
-                    ...validPeriods.filter(p => p.months === highlightMonths),
-                    ...validPeriods.filter(p => p.months !== highlightMonths),
-                  ];
+                  // Keep chronological order of the periods
+                  const sorted = validPeriods;
 
                   return (
                     <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
