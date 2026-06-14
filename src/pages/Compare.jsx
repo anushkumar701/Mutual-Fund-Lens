@@ -1024,17 +1024,17 @@ export default function Compare() {
                         if (!event && defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
                           if (avgReturn >= 25) {
-                            event = { label: '🟢 An extremely rare year where almost everything went up fast', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 Extremely rare boom due to historic positive global events', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= 12) {
-                            event = { label: '🟢 A great year for the stock market overall', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 Strong economic growth pushed the market up', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= 5) {
-                            event = { label: '🟢 A slow and steady positive year', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 Steady business progress led to positive returns', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= -2) {
-                            event = { label: '🟡 The market mostly stayed flat with no clear direction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                            event = { label: '🟡 Lack of major economic news kept the market flat', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
                           } else if (avgReturn >= -12) {
-                            event = { label: '🟡 A tough year where the market lost some value', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                            event = { label: '🟡 Economic uncertainties caused investors to pull back slightly', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
                           } else {
-                            event = { label: '🔴 A major crash year where most funds lost heavy money', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
+                            event = { label: '🔴 A severe global or domestic crisis caused a massive panic sell-off', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
                           }
                         }
                         return (
