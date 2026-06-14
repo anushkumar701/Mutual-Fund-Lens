@@ -33,5 +33,7 @@
   "2021": { "label": "🟢 Post-COVID recovery and massive retail investments", "color": "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" },
   "2022": { "label": "🔴 Russia-Ukraine war and high inflation caused a tough market", "color": "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" },
   "2023": { "label": "🟢 Inflation cooled down, causing mid/small companies to boom", "color": "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" },
-  "2024": { "label": "🟢 General elections concluded peacefully, keeping markets stable", "color": "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" }
+  "2024": { "label": "🟢 General elections concluded peacefully, keeping markets stable", "color": "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" },
+  "2025": { "label": "🟡 Market volatility due to escalating geopolitical tensions", "color": "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" },
+  "2026": { "label": "🔴 Ongoing global war causing severe economic disruption", "color": "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" }
 }
