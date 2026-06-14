@@ -1,14 +1,23 @@
 // components/FundDetailModal.jsx
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { fetchFundDetail } from '../hooks/useFunds';
-import { getExpenseRatio, getTERMeta, setUserER, clearUserER } from '../utils/expenseRatio';
-import { getAllPlatformUrls, getUserPlatform, setUserPlatform } from '../utils/platformLinks';
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { fetchFundDetail } from "../hooks/useFunds";
+import {
+  getExpenseRatio,
+  getTERMeta,
+  setUserER,
+  clearUserER,
+} from "../utils/expenseRatio";
+import {
+  getAllPlatformUrls,
+  getUserPlatform,
+  setUserPlatform,
+} from "../utils/platformLinks";
 
 function parseNavDate(s) {
-  if (!s || typeof s !== 'string') return NaN;
-  const parts = s.split('-');
+  if (!s || typeof s !== "string") return NaN;
+  const parts = s.split("-");
   if (parts.length !== 3) return NaN;
   const [dd, mm, yyyy] = parts;
   const ts = new Date(`${yyyy}-${mm}-${dd}`).getTime();
@@ -18,20 +27,24 @@ function parseNavDate(s) {
 // Pre-sort navData ascending by timestamp (called once per modal open)
 function buildSortedForModal(navData) {
   return navData
-    .map(d => ({ ts: parseNavDate(d.date), nav: parseFloat(d.nav) }))
-    .filter(d => Number.isFinite(d.ts) && Number.isFinite(d.nav) && d.nav > 0)
+    .map((d) => ({ ts: parseNavDate(d.date), nav: parseFloat(d.nav) }))
+    .filter((d) => Number.isFinite(d.ts) && Number.isFinite(d.nav) && d.nav > 0)
     .sort((a, b) => a.ts - b.ts);
 }
 
 // Binary search for closest date in pre-sorted array — O(log n) vs O(n)
 function binarySearchModal(sorted, targetTs) {
-  let lo = 0, hi = sorted.length - 1;
+  let lo = 0,
+    hi = sorted.length - 1;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     if (sorted[mid].ts < targetTs) lo = mid + 1;
     else hi = mid;
   }
-  if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+  if (
+    lo > 0 &&
+    Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)
+  ) {
     return lo - 1;
   }
   return lo;
@@ -39,7 +52,12 @@ function binarySearchModal(sorted, targetTs) {
 
 function calcReturn(sorted, latestNav, latestTs, days) {
   if (!sorted || sorted.length < 2) return null;
-  if (!Number.isFinite(latestTs) || !Number.isFinite(latestNav) || latestNav <= 0) return null;
+  if (
+    !Number.isFinite(latestTs) ||
+    !Number.isFinite(latestNav) ||
+    latestNav <= 0
+  )
+    return null;
   const cutoffTs = latestTs - days * 86400000;
   // For very short periods (< 1Y) don't look for data older than the fund itself
   if (cutoffTs < sorted[0].ts) return null;
@@ -63,8 +81,8 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [watchlist, setWatchlist] = useLocalStorage('fundlens_watchlist', []);
-  const [compareList, setCompareList] = useLocalStorage('fundlens_compare', []);
+  const [watchlist, setWatchlist] = useLocalStorage("fundlens_watchlist", []);
+  const [compareList, setCompareList] = useLocalStorage("fundlens_compare", []);
   const modalRef = useRef(null);
 
   const codeStr = String(schemeCode);
@@ -72,8 +90,10 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
   const isCmp = compareList.map(String).includes(codeStr);
 
   const [editingER, setEditingER] = useState(false);
-  const [tempER, setTempER] = useState('');
-  const [erState, setERState] = useState(() => getExpenseRatio(schemeName, codeStr));
+  const [tempER, setTempER] = useState("");
+  const [erState, setERState] = useState(() =>
+    getExpenseRatio(schemeName, codeStr),
+  );
 
   useEffect(() => {
     setERState(getExpenseRatio(schemeName, codeStr));
@@ -84,7 +104,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
     const num = parseFloat(val);
     if (!isNaN(num) && num >= 0 && num <= 5) {
       setUserER(codeStr, num);
-      setERState({ value: num, source: 'user', label: 'Custom' });
+      setERState({ value: num, source: "user", label: "Custom" });
       setEditingER(false);
     }
   };
@@ -100,49 +120,85 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
     setLoading(true);
     setError(false);
     fetchFundDetail(schemeCode)
-      .then((d) => { if (mounted) { setData(d); setLoading(false); } })
-      .catch(() => { if (mounted) { setError(true); setLoading(false); } });
-    return () => { mounted = false; };
+      .then((d) => {
+        if (mounted) {
+          setData(d);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
   }, [schemeCode]);
 
   // Lock body scroll while modal is open
   useEffect(() => {
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   // Keyboard: close on Escape + focus trap
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') { onClose(); return; }
-      if (e.key !== 'Tab') return;
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
       const modal = modalRef.current;
       if (!modal) return;
-      const focusable = Array.from(modal.querySelectorAll(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      ));
+      const focusable = Array.from(
+        modal.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
       } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     // Move focus to modal title for correct screen reader context (not ✕ button)
-    const titleEl = modalRef.current?.querySelector('[data-modal-title]');
+    const titleEl = modalRef.current?.querySelector("[data-modal-title]");
     const firstFocusable = modalRef.current?.querySelector(
-      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
     );
     (titleEl || firstFocusable)?.focus();
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const toggleWL = () => setWatchlist(p => p.map(String).includes(codeStr) ? p.filter(c => String(c) !== codeStr) : [...p, codeStr]);
-  const toggleCmp = () => setCompareList(p => { const s = p.map(String); if (s.includes(codeStr)) return p.filter(c => String(c) !== codeStr); if (p.length >= 4) return p; return [...p, codeStr]; });
+  const toggleWL = () =>
+    setWatchlist((p) =>
+      p.map(String).includes(codeStr)
+        ? p.filter((c) => String(c) !== codeStr)
+        : [...p, codeStr],
+    );
+  const toggleCmp = () =>
+    setCompareList((p) => {
+      const s = p.map(String);
+      if (s.includes(codeStr)) return p.filter((c) => String(c) !== codeStr);
+      if (p.length >= 4) return p;
+      return [...p, codeStr];
+    });
 
   const nav = data?.data;
   const meta = data?.meta;
@@ -156,21 +212,26 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
     const latestTs = parseNavDate(latestNAV?.date);
     if (!Number.isFinite(latestTs) || latestNavVal <= 0) return {};
     return {
-      '1M': calcReturn(sorted, latestNavVal, latestTs, 30),
-      '3M': calcReturn(sorted, latestNavVal, latestTs, 90),
-      '6M': calcReturn(sorted, latestNavVal, latestTs, 180),
-      '1Y': calcReturn(sorted, latestNavVal, latestTs, 365),
-      '3Y': calcReturn(sorted, latestNavVal, latestTs, 1095),
-      '5Y': calcReturn(sorted, latestNavVal, latestTs, 1825),
+      "1M": calcReturn(sorted, latestNavVal, latestTs, 30),
+      "3M": calcReturn(sorted, latestNavVal, latestTs, 90),
+      "6M": calcReturn(sorted, latestNavVal, latestTs, 180),
+      "1Y": calcReturn(sorted, latestNavVal, latestTs, 365),
+      "3Y": calcReturn(sorted, latestNavVal, latestTs, 1095),
+      "5Y": calcReturn(sorted, latestNavVal, latestTs, 1825),
     };
   }, [nav, latestNAV]);
 
   // Fund age in years
-  const fundAge = nav && nav.length > 1 ? (() => {
-    const oldest = parseNavDate(nav[nav.length - 1].date);
-    const latest = parseNavDate(nav[0].date);
-    return ((latest - oldest) / (1000*60*60*24*365.25)).toFixed(1);
-  })() : null;
+  const fundAge =
+    nav && nav.length > 1
+      ? (() => {
+          const oldest = parseNavDate(nav[nav.length - 1].date);
+          const latest = parseNavDate(nav[0].date);
+          return ((latest - oldest) / (1000 * 60 * 60 * 24 * 365.25)).toFixed(
+            1,
+          );
+        })()
+      : null;
 
   return (
     <div
@@ -180,46 +241,81 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
       aria-labelledby="modal-title"
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true"/>
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
       {/* Modal */}
-      <div ref={modalRef} className="relative w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl">
+      <div
+        ref={modalRef}
+        className="relative w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl"
+      >
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-start justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">Fund Details</p>
+            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">
+              Fund Details
+            </p>
             <h2
               id="modal-title"
               data-modal-title
               tabIndex={-1}
               className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 focus:outline-none"
-            >{schemeName}</h2>
+            >
+              {schemeName}
+            </h2>
           </div>
-          <button onClick={onClose} aria-label="Close fund details" className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg font-bold transition-all">×</button>
+          <button
+            onClick={onClose}
+            aria-label="Close fund details"
+            className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg font-bold transition-all"
+          >
+            ×
+          </button>
         </div>
 
         <div className="p-5 space-y-4">
           {loading && (
             <div className="space-y-3 animate-pulse">
-              {Array(5).fill(0).map((_,i) => <div key={i} className="h-10 bg-slate-100 dark:bg-slate-800 rounded-lg"/>)}
+              {Array(5)
+                .fill(0)
+                .map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-10 bg-slate-100 dark:bg-slate-800 rounded-lg"
+                  />
+                ))}
             </div>
           )}
 
-          {error && <div className="text-center py-8 text-slate-500">Failed to load fund data. Please try again.</div>}
+          {error && (
+            <div className="text-center py-8 text-slate-500">
+              Failed to load fund data. Please try again.
+            </div>
+          )}
 
           {!loading && !error && data && (
             <>
               {/* Meta info */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  ['Fund House', meta?.fund_house || '—'],
-                  ['Category', meta?.scheme_category || '—'],
-                  ['Type', meta?.scheme_type || '—'],
-                  ['Scheme Code', `#${codeStr}`],
-                ].map(([l,v]) => (
-                  <div key={l} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{l}</p>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2">{v}</p>
+                  ["Fund House", meta?.fund_house || "—"],
+                  ["Category", meta?.scheme_category || "—"],
+                  ["Type", meta?.scheme_type || "—"],
+                  ["Scheme Code", `#${codeStr}`],
+                ].map(([l, v]) => (
+                  <div
+                    key={l}
+                    className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3"
+                  >
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">
+                      {l}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2">
+                      {v}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -227,13 +323,23 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
               {/* NAV + Age */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
-                  <p className="text-[10px] text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Latest NAV</p>
-                  <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">₹{parseFloat(latestNAV?.nav || 0).toFixed(4)}</p>
-                  <p className="text-[10px] text-slate-500 mt-1">as of {latestNAV?.date}</p>
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
+                    Latest NAV
+                  </p>
+                  <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                    ₹{parseFloat(latestNAV?.nav || 0).toFixed(4)}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    as of {latestNAV?.date}
+                  </p>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 text-center">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Fund Age</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{fundAge}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">
+                    Fund Age
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {fundAge}
+                  </p>
                   <p className="text-[10px] text-slate-500">years old</p>
                 </div>
               </div>
@@ -246,13 +352,18 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/40 rounded-xl p-4 border border-orange-100 dark:border-orange-900/50">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-wider font-bold">Expense Ratio (TER)</span>
+                        <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-wider font-bold">
+                          Expense Ratio (TER)
+                        </span>
                         {er.value !== null && (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                            er.source === 'amfi' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' :
-                            'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400'
-                          }`}>
-                            {er.source === 'amfi' ? '✓ AMFI Data' : '✏️ Custom'}
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                              er.source === "amfi"
+                                ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
+                                : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400"
+                            }`}
+                          >
+                            {er.source === "amfi" ? "✓ AMFI Data" : "✏️ Custom"}
                           </span>
                         )}
                       </div>
@@ -285,18 +396,29 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className={`text-xl font-black tabular-nums ${
-                            er.value === null ? 'text-slate-400' :
-                            er.value > 1.5 ? 'text-red-600 dark:text-red-400' :
-                            er.value > 1 ? 'text-orange-600 dark:text-orange-400' :
-                            'text-emerald-600 dark:text-emerald-400'
-                          }`}>
-                            {er.value !== null ? `${er.value}%` : 'N/A'}
-                            {er.value !== null && <span className="text-xs font-medium text-slate-500 ml-1">p.a.</span>}
+                          <span
+                            className={`text-xl font-black tabular-nums ${
+                              er.value === null
+                                ? "text-slate-400"
+                                : er.value > 1.5
+                                  ? "text-red-600 dark:text-red-400"
+                                  : er.value > 1
+                                    ? "text-orange-600 dark:text-orange-400"
+                                    : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            {er.value !== null ? `${er.value}%` : "N/A"}
+                            {er.value !== null && (
+                              <span className="text-xs font-medium text-slate-500 ml-1">
+                                p.a.
+                              </span>
+                            )}
                           </span>
                           <button
                             onClick={() => {
-                              setTempER(er.value !== null ? String(er.value) : '');
+                              setTempER(
+                                er.value !== null ? String(er.value) : "",
+                              );
                               setEditingER(true);
                             }}
                             className="text-slate-400 hover:text-blue-500 text-xs transition-colors"
@@ -310,18 +432,22 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
 
                     {er.value !== null ? (
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {er.value <= 0.5 ? '✅ Excellent — very low fee. More returns stay with you.' :
-                         er.value <= 1.0 ? '👍 Good — competitive expense ratio for this category.' :
-                         er.value <= 1.5 ? '⚠️ Above average — consider switching to a Direct plan to save ~0.5-1%.' :
-                         '🚫 High — significant fee drag. A Direct plan alternative can save you ₹ lakhs over time.'}
+                        {er.value <= 0.5
+                          ? "✅ Excellent — very low fee. More returns stay with you."
+                          : er.value <= 1.0
+                            ? "👍 Good — competitive expense ratio for this category."
+                            : er.value <= 1.5
+                              ? "⚠️ Above average — consider switching to a Direct plan to save ~0.5-1%."
+                              : "🚫 High — significant fee drag. A Direct plan alternative can save you ₹ lakhs over time."}
                       </p>
                     ) : (
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        ⚠️ No official data found. Click the pencil icon to set your own expense ratio.
+                        ⚠️ No official data found. Click the pencil icon to set
+                        your own expense ratio.
                       </p>
                     )}
 
-                    {er.source === 'user' && (
+                    {er.source === "user" && (
                       <button
                         onClick={handleClearER}
                         className="text-[9px] text-red-500 hover:underline mt-1.5 block font-bold"
@@ -330,9 +456,13 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                       </button>
                     )}
 
-                    {terMetaInfo && er.source === 'amfi' && (
+                    {terMetaInfo && er.source === "amfi" && (
                       <p className="text-[9px] text-slate-400 mt-1.5">
-                        Source: AMFI India · Updated: {new Date(terMetaInfo.fetchedAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                        Source: AMFI India · Updated:{" "}
+                        {new Date(terMetaInfo.fetchedAt).toLocaleDateString(
+                          "en-IN",
+                          { month: "short", year: "numeric" },
+                        )}
                       </p>
                     )}
                   </div>
@@ -341,47 +471,66 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
 
               {/* Platform Invest Links */}
               <div>
-                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Invest on Your Platform</h3>
+                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                  Invest on Your Platform
+                </h3>
                 <div className="flex gap-2 flex-wrap">
-                  {getAllPlatformUrls(schemeName, codeStr).slice(0, 6).map((p) => (
-                    <a
-                      key={p.id}
-                      href={p.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={p.tip}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all text-xs font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      <span>{p.icon}</span>
-                      <span>{p.name}</span>
-                    </a>
-                  ))}
+                  {getAllPlatformUrls(schemeName, codeStr)
+                    .slice(0, 6)
+                    .map((p) => (
+                      <a
+                        key={p.id}
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={p.tip}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all text-xs font-medium text-slate-700 dark:text-slate-300"
+                      >
+                        <span>{p.icon}</span>
+                        <span>{p.name}</span>
+                      </a>
+                    ))}
                 </div>
                 {(() => {
                   const preferred = getUserPlatform();
-                  if (!preferred) return (
-                    <p className="text-[10px] text-slate-400 mt-2">
-                      💡 Tip: Set your default platform in Settings to see a quick "Invest Now" button.
-                    </p>
-                  );
+                  if (!preferred)
+                    return (
+                      <p className="text-[10px] text-slate-400 mt-2">
+                        💡 Tip: Set your default platform in Settings to see a
+                        quick "Invest Now" button.
+                      </p>
+                    );
                   return null;
                 })()}
               </div>
 
               {/* Returns */}
               <div>
-                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Performance Returns</h3>
+                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
+                  Performance Returns
+                </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                   {Object.entries(returns).map(([period, ret]) => {
                     const val = ret !== null ? parseFloat(ret) : null;
                     const isPos = val !== null && val >= 0;
                     return (
-                      <div key={period} className={`rounded-xl p-3 text-center border ${val === null ? 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700' : isPos ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900' : 'bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900'}`}>
-                        <p className="text-[10px] text-slate-500 mb-1">{period}</p>
-                        <p className={`text-sm font-bold ${val === null ? 'text-slate-500' : isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {val === null ? '—' : `${isPos ? '+' : ''}${val}%`}
+                      <div
+                        key={period}
+                        className={`rounded-xl p-3 text-center border ${val === null ? "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700" : isPos ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900" : "bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900"}`}
+                      >
+                        <p className="text-[10px] text-slate-500 mb-1">
+                          {period}
                         </p>
-                        <p className="text-[9px] text-slate-500">{period.includes('Y') && parseInt(period) > 1 ? 'CAGR' : 'Abs'}</p>
+                        <p
+                          className={`text-sm font-bold ${val === null ? "text-slate-500" : isPos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                        >
+                          {val === null ? "—" : `${isPos ? "+" : ""}${val}%`}
+                        </p>
+                        <p className="text-[9px] text-slate-500">
+                          {period.includes("Y") && parseInt(period) > 1
+                            ? "CAGR"
+                            : "Abs"}
+                        </p>
                       </div>
                     );
                   })}
@@ -390,27 +539,47 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
 
               {/* Data history */}
               <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>📅 NAV history: <strong className="text-slate-700 dark:text-slate-300">{nav?.length?.toLocaleString('en-IN')} data points</strong></span>
-                <span>Since {nav?.[nav.length-1]?.date}</span>
+                <span>
+                  📅 NAV history:{" "}
+                  <strong className="text-slate-700 dark:text-slate-300">
+                    {nav?.length?.toLocaleString("en-IN")} data points
+                  </strong>
+                </span>
+                <span>Since {nav?.[nav.length - 1]?.date}</span>
               </div>
 
               {/* Actions */}
               <div className="grid grid-cols-3 gap-3 pt-2">
-                <button onClick={toggleWL}
-                  aria-label={isWL ? 'Remove from watchlist' : 'Add to watchlist'}
+                <button
+                  onClick={toggleWL}
+                  aria-label={
+                    isWL ? "Remove from watchlist" : "Add to watchlist"
+                  }
                   aria-pressed={isWL}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isWL ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-950 border border-slate-200 dark:border-slate-700'}`}>
-                  {isWL ? '⭐ Saved' : '⭐ Watchlist'}
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isWL ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-950 border border-slate-200 dark:border-slate-700"}`}
+                >
+                  {isWL ? "⭐ Saved" : "⭐ Watchlist"}
                 </button>
-                <button onClick={toggleCmp}
-                  aria-label={isCmp ? 'Remove from comparison' : compareList.length >= 4 ? 'Compare list is full' : 'Add to comparison'}
+                <button
+                  onClick={toggleCmp}
+                  aria-label={
+                    isCmp
+                      ? "Remove from comparison"
+                      : compareList.length >= 4
+                        ? "Compare list is full"
+                        : "Add to comparison"
+                  }
                   aria-pressed={isCmp}
                   disabled={!isCmp && compareList.length >= 4}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isCmp ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : compareList.length >= 4 ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-950 border border-slate-200 dark:border-slate-700'}`}>
-                  {isCmp ? '⚖️ In Compare' : '⚖️ Compare'}
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${isCmp ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800" : compareList.length >= 4 ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-950 border border-slate-200 dark:border-slate-700"}`}
+                >
+                  {isCmp ? "⚖️ In Compare" : "⚖️ Compare"}
                 </button>
-                <Link to={`/compare?code=${codeStr}`} onClick={onClose}
-                  className="py-2.5 rounded-xl text-xs font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 transition-all">
+                <Link
+                  to={`/compare?code=${codeStr}`}
+                  onClick={onClose}
+                  className="py-2.5 rounded-xl text-xs font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 transition-all"
+                >
                   📊 Full Analysis →
                 </Link>
               </div>

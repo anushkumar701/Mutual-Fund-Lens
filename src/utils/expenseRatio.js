@@ -2,25 +2,25 @@
 //   1. User-overridden value (from localStorage)
 //   2. AMFI TER data (src/data/expenseRatios.json) — most accurate
 
-import terDataRaw from '../data/expenseRatios.json';
+import terDataRaw from "../data/expenseRatios.json";
 
 // Pre-process: the JSON has { _meta, funds } structure
 const terFunds = terDataRaw?.funds || {};
 const terMeta = terDataRaw?._meta || null;
 
 // localStorage keys
-const ACTIVE_PLATFORM_KEY = 'fundlens_active_platform';
-const USER_ER_KEY_PREFIX = 'fundlens_user_er_';
-const OLD_USER_ER_KEY = 'fundlens_user_expense_ratios'; // for backward compatibility
+const ACTIVE_PLATFORM_KEY = "fundlens_active_platform";
+const USER_ER_KEY_PREFIX = "fundlens_user_er_";
+const OLD_USER_ER_KEY = "fundlens_user_expense_ratios"; // for backward compatibility
 
 /**
  * Get the currently active platform (e.g., Default, Zerodha, Kuvera)
  */
 export function getActivePlatform() {
   try {
-    return localStorage.getItem(ACTIVE_PLATFORM_KEY) || 'Default';
+    return localStorage.getItem(ACTIVE_PLATFORM_KEY) || "Default";
   } catch {
-    return 'Default';
+    return "Default";
   }
 }
 
@@ -41,10 +41,9 @@ export function setActivePlatform(platform) {
  */
 function getCurrentERKey() {
   const platform = getActivePlatform();
-  if (platform === 'Default') return OLD_USER_ER_KEY;
-  return `${USER_ER_KEY_PREFIX}${platform.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  if (platform === "Default") return OLD_USER_ER_KEY;
+  return `${USER_ER_KEY_PREFIX}${platform.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
 }
-
 
 /**
  * Normalize a scheme name the same way the build script does.
@@ -53,11 +52,14 @@ function getCurrentERKey() {
 function normalizeKey(name) {
   return name
     .toLowerCase()
-    .replace(/\s*-\s*(direct|regular|growth|idcw|dividend|payout|reinvestment)\s*/gi, ' ')
-    .replace(/\s*(direct|regular)\s*plan\s*/gi, ' ')
-    .replace(/\s*(growth|idcw|dividend)\s*option\s*/gi, ' ')
-    .replace(/\(formerly known as[^)]*\)/gi, '')
-    .replace(/\s+/g, ' ')
+    .replace(
+      /\s*-\s*(direct|regular|growth|idcw|dividend|payout|reinvestment)\s*/gi,
+      " ",
+    )
+    .replace(/\s*(direct|regular)\s*plan\s*/gi, " ")
+    .replace(/\s*(growth|idcw|dividend)\s*option\s*/gi, " ")
+    .replace(/\(formerly known as[^)]*\)/gi, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -81,11 +83,11 @@ function lookupAMFI(schemeName) {
   const key = normalizeKey(schemeName);
   const platform = getActivePlatform();
   let direct = isDirect(schemeName);
-  
+
   // Force Direct plan ER for known Direct-only platforms to improve accuracy
-  if (['Zerodha', 'Kuvera', 'Groww', 'INDmoney'].includes(platform)) {
+  if (["Zerodha", "Kuvera", "Groww", "INDmoney"].includes(platform)) {
     direct = true;
-  } else if (platform === 'Regular Broker (Banks)') {
+  } else if (platform === "Regular Broker (Banks)") {
     direct = false;
   }
 
@@ -114,9 +116,9 @@ function lookupAMFI(schemeName) {
 function getUserOverride(schemeCode) {
   try {
     const key = getCurrentERKey();
-    const stored = JSON.parse(localStorage.getItem(key) || '{}');
+    const stored = JSON.parse(localStorage.getItem(key) || "{}");
     const val = stored[String(schemeCode)];
-    return typeof val === 'number' ? val : null;
+    return typeof val === "number" ? val : null;
   } catch {
     return null;
   }
@@ -130,7 +132,7 @@ function getUserOverride(schemeCode) {
 export function setUserER(schemeCode, er) {
   try {
     const key = getCurrentERKey();
-    const stored = JSON.parse(localStorage.getItem(key) || '{}');
+    const stored = JSON.parse(localStorage.getItem(key) || "{}");
     stored[String(schemeCode)] = er;
     localStorage.setItem(key, JSON.stringify(stored));
   } catch {
@@ -144,7 +146,7 @@ export function setUserER(schemeCode, er) {
 export function clearUserER(schemeCode) {
   try {
     const key = getCurrentERKey();
-    const stored = JSON.parse(localStorage.getItem(key) || '{}');
+    const stored = JSON.parse(localStorage.getItem(key) || "{}");
     delete stored[String(schemeCode)];
     localStorage.setItem(key, JSON.stringify(stored));
   } catch {
@@ -168,18 +170,18 @@ export function getExpenseRatio(schemeName, schemeCode) {
   if (schemeCode) {
     const userER = getUserOverride(schemeCode);
     if (userER !== null) {
-      return { value: userER, source: 'user', label: 'Custom' };
+      return { value: userER, source: "user", label: "Custom" };
     }
   }
 
   // 2. AMFI data
   const amfiER = lookupAMFI(schemeName);
   if (amfiER !== null) {
-    return { value: amfiER, source: 'amfi', label: 'AMFI' };
+    return { value: amfiER, source: "amfi", label: "AMFI" };
   }
 
   // No fallback
-  return { value: null, source: 'none', label: 'N/A' };
+  return { value: null, source: "none", label: "N/A" };
 }
 
 /**
@@ -198,6 +200,6 @@ export function getTERMeta() {
   return {
     fetchedAt: terMeta.fetchedAt,
     count: terMeta.count,
-    source: 'AMFI India (via captn3m0/india-mutual-fund-ter-tracker)',
+    source: "AMFI India (via captn3m0/india-mutual-fund-ter-tracker)",
   };
 }

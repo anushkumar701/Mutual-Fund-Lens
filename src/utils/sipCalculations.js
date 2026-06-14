@@ -2,8 +2,12 @@
 
 // Shared zero result to prevent ₹Infinity / ₹NaN on extreme inputs
 const zeroResult = () => ({
-  invested: 0, baseInvested: 0, stepUpInvested: 0,
-  maturity: 0, returns: 0, yearlyData: [],
+  invested: 0,
+  baseInvested: 0,
+  stepUpInvested: 0,
+  maturity: 0,
+  returns: 0,
+  yearlyData: [],
 });
 
 /**
@@ -15,7 +19,7 @@ export function calculateSIP(monthlyAmount, years, annualReturn, stepUp = 0) {
   const amt = Math.max(0, Math.min(Number(monthlyAmount) || 0, 10_000_000));
   const yrs = Math.max(0, Math.min(Math.round(Number(years) || 0), 100));
   const ret = Math.max(0, Math.min(Number(annualReturn) || 0, 100));
-  const su  = Math.max(0, Math.min(Number(stepUp) || 0, 50));
+  const su = Math.max(0, Math.min(Number(stepUp) || 0, 50));
   if (amt <= 0 || yrs <= 0) return zeroResult();
 
   const r = ret / 100 / 12;
@@ -57,7 +61,7 @@ export function calculateSIP(monthlyAmount, years, annualReturn, stepUp = 0) {
  */
 export function calculateLumpsum(principal, years, annualReturn) {
   // Sanitize: cap principal at ₹100 Cr, years 1–100, return 0–100%
-  const p   = Math.max(0, Math.min(Number(principal) || 0, 1_000_000_000));
+  const p = Math.max(0, Math.min(Number(principal) || 0, 1_000_000_000));
   const yrs = Math.max(0, Math.min(Math.round(Number(years) || 0), 100));
   const ret = Math.max(0, Math.min(Number(annualReturn) || 0, 100));
   if (p <= 0 || yrs <= 0) return zeroResult();
@@ -115,7 +119,8 @@ export function calculateGoalSIP(targetAmount, years, annualReturn) {
  */
 export function calculateGoalYears(targetAmount, principal, annualReturn) {
   if (annualReturn <= 0 || principal <= 0) return null;
-  const years = Math.log(targetAmount / principal) / Math.log(1 + annualReturn / 100);
+  const years =
+    Math.log(targetAmount / principal) / Math.log(1 + annualReturn / 100);
   return parseFloat(years.toFixed(1));
 }
 
@@ -137,16 +142,28 @@ export function calculateELSSTaxSaving(elssAmount, taxSlab) {
     taxSaved,
     effectiveCost,
     // Always show disclaimer — new regime users have zero 80C benefit
-    disclaimer: 'Applicable under Old Tax Regime only. New Tax Regime (default from FY 2023-24) does not allow Section 80C deductions.',
+    disclaimer:
+      "Applicable under Old Tax Regime only. New Tax Regime (default from FY 2023-24) does not allow Section 80C deductions.",
   };
 }
 
 /**
  * Calculate SWP (Systematic Withdrawal Plan)
  */
-export function calculateSWP(totalInvestment, withdrawalPerMonth, annualReturn, years) {
-  const principal = Math.max(0, Math.min(Number(totalInvestment) || 0, 1_000_000_000));
-  const withdrawal = Math.max(0, Math.min(Number(withdrawalPerMonth) || 0, 10_000_000));
+export function calculateSWP(
+  totalInvestment,
+  withdrawalPerMonth,
+  annualReturn,
+  years,
+) {
+  const principal = Math.max(
+    0,
+    Math.min(Number(totalInvestment) || 0, 1_000_000_000),
+  );
+  const withdrawal = Math.max(
+    0,
+    Math.min(Number(withdrawalPerMonth) || 0, 10_000_000),
+  );
   const ret = Math.max(0, Math.min(Number(annualReturn) || 0, 100));
   const yrs = Math.max(0, Math.min(Math.round(Number(years) || 0), 100));
 
@@ -177,20 +194,23 @@ export function calculateSWP(totalInvestment, withdrawalPerMonth, annualReturn, 
       if (currentBalance <= 0) {
         if (ranOutYear === null) {
           ranOutYear = Math.ceil((monthCount - 1) / 12);
-          ranOutMonth = ((monthCount - 1) % 12) || 12;
+          ranOutMonth = (monthCount - 1) % 12 || 12;
         }
         currentBalance = 0;
         continue;
       }
       const interestEarned = currentBalance * r;
-      const actualWithdrawal = Math.min(currentBalance + interestEarned, withdrawal);
+      const actualWithdrawal = Math.min(
+        currentBalance + interestEarned,
+        withdrawal,
+      );
       currentBalance = currentBalance + interestEarned - actualWithdrawal;
       totalWithdrawn += actualWithdrawal;
       totalReturns += interestEarned;
 
       if (currentBalance <= 0 && ranOutYear === null) {
         ranOutYear = Math.ceil(monthCount / 12);
-        ranOutMonth = (monthCount % 12) || 12;
+        ranOutMonth = monthCount % 12 || 12;
       }
     }
     yearlyData.push({
@@ -212,5 +232,3 @@ export function calculateSWP(totalInvestment, withdrawalPerMonth, annualReturn, 
     ranOutMonth,
   };
 }
-
-

@@ -1,10 +1,10 @@
 // components/PWAInstallPrompt.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [dismissed, setDismissed] = useState(
-    () => localStorage.getItem('fundlens_pwa_dismissed') === '1'
+    () => localStorage.getItem("fundlens_pwa_dismissed") === "1",
   );
 
   useEffect(() => {
@@ -12,8 +12,8 @@ export default function PWAInstallPrompt() {
       e.preventDefault();
       setDeferredPrompt(e);
     };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   if (!deferredPrompt || dismissed) return null;
@@ -22,12 +22,12 @@ export default function PWAInstallPrompt() {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
-    if (outcome !== 'accepted') dismiss();
+    if (outcome !== "accepted") dismiss();
   };
 
   const dismiss = () => {
     setDismissed(true);
-    localStorage.setItem('fundlens_pwa_dismissed', '1');
+    localStorage.setItem("fundlens_pwa_dismissed", "1");
   };
 
   return (
@@ -38,7 +38,9 @@ export default function PWAInstallPrompt() {
             📊
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-900 dark:text-white text-sm">Install FundLens</p>
+            <p className="font-bold text-slate-900 dark:text-white text-sm">
+              Install FundLens
+            </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
               Add to home screen for quick access. Works offline too!
             </p>
