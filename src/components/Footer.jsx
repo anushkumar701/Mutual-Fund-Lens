@@ -30,7 +30,7 @@ export default function Footer() {
               { to: "/", label: "Dashboard" },
               { to: "/screener", label: "Screener" },
               { to: "/compare", label: "Compare" },
-              { to: "/sip", label: "SIP Calc" },
+              { to: "/sip", label: "Wealth Simulator" },
             ].map(({ to, label }) => (
               <Link
                 key={to}
@@ -91,7 +91,7 @@ export default function Footer() {
                   { to: "/", label: "Dashboard" },
                   { to: "/screener", label: "Fund Screener" },
                   { to: "/compare", label: "Compare Funds" },
-                  { to: "/sip", label: "SIP Calculator" },
+                  { to: "/sip", label: "Wealth Simulator" },
                 ].map(({ to, label }) => (
                   <li key={to}>
                     <Link

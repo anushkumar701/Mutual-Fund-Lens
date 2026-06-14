@@ -226,7 +226,7 @@ function QuickCalc() {
   return (
     <div className="card p-4 sm:p-5 h-full">
       <h3 className="font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
-        🧮 Quick SIP Calculator
+        🧮 Quick Wealth Simulator
       </h3>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {[
