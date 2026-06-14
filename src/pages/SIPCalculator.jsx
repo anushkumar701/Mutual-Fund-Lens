@@ -2235,9 +2235,9 @@ export default function SIPCalculator() {
                   label="Monthly SIP Amount"
                   value={dateSipAmount}
                   onChange={setDateSipAmount}
-                  min={500}
+                  min={100}
                   max={100000}
-                  step={500}
+                  step={100}
                   prefix="₹"
                   formatFn={formatINR}
                 />
