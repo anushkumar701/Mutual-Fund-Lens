@@ -133,6 +133,41 @@ export function buildChartData(funds, range) {
 }
 
 /**
+ * Collapse daily chart data to weekly (last trading day of each ISO week).
+ * Correctly handles DD-MM-YYYY date format.
+ */
+export function toWeeklyData(chartData) {
+  const weekMap = {};
+  chartData.forEach((row) => {
+    const parts = row.date.split('-');
+    if (parts.length !== 3) return;
+    const [dd, mm, yyyy] = parts;
+    const d = new Date(`${yyyy}-${mm}-${dd}`);
+    if (isNaN(d.getTime())) return;
+    // ISO week number: Thursday-based week
+    const tmp = new Date(d);
+    tmp.setHours(0, 0, 0, 0);
+    tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+    const yearStart = new Date(tmp.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((tmp - yearStart) / 86400000 + 1) / 7);
+    const key = `${tmp.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    // Last entry per week wins (data is sorted ascending by date)
+    weekMap[key] = row;
+  });
+
+  const getSortKey = (s) => {
+    const parts = s.split('-');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}${mm}${dd}`;
+  };
+
+  return Object.values(weekMap).sort(
+    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  );
+}
+
+/**
  * Collapse daily chart data to monthly (last trading day of each month).
  * Correctly handles DD-MM-YYYY date format.
  */
