@@ -846,33 +846,92 @@ export default function Compare() {
 
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: '#94a3b8' }}
                     tickLine={false}
-                    axisLine={false}
-                    minTickGap={44}
-                    tickFormatter={(val) => {
-                      if (!val) return '';
-                      const [dd, mm, yyyy] = val.split('-');
+                    axisLine={{ stroke: isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.3)', strokeWidth: 1 }}
+                    minTickGap={52}
+                    dy={6}
+                    tick={(props) => {
+                      const { x, y, payload } = props;
+                      if (!payload?.value) return null;
+                      const [dd, mm, yyyy] = payload.value.split('-');
                       const d = new Date(`${yyyy}-${mm}-${dd}`);
-                      if (isNaN(d.getTime())) return val;
-                      if (['1M', '3M', '6M'].includes(range)) {
-                        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-                      } else if (['1Y', '3Y'].includes(range)) {
-                        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                      if (isNaN(d.getTime())) return null;
+
+                      let line1 = '', line2 = '';
+                      if (['1M', '3M'].includes(range)) {
+                        // "15" / "Jun"
+                        line1 = d.toLocaleDateString('en-US', { day: 'numeric' });
+                        line2 = d.toLocaleDateString('en-US', { month: 'short' });
+                      } else if (['6M', '1Y'].includes(range)) {
+                        // "Jun" / "'25"
+                        line1 = d.toLocaleDateString('en-US', { month: 'short' });
+                        line2 = `'${d.toLocaleDateString('en-US', { year: '2-digit' })}`;
+                      } else if (['3Y', '5Y'].includes(range)) {
+                        // "Jun 2023"
+                        line1 = d.toLocaleDateString('en-US', { month: 'short' });
+                        line2 = d.toLocaleDateString('en-US', { year: 'numeric' });
                       } else {
-                        return d.toLocaleDateString('en-US', { year: 'numeric' });
+                        // just the year
+                        line1 = d.toLocaleDateString('en-US', { year: 'numeric' });
+                        line2 = '';
                       }
+
+                      const textColor = isDark ? '#94a3b8' : '#64748b';
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          {/* subtle tick mark */}
+                          <line y1={0} y2={4} stroke={isDark ? 'rgba(148,163,184,0.2)' : 'rgba(148,163,184,0.4)'} strokeWidth={1} />
+                          <text x={0} y={14} textAnchor="middle" fill={textColor} fontSize={11} fontWeight={600} fontFamily="inherit">
+                            {line1}
+                          </text>
+                          {line2 && (
+                            <text x={0} y={26} textAnchor="middle" fill={isDark ? '#64748b' : '#94a3b8'} fontSize={10} fontFamily="inherit">
+                              {line2}
+                            </text>
+                          )}
+                        </g>
+                      );
                     }}
-                    dy={10}
                   />
 
                   <YAxis
-                    tick={{ fontSize: 10, fill: '#94a3b8' }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`}
-                    width={56}
-                    dx={-4}
+                    width={62}
+                    dx={-2}
+                    tick={(props) => {
+                      const { x, y, payload } = props;
+                      const v = parseFloat(payload?.value);
+                      if (!isFinite(v)) return null;
+
+                      // Color-code: green positive, red negative, gray zero
+                      let color;
+                      if (v > 0)      color = isDark ? '#34d399' : '#059669';
+                      else if (v < 0) color = isDark ? '#f87171' : '#dc2626';
+                      else            color = isDark ? '#64748b' : '#94a3b8';
+
+                      // Format: drop decimal for round numbers
+                      const absV = Math.abs(v);
+                      const formatted = absV % 1 === 0
+                        ? `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`
+                        : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          <text
+                            x={0}
+                            y={4}
+                            textAnchor="end"
+                            fill={color}
+                            fontSize={10}
+                            fontWeight={v === 0 ? 400 : 600}
+                            fontFamily="inherit"
+                          >
+                            {formatted}
+                          </text>
+                        </g>
+                      );
+                    }}
                   />
 
                   <ReferenceLine y={0} stroke={isDark ? 'rgba(148,163,184,0.35)' : 'rgba(100,116,139,0.4)'} strokeDasharray="4 3" />
