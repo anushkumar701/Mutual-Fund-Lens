@@ -110,7 +110,7 @@ export default function Compare() {
     
     if (codesToAdd.length > 0) {
       setCompareList((prev) => {
-        const unique = new Set([...prev, ...codesToAdd]);
+        const unique = new Set([...prev.map(String), ...codesToAdd.map(String)]);
         return Array.from(unique).slice(0, 4);
       });
     }
@@ -119,23 +119,24 @@ export default function Compare() {
   // Load all codes in compareList
   useEffect(() => {
     compareList.forEach((code) => {
-      if (!fundData.find((f) => f.schemeCode === code)) {
+      if (!fundData.find((f) => String(f.schemeCode) === String(code))) {
         loadFund(code);
       }
     });
   }, [compareList, fundData, loadFund]);
 
   const handleAddCode = (code) => {
+    const codeStr = String(code);
     if (compareList.length >= 4) {
       showError('You can compare up to 4 funds at a time.');
       return;
     }
-    if (compareList.includes(code.toString())) {
+    if (compareList.map(String).includes(codeStr)) {
       showError('This fund is already in your comparison.');
       return;
     }
-    setCompareList((prev) => [...prev, code.toString()]);
-    loadFund(code.toString());
+    setCompareList((prev) => [...prev, codeStr]);
+    loadFund(codeStr);
     setSearchQuery('');
     setShowDropdown(false);
   };
@@ -167,8 +168,9 @@ export default function Compare() {
   }, [debouncedSearchQuery, funds]);
 
   const removeFund = (code) => {
-    setCompareList((prev) => prev.filter((c) => c !== code));
-    setFundData((prev) => prev.filter((f) => f.schemeCode !== code));
+    const codeStr = String(code);
+    setCompareList((prev) => prev.filter((c) => String(c) !== codeStr));
+    setFundData((prev) => prev.filter((f) => String(f.schemeCode) !== codeStr));
   };
 
   const clearAll = () => {
