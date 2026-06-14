@@ -13,7 +13,6 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Screener = lazy(() => import('./pages/Screener'));
 const Compare = lazy(() => import('./pages/Compare'));
 const SIPCalculator = lazy(() => import('./pages/SIPCalculator'));
-const Settings = lazy(() => import('./pages/Settings'));
 
 // Per-route SEO — updates document.title, meta description, and canonical URL
 const ROUTE_SEO = {
@@ -32,10 +31,6 @@ const ROUTE_SEO = {
   '/sip': {
     title: 'SIP & FIRE Calculator | FundLens',
     description: 'Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.',
-  },
-  '/settings': {
-    title: 'Settings — FundLens',
-    description: 'Personalize your FundLens experience. Choose your default investment platform and view data source disclosures.',
   },
 };
 
@@ -102,7 +97,6 @@ export default function App() {
                     <Route path="/screener" element={<Screener />} />
                     <Route path="/compare" element={<Compare />} />
                     <Route path="/sip" element={<SIPCalculator />} />
-                    <Route path="/settings" element={<Settings />} />
                     {/* Catch-all: redirect any unknown URL to home */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

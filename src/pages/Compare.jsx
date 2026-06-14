@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { getER } from '../utils/expenseRatio';
-import { getFundAgeYears, buildChartData, buildSIPChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
 // ── Index Benchmarks ──────────────────────────────────────────────────────────
@@ -50,7 +50,6 @@ export default function Compare() {
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
-  const [chartMode, setChartMode] = useState('lumpsum'); // 'lumpsum' or 'sip'
   const toast = useToast();
 
   // ── Benchmark state ──────────────────────────────────────────────────────────
@@ -327,15 +326,13 @@ export default function Compare() {
       const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
       allFunds.push({ schemeCode: `bm_${activeBenchmark}`, meta: { scheme_name: bm.label }, navData: benchmarkData });
     }
-    let data = chartMode === 'sip'
-      ? buildSIPChartData(allFunds, range, 10000)
-      : buildChartData(allFunds, range);
+    let data = buildChartData(allFunds, range);
 
     if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
       data = toMonthlyData(data);
     }
     return data;
-  }, [fundData, range, activeBenchmark, benchmarkData, chartMode]);
+  }, [fundData, range, activeBenchmark, benchmarkData]);
 
 
 
@@ -766,48 +763,22 @@ export default function Compare() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-                    {/* Invest Mode selector */}
-                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 flex-shrink-0">
+                  {/* Range selector */}
+                  <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
+                    {availableRanges.map((r) => (
                       <button
-                        onClick={() => setChartMode('lumpsum')}
-                        className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${
-                          chartMode === 'lumpsum'
+                        key={r}
+                        id={`range-${r}`}
+                        onClick={() => setRange(r)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                          range === r
                             ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                         }`}
                       >
-                        Lumpsum
+                        {r}
                       </button>
-                      <button
-                        onClick={() => setChartMode('sip')}
-                        className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${
-                          chartMode === 'sip'
-                            ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                        }`}
-                      >
-                        Monthly SIP
-                      </button>
-                    </div>
-
-                    {/* Range selector */}
-                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-                      {availableRanges.map((r) => (
-                        <button
-                          key={r}
-                          id={`range-${r}`}
-                          onClick={() => setRange(r)}
-                          className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                            range === r
-                              ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1046,41 +1017,22 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Market events by year — both bad AND good years explained
-                        const MARKET_EVENTS = {
-                          2003: { label: '🟢 Post dot-com recovery rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2007: { label: '🟢 Pre-crisis bull market peak', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2008: { label: '🔴 Global Financial Crisis (Lehman collapse)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2009: { label: '🟢 Post-GFC recovery boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2011: { label: '🟡 Eurozone debt crisis, INR fall', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2014: { label: '🟢 Modi 1.0 election rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2015: { label: '🟡 China slowdown, global sell-off', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2016: { label: '🟡 Demonetisation shock (Nov 2016)', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2017: { label: '🟢 GST rollout + global bull run', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2019: { label: '🟡 NBFC crisis, slow growth', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2020: { label: '🔴 COVID-19 crash (Mar 2020)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2021: { label: '🟢 Bull run — vaccine rally & stimulus', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2022: { label: '🔴 Russia-Ukraine war + aggressive rate hikes', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2023: { label: '🟢 Recovery rally, FII inflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2024: { label: '🟡 Election year + US rate uncertainty', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' },
-                          2025: { label: '🟢 Retail-driven resilience despite FII outflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2026: { label: '🔴 High volatility, Geopolitics & FII sell-off', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                        };
-                        let event = MARKET_EVENTS[year];
-                        
-                        // Automatically infer the "reason" / market sentiment for any future or unmapped years based on average returns
-                        if (!event && defined.length > 0) {
+                        // Dynamically determine market sentiment based on actual fund performance (Future-proof)
+                        let event = null;
+                        if (defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
-                          if (avgReturn >= 15) {
-                            event = { label: '🟢 Strong bull market trend', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          if (avgReturn >= 25) {
+                            event = { label: '🟢 Exceptional Bull Run', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          } else if (avgReturn >= 12) {
+                            event = { label: '🟢 Strong Bull Market', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= 5) {
-                            event = { label: '🟢 Positive market sentiment', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 0) {
-                            event = { label: '🟡 Flat / Muted growth', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else if (avgReturn >= -10) {
-                            event = { label: '🟡 Mild market correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                            event = { label: '🟢 Positive Growth', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          } else if (avgReturn >= -2) {
+                            event = { label: '🟡 Flat / Consolidation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                          } else if (avgReturn >= -12) {
+                            event = { label: '🟡 Market Correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
                           } else {
-                            event = { label: '🔴 Major market correction', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' };
+                            event = { label: '🔴 Bear Market / Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' };
                           }
                         }
                         return (
