@@ -1,4 +1,3 @@
-// pages/Compare.jsx
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -14,13 +13,35 @@ import { getER } from '../utils/expenseRatio';
 import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
+// ── Index Benchmarks ──────────────────────────────────────────────────────────
+const BENCHMARKS = [
+  { id: 'nifty50',   label: 'Nifty 50',        code: '120716', color: '#a855f7' },
+  { id: 'sensex',    label: 'Sensex',           code: '118825', color: '#f97316' },
+  { id: 'midcap150', label: 'Nifty Midcap 150', code: '147622', color: '#06b6d4' },
+];
+
+// Dark-mode-aware chart colors — brighter on dark, standard on light
+const DARK_CHART_COLORS  = ['#60a5fa', '#34d399', '#fbbf24', '#f87171'];
+const LIGHT_CHART_COLORS = CHART_COLORS; // ['#2563eb','#10b981','#f59e0b','#ef4444']
+
+// Popular funds for the empty-state quick-add chips
+const POPULAR_FUNDS = [
+  { name: 'Parag Parikh Flexi Cap',         code: '122639' },
+  { name: 'Mirae Asset Large Cap',           code: '118989' },
+  { name: 'SBI Small Cap',                  code: '125497' },
+  { name: 'Axis Bluechip',                  code: '120503' },
+  { name: 'HDFC Mid-Cap Opportunities',     code: '118989' },
+  { name: 'Nippon India Small Cap',         code: '118778' },
+];
+
+
 export default function Compare() {
   const [searchParams] = useSearchParams();
   const { funds } = useFunds();
   const [compareList, setCompareList] = useLocalStorage('fundlens_compare', []);
   const [, setRecentList] = useLocalStorage('fundlens_recent', []);
   const [fundData, setFundData] = useState([]);
-  
+
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -29,6 +50,33 @@ export default function Compare() {
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
   const toast = useToast();
+
+  // ── Benchmark state ──────────────────────────────────────────────────────────
+  const [activeBenchmark, setActiveBenchmark] = useState(null); // null | benchmark id
+  const [benchmarkData, setBenchmarkData] = useState(null);     // fetched navData array
+  const [loadingBenchmark, setLoadingBenchmark] = useState(false);
+
+  // ── Dark-mode detection ──────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains('dark'))
+    );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+  const activeColors = isDark ? DARK_CHART_COLORS : LIGHT_CHART_COLORS;
+
+  // ── Undo-remove state ────────────────────────────────────────────────────────
+  const [removedFund, setRemovedFund] = useState(null); // { code, meta, navData }
+  const undoTimerRef = useRef(null);
+
+  // ── Share card state ─────────────────────────────────────────────────────────
+  const [showShareCard, setShowShareCard] = useState(false);
+  const shareCardRef = useRef(null);
+
 
   // SIP comparison state
   const [sipAmount, setSipAmount] = useState(5000);
@@ -184,8 +232,30 @@ export default function Compare() {
 
   const removeFund = (code) => {
     const codeStr = String(code);
-    setCompareList((prev) => prev.filter((c) => String(c) !== codeStr));
-    setFundData((prev) => prev.filter((f) => String(f.schemeCode) !== codeStr));
+    const removed = fundData.find(f => String(f.schemeCode) === codeStr);
+    if (!removed) return;
+
+    setCompareList(prev => prev.filter(c => String(c) !== codeStr));
+    setFundData(prev => prev.filter(f => String(f.schemeCode) !== codeStr));
+
+    // Store for potential undo
+    setRemovedFund(removed);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    toast(
+      `Removed ${removed.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || codeStr}`,
+      'info',
+      4000
+    );
+    undoTimerRef.current = setTimeout(() => setRemovedFund(null), 4000);
+  };
+
+  const undoRemove = () => {
+    if (!removedFund) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    const codeStr = String(removedFund.schemeCode);
+    setCompareList(prev => [...prev, codeStr].slice(0, 4));
+    setFundData(prev => [...prev, removedFund].slice(0, 4));
+    setRemovedFund(null);
   };
 
   const clearAll = () => {
@@ -220,13 +290,64 @@ export default function Compare() {
     });
   };
 
+  // ── Benchmark fetch ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!activeBenchmark) { setBenchmarkData(null); return; }
+    const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
+    if (!bm) return;
+    let cancelled = false;
+    setLoadingBenchmark(true);
+    fetchFundDetail(bm.code)
+      .then(d => { if (!cancelled) setBenchmarkData(d.data); })
+      .catch(() => { if (!cancelled) setBenchmarkData(null); })
+      .finally(() => { if (!cancelled) setLoadingBenchmark(false); });
+    return () => { cancelled = true; };
+  }, [activeBenchmark]);
+
   const chartData = useMemo(() => {
-    let data = buildChartData(fundData, range);
+    // Merge benchmark navData as a pseudo-fund
+    const allFunds = [...fundData];
+    if (activeBenchmark && benchmarkData) {
+      const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
+      allFunds.push({ schemeCode: `bm_${activeBenchmark}`, meta: { scheme_name: bm.label }, navData: benchmarkData });
+    }
+    let data = buildChartData(allFunds, range);
     if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
       data = toMonthlyData(data);
     }
     return data;
-  }, [fundData, range]);
+  }, [fundData, range, activeBenchmark, benchmarkData]);
+
+  // ── Similar funds helper ─────────────────────────────────────────────────────
+  const getSimilarFunds = useCallback((fund) => {
+    if (!funds || !fund.meta?.scheme_category) return [];
+    const cat = fund.meta.scheme_category.toLowerCase();
+    return funds
+      .filter(f =>
+        f.schemeName.toLowerCase().includes(cat.split(' ')[0]) &&
+        !compareList.map(String).includes(String(f.schemeCode)) &&
+        String(f.schemeCode) !== String(fund.schemeCode)
+      )
+      .slice(0, 3);
+  }, [funds, compareList]);
+
+  // ── Share card export ────────────────────────────────────────────────────────
+  const exportShareCard = async () => {
+    if (!shareCardRef.current) return;
+    try {
+      const html2canvasModule = await import('html2canvas');
+      const canvas = await html2canvasModule.default(shareCardRef.current, {
+        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+        scale: 2,
+      });
+      const link = document.createElement('a');
+      link.download = `fundlens-comparison-${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch {
+      showError('Failed to generate share card.');
+    }
+  };
 
   // Annual calendar-year returns — O(n log n) via binary search (was O(n²) linear scan)
   const annualReturns = useMemo(() => {
@@ -455,6 +576,9 @@ export default function Compare() {
                 <button onClick={handleCopyLink} aria-label="Share comparison link" className="btn-secondary text-xs px-3 py-2 border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
                   🔗 Share Link
                 </button>
+                <button onClick={() => setShowShareCard(true)} aria-label="Generate shareable comparison card" className="btn-secondary text-xs px-3 py-2 border-purple-200 text-purple-600 dark:border-purple-800 dark:text-purple-400">
+                  🃏 Share Card
+                </button>
                 <button onClick={handleExport} aria-label="Export comparison as PNG image" className="btn-secondary text-xs px-3 py-2">
                   📸 Export PNG
                 </button>
@@ -534,15 +658,38 @@ export default function Compare() {
           {compareList.length}/4 funds added. You can find scheme codes on the Screener page.
         </p>
 
+        {/* Undo remove banner */}
+        {removedFund && (
+          <div className="flex items-center justify-between bg-slate-800 dark:bg-slate-700 text-white text-sm px-4 py-3 rounded-lg shadow-lg animate-pulse-once">
+            <span>Removed <strong>{removedFund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || removedFund.schemeCode}</strong></span>
+            <button onClick={undoRemove} className="ml-4 px-3 py-1 text-xs font-bold bg-white text-slate-900 rounded-md hover:bg-slate-100 transition-colors">Undo</button>
+          </div>
+        )}
+
         {/* Wrap content in export div — no negative margin: it breaks Recharts width measurement on mobile */}
         <div id="compare-export-area" className="space-y-6">
-          
+
           {/* Fund cards */}
           {fundData.length === 0 ? (
-            <div className="card p-12 text-center">
-              <div className="text-5xl mb-4">📊</div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No funds added yet</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Enter a scheme code above or search funds to start comparing.</p>
+            <div className="card p-10 text-center space-y-6">
+              <div className="text-5xl">📊</div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Start your comparison</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Search above or pick a popular fund below to get started</p>
+              </div>
+              {/* Popular fund quick-add chips */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {POPULAR_FUNDS.filter(pf => !compareList.map(String).includes(String(pf.code))).slice(0, 5).map(pf => (
+                  <button
+                    key={pf.code}
+                    onClick={() => handleAddCode(pf.code)}
+                    disabled={!!loadingCode || compareList.length >= 4}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-all disabled:opacity-50"
+                  >
+                    <span className="text-base">+</span> {pf.name}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <>
@@ -582,15 +729,39 @@ export default function Compare() {
                 </div>
               )}
 
+              {/* Fund cards + similar suggestions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {fundData.map((fund, i) => (
-                  <ComparedFundCard
-                    key={fund.schemeCode}
-                    fund={fund}
-                    color={CHART_COLORS[i % CHART_COLORS.length]}
-                    onRemove={() => removeFund(fund.schemeCode)}
-                  />
-                ))}
+                {fundData.map((fund, i) => {
+                  const similarFunds = getSimilarFunds(fund);
+                  return (
+                    <div key={fund.schemeCode} className="flex flex-col gap-2">
+                      <ComparedFundCard
+                        fund={fund}
+                        color={activeColors[i % activeColors.length]}
+                        onRemove={() => removeFund(fund.schemeCode)}
+                      />
+                      {/* Similar fund suggestions */}
+                      {similarFunds.length > 0 && compareList.length < 4 && (
+                        <div className="card p-3 bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700">
+                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Similar funds to add</p>
+                          <div className="space-y-1.5">
+                            {similarFunds.map(sf => (
+                              <button
+                                key={sf.schemeCode}
+                                onClick={() => handleAddCode(sf.schemeCode)}
+                                disabled={!!loadingCode}
+                                className="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors group"
+                              >
+                                <span className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 flex-1">{sf.schemeName}</span>
+                                <span className="text-[10px] font-bold text-blue-500 group-hover:text-blue-600 flex-shrink-0">+ Add</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
             {/* NAV History Chart */}
@@ -602,6 +773,30 @@ export default function Compare() {
                     <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">Relative Performance</h2>
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">% growth from period start — all funds fairly compared</p>
                   </div>
+                </div>
+                {/* Benchmark selector */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">vs Index:</span>
+                  {BENCHMARKS.map(bm => (
+                    <button
+                      key={bm.id}
+                      onClick={() => setActiveBenchmark(prev => prev === bm.id ? null : bm.id)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                        activeBenchmark === bm.id
+                          ? 'text-white border-transparent shadow-sm'
+                          : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                      }`}
+                      style={activeBenchmark === bm.id ? { backgroundColor: bm.color, borderColor: bm.color } : {}}
+                    >
+                      {loadingBenchmark && activeBenchmark === bm.id
+                        ? <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />
+                        : <span className="w-2 h-2 rounded-full" style={{ backgroundColor: bm.color }} />}
+                      {bm.label}
+                    </button>
+                  ))}
+                  {activeBenchmark && (
+                    <span className="text-[10px] text-slate-400">Click again to hide</span>
+                  )}
                 </div>
                 {/* Range selector — scrollable on mobile */}
                 <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
@@ -682,6 +877,7 @@ export default function Compare() {
                     labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
                   />
                   <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
+                  {/* Fund lines */}
                   {fundData.map((fund, i) => {
                     const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
                     const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
@@ -691,14 +887,33 @@ export default function Compare() {
                         type="monotone"
                         dataKey={lineKey}
                         name={displayName}
-                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                        stroke={activeColors[i % activeColors.length]}
                         strokeWidth={2.5}
                         dot={false}
                         connectNulls={true}
-                        activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                        activeDot={{ r: 5, strokeWidth: 0, fill: activeColors[i % activeColors.length] }}
                       />
                     );
                   })}
+                  {/* Benchmark line — dashed */}
+                  {activeBenchmark && benchmarkData && (() => {
+                    const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
+                    const lineKey = sanitizeDataKey(bm.label);
+                    return (
+                      <Line
+                        key={`bm_${activeBenchmark}`}
+                        type="monotone"
+                        dataKey={lineKey}
+                        name={`${bm.label} (Index)`}
+                        stroke={bm.color}
+                        strokeWidth={2}
+                        strokeDasharray="5 4"
+                        dot={false}
+                        connectNulls={true}
+                        activeDot={{ r: 4, strokeWidth: 0, fill: bm.color }}
+                      />
+                    );
+                  })()}
                 </LineChart>
               </ResponsiveContainer>
               </div>
@@ -1172,6 +1387,75 @@ export default function Compare() {
 
         </div>
       </div>
+
+      {/* ── Share Card Modal ───────────────────────────────────────────────── */}
+      {showShareCard && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowShareCard(false); }}
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="font-bold text-slate-900 dark:text-white">Share Comparison Card</h3>
+              <button onClick={() => setShowShareCard(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xl leading-none">&times;</button>
+            </div>
+
+            {/* The card that gets exported */}
+            <div ref={shareCardRef} className="p-6 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 rounded-b-none">
+              {/* Branding */}
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-blue-400 text-xl font-bold">📈 FundLens</span>
+                <span className="text-slate-500 text-xs">Fund Comparison</span>
+                <span className="ml-auto text-slate-500 text-xs">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+
+              {/* Fund rows */}
+              <div className="space-y-3">
+                {fundData.map((fund, i) => {
+                  const m = calculateFundMetrics(fund.navData);
+                  return (
+                    <div key={fund.schemeCode} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: activeColors[i % activeColors.length] }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold line-clamp-1">
+                          {fund.meta?.scheme_name || fund.schemeCode}
+                        </p>
+                        <p className="text-slate-400 text-[10px]">{fund.meta?.scheme_category}</p>
+                      </div>
+                      <div className="flex gap-4 flex-shrink-0 text-right">
+                        <div>
+                          <p className="text-[10px] text-slate-500">1Y Return</p>
+                          <p className={`text-sm font-bold ${m?.return1Y >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {m?.return1Y !== null ? `${m.return1Y >= 0 ? '+' : ''}${m.return1Y.toFixed(1)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500">3Y CAGR</p>
+                          <p className={`text-sm font-bold ${m?.cagr3Y >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {m?.cagr3Y !== null ? `${m.cagr3Y >= 0 ? '+' : ''}${m.cagr3Y.toFixed(1)}%` : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <p className="text-slate-600 text-[9px] text-center mt-5">
+                Generated by FundLens · fundlens.app · Historical returns, not a guarantee of future performance
+              </p>
+            </div>
+
+            {/* Download button */}
+            <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
+              <button onClick={() => setShowShareCard(false)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+              <button onClick={exportShareCard} className="btn-primary text-sm px-4 py-2">⬇️ Download PNG</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
