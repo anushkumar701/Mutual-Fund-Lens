@@ -36,6 +36,42 @@ const POPULAR_FUNDS = [
   { name: 'Nippon India Small Cap',         code: '118778' },
 ];
 
+function TERInput({ codeStr, fundName, initialValue, onSave }) {
+  const [val, setVal] = useState(String(initialValue));
+  useEffect(() => { setVal(String(initialValue)); }, [initialValue]);
+
+  const handleSave = () => {
+    let num = parseFloat(val);
+    if (isNaN(num)) num = 0;
+    num = Math.max(0, Math.min(3, num));
+    setVal(String(num));
+    onSave(codeStr, num);
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 mb-3 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1.5">
+      <span className="text-[10px] text-slate-400 whitespace-nowrap">Expense Ratio:</span>
+      <input
+        type="number" min="0" max="3" step="0.01"
+        id={`ter-input-${codeStr}`}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+        className="w-14 text-xs font-bold text-center bg-transparent border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300"
+        placeholder="0.5"
+        aria-label={`Expense ratio for ${fundName}`}
+      />
+      <span className="text-[10px] text-slate-400">% p.a.</span>
+      {val !== String(initialValue) && (
+        <button onClick={handleSave} className="ml-auto text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold hover:bg-blue-200 transition-colors">
+          Save
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 export default function Compare() {
   const [searchParams] = useSearchParams();
@@ -1308,18 +1344,12 @@ export default function Compare() {
                       </h4>
 
                       {/* Per-fund TER input */}
-                      <div className="flex items-center gap-1.5 mb-3 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1.5">
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">Expense Ratio:</span>                          <input
-                            type="number" min="0" max="3" step="0.01"
-                            id={`ter-input-${codeStr}`}
-                            value={fundTER}
-                            onChange={(e) => setFundTER(codeStr, Math.max(0, Math.min(3, Number(e.target.value))))}
-                            className="w-14 text-xs font-bold text-center bg-transparent border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300"
-                            placeholder="0.5"
-                            aria-label={`Expense ratio for ${fund.meta?.scheme_name || fund.schemeCode}`}
-                          />
-                        <span className="text-[10px] text-slate-400">% p.a.</span>
-                      </div>
+                      <TERInput
+                        codeStr={codeStr}
+                        fundName={fund.meta?.scheme_name || fund.schemeCode}
+                        initialValue={fundTER}
+                        onSave={setFundTER}
+                      />
 
                       {!sipResult ? (
                         <p className="text-xs text-slate-400">Not enough history for {sipYears} year{sipYears > 1 ? 's' : ''}.</p>
