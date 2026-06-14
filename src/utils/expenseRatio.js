@@ -8,8 +8,43 @@ import terDataRaw from '../data/expenseRatios.json';
 const terFunds = terDataRaw?.funds || {};
 const terMeta = terDataRaw?._meta || null;
 
-// localStorage key for user-overridden expense ratios
-const USER_ER_KEY = 'fundlens_user_expense_ratios';
+// localStorage keys
+const ACTIVE_PLATFORM_KEY = 'fundlens_active_platform';
+const USER_ER_KEY_PREFIX = 'fundlens_user_er_';
+const OLD_USER_ER_KEY = 'fundlens_user_expense_ratios'; // for backward compatibility
+
+/**
+ * Get the currently active platform (e.g., Default, Zerodha, Kuvera)
+ */
+export function getActivePlatform() {
+  try {
+    return localStorage.getItem(ACTIVE_PLATFORM_KEY) || 'Default';
+  } catch {
+    return 'Default';
+  }
+}
+
+/**
+ * Set the globally active platform and trigger a window event
+ */
+export function setActivePlatform(platform) {
+  try {
+    localStorage.setItem(ACTIVE_PLATFORM_KEY, platform);
+    window.location.reload();
+  } catch {
+    // silently fail
+  }
+}
+
+/**
+ * Get the correct localStorage key for the current platform
+ */
+function getCurrentERKey() {
+  const platform = getActivePlatform();
+  if (platform === 'Default') return OLD_USER_ER_KEY;
+  return `${USER_ER_KEY_PREFIX}${platform.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+}
+
 
 /**
  * Normalize a scheme name the same way the build script does.
@@ -70,7 +105,8 @@ function lookupAMFI(schemeName) {
  */
 function getUserOverride(schemeCode) {
   try {
-    const stored = JSON.parse(localStorage.getItem(USER_ER_KEY) || '{}');
+    const key = getCurrentERKey();
+    const stored = JSON.parse(localStorage.getItem(key) || '{}');
     const val = stored[String(schemeCode)];
     return typeof val === 'number' ? val : null;
   } catch {
@@ -85,9 +121,10 @@ function getUserOverride(schemeCode) {
  */
 export function setUserER(schemeCode, er) {
   try {
-    const stored = JSON.parse(localStorage.getItem(USER_ER_KEY) || '{}');
+    const key = getCurrentERKey();
+    const stored = JSON.parse(localStorage.getItem(key) || '{}');
     stored[String(schemeCode)] = er;
-    localStorage.setItem(USER_ER_KEY, JSON.stringify(stored));
+    localStorage.setItem(key, JSON.stringify(stored));
   } catch {
     // silently fail
   }
@@ -98,9 +135,10 @@ export function setUserER(schemeCode, er) {
  */
 export function clearUserER(schemeCode) {
   try {
-    const stored = JSON.parse(localStorage.getItem(USER_ER_KEY) || '{}');
+    const key = getCurrentERKey();
+    const stored = JSON.parse(localStorage.getItem(key) || '{}');
     delete stored[String(schemeCode)];
-    localStorage.setItem(USER_ER_KEY, JSON.stringify(stored));
+    localStorage.setItem(key, JSON.stringify(stored));
   } catch {
     // silently fail
   }
