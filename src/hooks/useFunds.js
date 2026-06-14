@@ -6,6 +6,29 @@ import { get, set } from 'idb-keyval';
 const BASE_URL = 'https://api.mfapi.in/mf';
 const AMFI_NAV_URL = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 
+async function getWithTimeout(key, timeoutMs = 1000) {
+  try {
+    return await Promise.race([
+      get(key),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('IndexedDB timeout')), timeoutMs))
+    ]);
+  } catch (err) {
+    console.warn(`[FundLens] IndexedDB get timed out or failed for ${key}:`, err.message);
+    return null;
+  }
+}
+
+async function setWithTimeout(key, value, timeoutMs = 1000) {
+  try {
+    return await Promise.race([
+      set(key, value),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('IndexedDB timeout')), timeoutMs))
+    ]);
+  } catch (err) {
+    console.warn(`[FundLens] IndexedDB set timed out or failed for ${key}:`, err.message);
+  }
+}
+
 // Module-level singletons — CLIENT-ONLY (pure SPA, no SSR).
 let memoryCachedList = null;
 let activeListFetchPromise = null;
@@ -125,7 +148,7 @@ export function useFunds() {
       }
 
       // 3. IndexedDB cache
-      const idbCached = await get(FUND_LIST_CACHE_KEY);
+      const idbCached = await getWithTimeout(FUND_LIST_CACHE_KEY);
       const now = Date.now();
       if (idbCached && idbCached.ts && (now - idbCached.ts < FUND_LIST_TTL)) {
         memoryCachedList = idbCached.data;
@@ -136,7 +159,7 @@ export function useFunds() {
           activeListFetchPromise = fetchFundListWithFallback()
             .then(({ data }) => {
               memoryCachedList = data;
-              set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
+              setWithTimeout(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
               activeListFetchPromise = null;
               return data;
             })
@@ -149,7 +172,7 @@ export function useFunds() {
       activeListFetchPromise = fetchFundListWithFallback()
         .then(({ data }) => {
           memoryCachedList = data;
-          set(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
+          setWithTimeout(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
           activeListFetchPromise = null;
           return data;
         })
@@ -196,24 +219,26 @@ export async function fetchFundDetail(schemeCode) {
   }
 
   const promise = (async () => {
-    const idbKey = `fund_detail_${codeStr}`;
-    const idbCached = await get(idbKey);
-    const now = Date.now();
+    try {
+      const idbKey = `fund_detail_${codeStr}`;
+      const idbCached = await getWithTimeout(idbKey);
+      const now = Date.now();
 
-    if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
-      detailsMemoryCache.set(codeStr, idbCached.data);
+      if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
+        detailsMemoryCache.set(codeStr, idbCached.data);
+        return idbCached.data;
+      }
+
+      const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
+      const data = res.data;
+
+      detailsMemoryCache.set(codeStr, data);
+      await setWithTimeout(idbKey, { timestamp: now, data });
+
+      return data;
+    } finally {
       activeDetailFetchPromises.delete(codeStr);
-      return idbCached.data;
     }
-
-    const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
-    const data = res.data;
-
-    detailsMemoryCache.set(codeStr, data);
-    set(idbKey, { timestamp: now, data });
-    activeDetailFetchPromises.delete(codeStr);
-
-    return data;
   })();
 
   activeDetailFetchPromises.set(codeStr, promise);
