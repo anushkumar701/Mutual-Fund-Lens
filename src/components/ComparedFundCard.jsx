@@ -227,14 +227,24 @@ const ComparedFundCard = memo(function ComparedFundCard({
 
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {tags.map((t) => (
-                      <span
-                        key={t}
-                        className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold border border-blue-100 dark:border-blue-800"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                    {tags.map((t) => {
+                      const isWarning = t.startsWith("⚠️");
+                      const isDanger = t.startsWith("🚨");
+                      const colorClass = isDanger
+                        ? "bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
+                        : isWarning
+                        ? "bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                        : "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800";
+                      
+                      return (
+                        <span
+                          key={t}
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${colorClass}`}
+                        >
+                          {t}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 

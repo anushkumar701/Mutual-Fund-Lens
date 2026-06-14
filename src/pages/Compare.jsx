@@ -37,12 +37,9 @@ import MARKET_EVENTS from "../data/marketReasons.json";
 const BENCHMARKS = [
   { id: "nifty50", label: "Nifty 50", code: "120716", color: "#a855f7" },
   { id: "sensex", label: "Sensex", code: "118825", color: "#f97316" },
-  {
-    id: "midcap150",
-    label: "Nifty Midcap 150",
-    code: "147622",
-    color: "#06b6d4",
-  },
+  { id: "midcap150", label: "Nifty Midcap 150", code: "147622", color: "#06b6d4" },
+  { id: "fd", label: "Fixed Deposit (6.5%)", isFixed: true, rate: 6.5, color: "#94a3b8" },
+  { id: "ppf", label: "PPF (7.1%)", isFixed: true, rate: 7.1, color: "#fca5a5" },
 ];
 
 // Dark-mode-aware chart colors — brighter on dark, standard on light
@@ -468,6 +465,13 @@ export default function Compare() {
     }
     const bm = BENCHMARKS.find((b) => b.id === activeBenchmark);
     if (!bm) return;
+
+    if (bm.isFixed) {
+      setLoadingBenchmark(false);
+      setBenchmarkData([]); // Dummy array to trigger chartData dependency
+      return;
+    }
+
     let cancelled = false;
     setLoadingBenchmark(true);
     fetchFundDetail(bm.code)
@@ -490,11 +494,37 @@ export default function Compare() {
     const allFunds = [...fundData];
     if (activeBenchmark && benchmarkData) {
       const bm = BENCHMARKS.find((b) => b.id === activeBenchmark);
-      allFunds.push({
-        schemeCode: `bm_${activeBenchmark}`,
-        meta: { scheme_name: bm.label },
-        navData: benchmarkData,
-      });
+      if (bm && bm.isFixed && fundData.length > 0 && fundData[0].navData?.length > 0) {
+        const referenceData = [...fundData[0].navData].reverse();
+        let currentNav = 100;
+        const fakeNavs = [];
+        const dailyMultiplier = Math.pow(1 + bm.rate / 100, 1 / 365);
+        
+        let lastTs = null;
+        for (let i = 0; i < referenceData.length; i++) {
+          const dStr = referenceData[i].date;
+          const [dd, mm, yyyy] = dStr.split("-");
+          const ts = new Date(`${yyyy}-${mm}-${dd}`).getTime();
+          if (lastTs !== null) {
+            const daysDiff = (ts - lastTs) / (1000 * 3600 * 24);
+            currentNav = currentNav * Math.pow(dailyMultiplier, Math.max(0, daysDiff));
+          }
+          fakeNavs.push({ date: dStr, nav: currentNav.toString() });
+          lastTs = ts;
+        }
+        fakeNavs.reverse();
+        allFunds.push({
+          schemeCode: `bm_${activeBenchmark}`,
+          meta: { scheme_name: bm.label },
+          navData: fakeNavs,
+        });
+      } else if (bm && !bm.isFixed) {
+        allFunds.push({
+          schemeCode: `bm_${activeBenchmark}`,
+          meta: { scheme_name: bm.label },
+          navData: benchmarkData,
+        });
+      }
     }
     let data = buildChartData(allFunds, range);
 
