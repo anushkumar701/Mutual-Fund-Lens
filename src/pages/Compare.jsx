@@ -84,7 +84,7 @@ export default function Compare() {
   const [sipYears, setSipYears] = useState(3);
   const [sipYearsInput, setSipYearsInput] = useState('3');
   const [sipMode, setSipMode] = useState('sip'); // 'sip' | 'lumpsum'
-  const [sipFundTER, setSipFundTER] = useState({}); // per-fund TER: { [schemeCode]: 0.5 }
+  const [sipFundTER, setSipFundTER] = useLocalStorage('fundlens_custom_ter', {}); // per-fund TER: { [schemeCode]: 0.5 }
   const setFundTER = (code, val) => setSipFundTER(prev => ({ ...prev, [String(code)]: val }));
   // Load funds from compareList
   const errorTimerRef = useRef(null);
