@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { getER } from '../utils/expenseRatio';
-import { getFundAgeYears, buildChartData, toMonthlyData, toWeeklyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
 export default function Compare() {
@@ -28,7 +28,6 @@ export default function Compare() {
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
-  const [viewMode, setViewMode] = useState('chart'); // 'chart' | 'table'
   const toast = useToast();
 
   // SIP comparison state
@@ -228,22 +227,6 @@ export default function Compare() {
     }
     return data;
   }, [fundData, range]);
-
-  // Table data: aggregated per selected range for readability
-  // 1M/3M → weekly snapshots | 6M/1Y → monthly | 3Y+ → already monthly via chartData
-  const tableData = useMemo(() => {
-    const raw = buildChartData(fundData, range);
-    if (['1M', '3M'].includes(range)) return toWeeklyData(raw);
-    if (['6M', '1Y'].includes(range)) return toMonthlyData(raw);
-    // 3Y+ already collapsed to monthly in chartData — reuse
-    return toMonthlyData(raw);
-  }, [fundData, range]);
-
-  // Label for table date column based on range
-  const tableDateLabel = useMemo(() => {
-    if (['1M', '3M'].includes(range)) return 'Week of';
-    return 'Month of';
-  }, [range]);
 
   // Annual calendar-year returns — O(n log n) via binary search (was O(n²) linear scan)
   const annualReturns = useMemo(() => {
@@ -612,31 +595,12 @@ export default function Compare() {
 
             {/* NAV History Chart */}
             <div className="card p-3 sm:p-5">
-              {/* Chart header — stacked on mobile, row on sm+ */}
+              {/* Chart header */}
               <div className="flex flex-col gap-3 mb-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">Relative Performance</h2>
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">% growth from period start — all funds fairly compared</p>
-                  </div>
-                  {/* Chart / Table toggle */}
-                  <div className="flex flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-                    <button
-                      onClick={() => setViewMode('chart')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                        viewMode === 'chart' ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      Chart
-                    </button>
-                    <button
-                      onClick={() => setViewMode('table')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                        viewMode === 'table' ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      Table
-                    </button>
                   </div>
                 </div>
                 {/* Range selector — scrollable on mobile */}
@@ -657,184 +621,87 @@ export default function Compare() {
                   ))}
                 </div>
               </div>
-              {viewMode === 'chart' ? (
-                <div className="chart-height-sm" style={{ width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.15)" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11, fill: '#94a3b8' }}
-                      tickLine={false}
-                      axisLine={false}
-                      minTickGap={40}
-                      tickFormatter={(val) => {
-                        if (!val) return '';
-                        const [dd, mm, yyyy] = val.split('-');
-                        const d = new Date(`${yyyy}-${mm}-${dd}`);
-                        if (isNaN(d.getTime())) return val;
-                        
-                        // Dynamic formatting based on selected range
-                        if (['1M', '3M', '6M'].includes(range)) {
-                          return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }); // e.g. 15 Jan
-                        } else if (['1Y', '3Y'].includes(range)) {
-                          return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); // e.g. Jan 23
-                        } else {
-                          return d.toLocaleDateString('en-US', { year: 'numeric' }); // e.g. 2023
-                        }
-                      }}
-                      dy={10}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: '#94a3b8' }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`}
-                      width={52}
-                      dx={-4}
-                    />
-                    <ReferenceLine y={0} stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
-                    <Tooltip
-                      labelFormatter={(label) => {
-                        if (!label) return '';
-                        const [dd, mm, yyyy] = label.split('-');
-                        const d = new Date(`${yyyy}-${mm}-${dd}`);
-                        if (isNaN(d.getTime())) return label;
-                        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-                      }}
-                      formatter={(value, name) => {
-                        // Skip internal _raw keys (used for tooltips only)
-                        if (typeof name === 'string' && name.endsWith('_raw')) return null;
-                        const v = parseFloat(value);
-                        if (!Number.isFinite(v)) return null;
-                        return [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name];
-                      }}
-                      contentStyle={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: '#f8fafc',
-                        fontSize: '12px',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                        padding: '10px 14px'
-                      }}
-                      itemStyle={{ color: '#f8fafc', paddingBottom: '4px' }}
-                      labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
-                    {fundData.map((fund, i) => {
-                      const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
-                      const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
-                      return (
-                        <Line
-                          key={fund.schemeCode}
-                          type="monotone"
-                          dataKey={lineKey}
-                          name={displayName}
-                          stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                          strokeWidth={2.5}
-                          dot={false}
-                          connectNulls={true}
-                          activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
-                        />
-                      );
-                    })}
-                  </LineChart>
-                </ResponsiveContainer>
-                </div>
-              ) : (
-                // Tabular view — aggregated by week (1M/3M) or month (6M+) for readability
-                (() => {
-                  if (!tableData || tableData.length === 0) {
+              <div className="chart-height-sm" style={{ width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.15)" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={40}
+                    tickFormatter={(val) => {
+                      if (!val) return '';
+                      const [dd, mm, yyyy] = val.split('-');
+                      const d = new Date(`${yyyy}-${mm}-${dd}`);
+                      if (isNaN(d.getTime())) return val;
+                      if (['1M', '3M', '6M'].includes(range)) {
+                        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+                      } else if (['1Y', '3Y'].includes(range)) {
+                        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                      } else {
+                        return d.toLocaleDateString('en-US', { year: 'numeric' });
+                      }
+                    }}
+                    dy={10}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`}
+                    width={52}
+                    dx={-4}
+                  />
+                  <ReferenceLine y={0} stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
+                  <Tooltip
+                    labelFormatter={(label) => {
+                      if (!label) return '';
+                      const [dd, mm, yyyy] = label.split('-');
+                      const d = new Date(`${yyyy}-${mm}-${dd}`);
+                      if (isNaN(d.getTime())) return label;
+                      return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                    }}
+                    formatter={(value, name) => {
+                      if (typeof name === 'string' && name.endsWith('_raw')) return null;
+                      const v = parseFloat(value);
+                      if (!Number.isFinite(v)) return null;
+                      return [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name];
+                    }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      padding: '10px 14px'
+                    }}
+                    itemStyle={{ color: '#f8fafc', paddingBottom: '4px' }}
+                    labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
+                  {fundData.map((fund, i) => {
+                    const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
+                    const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
                     return (
-                      <div className="h-[260px] sm:h-[340px] flex items-center justify-center text-slate-400">
-                        No performance data available for this range.
-                      </div>
+                      <Line
+                        key={fund.schemeCode}
+                        type="monotone"
+                        dataKey={lineKey}
+                        name={displayName}
+                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                        strokeWidth={2.5}
+                        dot={false}
+                        connectNulls={true}
+                        activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
                     );
-                  }
-
-                  // Newest first
-                  const tableRows = [...tableData].reverse();
-
-                  return (
-                    <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg max-h-[340px]">
-                      <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                          <tr className="backdrop-blur-md">
-                            <th className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50">{tableDateLabel}</th>
-                            {fundData.map((fund, i) => (
-                              <th key={fund.schemeCode} className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                                <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
-                                  {fund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || fund.schemeCode}
-                                </div>
-                              </th>
-                            ))}
-                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/50">Leader</th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                          {tableRows.map((row) => {
-                            let bestPct = -Infinity;
-                            let leaderIdx = -1;
-
-                            fundData.forEach((fund, idx) => {
-                              const key = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
-                              const pct = row[key];
-                              if (pct !== undefined && pct > bestPct) {
-                                bestPct = pct;
-                                leaderIdx = idx;
-                              }
-                            });
-
-                            return (
-                              <tr key={row.date} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                <td className="px-4 py-3 font-medium whitespace-nowrap text-slate-900 dark:text-white">
-                                  {row.date}
-                                </td>
-                                {fundData.map((fund, idx) => {
-                                  const key = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
-                                  const pct = row[key];
-                                  const rawNav = row[`${key}_raw`];
-
-                                  return (
-                                    <td key={idx} className="px-4 py-3 whitespace-nowrap">
-                                      {pct !== undefined ? (
-                                        <div className="flex flex-col">
-                                          <span className={`font-semibold ${pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-                                          </span>
-                                          {rawNav !== undefined && (
-                                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                                              ₹{parseFloat(rawNav).toFixed(2)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span className="text-slate-400">N/A</span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                                {fundData.length >= 2 && (
-                                  <td className="px-3 py-3 font-medium whitespace-nowrap text-slate-500">
-                                    {leaderIdx !== -1 ? (
-                                      <span className="flex items-center gap-1">
-                                        👑 <span className="text-[11px] font-bold" style={{ color: CHART_COLORS[leaderIdx % CHART_COLORS.length] }}>
-                                          {fundData[leaderIdx].meta?.scheme_name?.split(' ').slice(0, 2).join(' ') || `Fund ${leaderIdx + 1}`}
-                                        </span>
-                                      </span>
-                                    ) : 'N/A'}
-                                  </td>
-                                )}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })()
-              )}
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+              </div>
 
               {chartData.length === 0 && (
                 <p className="text-center text-sm text-slate-400 dark:text-slate-500 mt-4">
