@@ -378,46 +378,65 @@ export default function SIPCalculator() {
   const dateOptimizerResults = useMemo(() => {
     if (!dateFundData?.data || dateFundData.data.length === 0) return [];
     const navData = dateFundData.data;
-    const results = [];
-    for (let d = 1; d <= 28; d++) {
-      const res = calculateHistoricalSIP(navData, dateSipAmount, dateSipYears);
-      if (res)
-        results.push({
-          date: d,
-          xirr: res.xirr,
-          currentValue: res.currentValue,
-          invested: res.invested,
-        });
-    }
-    // Note: mfapi returns NAV for whichever trading day is closest — the date loop
-    // produces the same result since calculateHistoricalSIP uses monthly intervals
-    // from latest date. A true per-day optimizer requires per-date SIP matching.
-    // For a quick visual demo we show slight variation by shifting start month.
-    const navArr = [...navData]
+    
+    const sortedNavs = [...navData]
       .reverse()
-      .map((d) => parseFloat(d.nav))
-      .filter((v) => v > 0);
-    const latest = navArr[navArr.length - 1];
+      .map((d) => {
+        const [dd, mm, yyyy] = d.date.split("-");
+        return {
+          ts: new Date(`${yyyy}-${mm}-${dd}`).getTime(),
+          nav: parseFloat(d.nav),
+        };
+      })
+      .filter((d) => !isNaN(d.ts) && d.nav > 0);
+      
+    if (sortedNavs.length === 0) return [];
+
+    const latest = sortedNavs[sortedNavs.length - 1];
+    const latestDate = new Date(latest.ts);
+    const oldestTs = sortedNavs[0].ts;
+
+    // Binary search to find the NAV on or immediately after the target date (mimicking weekend/holiday delays)
+    function getNextAvailableNav(targetTs) {
+      if (targetTs < oldestTs) return null; // Fund didn't exist yet
+      if (targetTs > latest.ts) return null; // In the future
+      let lo = 0;
+      let hi = sortedNavs.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sortedNavs[mid].ts < targetTs) lo = mid + 1;
+        else hi = mid;
+      }
+      return sortedNavs[lo].nav;
+    }
+
     const out = [];
+    const monthsBack = dateSipYears * 12;
+
     for (let day = 1; day <= 28; day++) {
-      let totalInvested = 0,
-        totalUnits = 0;
-      const monthsBack = dateSipYears * 12;
+      let totalInvested = 0;
+      let totalUnits = 0;
+      let validMonths = 0;
+
       for (let m = 0; m < monthsBack; m++) {
-        // pick nav from roughly m months ago, offset by day/30 factor
-        const idx = Math.min(
-          navArr.length - 1,
-          Math.round(m * 21 + (day / 28) * 5),
-        );
-        const nav = navArr[navArr.length - 1 - idx];
-        if (nav && nav > 0) {
+        // Calculate the exact target SIP date for this specific month in the past
+        const targetDate = new Date(latestDate);
+        targetDate.setMonth(targetDate.getMonth() - m);
+        targetDate.setDate(day);
+        const targetTs = targetDate.getTime();
+
+        const nav = getNextAvailableNav(targetTs);
+        if (nav !== null) {
           totalInvested += dateSipAmount;
           totalUnits += dateSipAmount / nav;
+          validMonths++;
         }
       }
+
       if (totalInvested === 0) continue;
-      const currentValue = totalUnits * latest;
-      const n = monthsBack;
+      const currentValue = totalUnits * latest.nav;
+      
+      // Calculate XIRR using the generic formula over the valid months invested
       let xirr = null;
       try {
         let lo = -0.5,
@@ -430,16 +449,16 @@ export default function SIPCalculator() {
             rate = 0;
             break;
           }
-          const fv =
-            (dateSipAmount * (1 + rate) * (Math.pow(1 + rate, n) - 1)) / rate;
+          const fv = (dateSipAmount * (1 + rate) * (Math.pow(1 + rate, validMonths) - 1)) / rate;
           if (fv > currentValue) hi = rate;
           else lo = rate;
         }
         xirr = parseFloat(((Math.pow(1 + rate, 12) - 1) * 100).toFixed(2));
-        if (!isFinite(xirr)) xirr = null;
+        if (!isFinite(xirr) || xirr < -100 || xirr > 500) xirr = null;
       } catch {
         xirr = null;
       }
+      
       out.push({ date: day, xirr, currentValue, invested: totalInvested });
     }
     return out;
