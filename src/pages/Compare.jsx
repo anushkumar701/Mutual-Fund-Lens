@@ -30,6 +30,7 @@ import {
   CHART_COLORS,
   sanitizeDataKey,
 } from "../utils/chartUtils";
+import { getHistoricalRate } from "../utils/historicalRates";
 import ComparedFundCard from "../components/ComparedFundCard";
 import MARKET_EVENTS from "../data/marketReasons.json";
 
@@ -38,8 +39,8 @@ const BENCHMARKS = [
   { id: "nifty50", label: "Nifty 50", code: "120716", color: "#a855f7" },
   { id: "sensex", label: "Sensex", code: "118825", color: "#f97316" },
   { id: "midcap150", label: "Nifty Midcap 150", code: "147622", color: "#06b6d4" },
-  { id: "fd", label: "Fixed Deposit (6.5%)", isFixed: true, rate: 6.5, color: "#94a3b8" },
-  { id: "ppf", label: "PPF (7.1%)", isFixed: true, rate: 7.1, color: "#fca5a5" },
+  { id: "fd", label: "Fixed Deposit (Historical Avg)", isFixed: true, color: "#94a3b8" },
+  { id: "ppf", label: "PPF (Historical Rates)", isFixed: true, color: "#fca5a5" },
 ];
 
 // Dark-mode-aware chart colors — brighter on dark, standard on light
@@ -498,15 +499,19 @@ export default function Compare() {
         const referenceData = [...fundData[0].navData].reverse();
         let currentNav = 100;
         const fakeNavs = [];
-        const dailyMultiplier = Math.pow(1 + bm.rate / 100, 1 / 365);
         
         let lastTs = null;
         for (let i = 0; i < referenceData.length; i++) {
           const dStr = referenceData[i].date;
           const [dd, mm, yyyy] = dStr.split("-");
-          const ts = new Date(`${yyyy}-${mm}-${dd}`).getTime();
+          const currentDateStr = `${yyyy}-${mm}-${dd}`;
+          const ts = new Date(currentDateStr).getTime();
+          
           if (lastTs !== null) {
             const daysDiff = (ts - lastTs) / (1000 * 3600 * 24);
+            // Query the exact historical rate for this specific date
+            const annualRate = getHistoricalRate(bm.id, currentDateStr);
+            const dailyMultiplier = Math.pow(1 + annualRate / 100, 1 / 365);
             currentNav = currentNav * Math.pow(dailyMultiplier, Math.max(0, daysDiff));
           }
           fakeNavs.push({ date: dStr, nav: currentNav.toString() });
