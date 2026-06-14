@@ -893,6 +893,18 @@ export default function Compare() {
                     axisLine={false}
                     width={62}
                     dx={-2}
+                    // Auto-fit domain to actual data values — never force-include 0
+                    domain={[
+                      (dataMin) => {
+                        const pad = Math.abs(dataMin) * 0.08 || 2;
+                        return Math.floor(dataMin - pad);
+                      },
+                      (dataMax) => {
+                        const pad = Math.abs(dataMax) * 0.08 || 2;
+                        return Math.ceil(dataMax + pad);
+                      },
+                    ]}
+                    allowDataOverflow={false}
                     tick={(props) => {
                       const { x, y, payload } = props;
                       const v = parseFloat(payload?.value);
@@ -986,6 +998,7 @@ export default function Compare() {
                         stroke={color}
                         strokeWidth={2.5}
                         fill={`url(#grad_${i})`}
+                        baseValue="dataMin"
                         dot={false}
                         connectNulls={true}
                         activeDot={{ r: 5, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: color }}
@@ -1009,6 +1022,7 @@ export default function Compare() {
                         strokeWidth={1.8}
                         strokeDasharray="6 4"
                         fill="url(#grad_bm)"
+                        baseValue="dataMin"
                         dot={false}
                         connectNulls={true}
                         activeDot={{ r: 4, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: bm.color }}
