@@ -1,8 +1,8 @@
 // utils/metrics.js
 
 function parseDate(dateStr) {
-  if (!dateStr || typeof dateStr !== 'string') return new Date(NaN);
-  const parts = dateStr.split('-');
+  if (!dateStr || typeof dateStr !== "string") return new Date(NaN);
+  const parts = dateStr.split("-");
   if (parts.length !== 3) return new Date(NaN);
   const [dd, mm, yyyy] = parts;
   const date = new Date(`${yyyy}-${mm}-${dd}`);
@@ -11,20 +11,25 @@ function parseDate(dateStr) {
 
 // Build a sorted ascending array of { ts, nav } for binary search
 function buildSortedNav(navData) {
-  return [...navData].reverse()
-    .map(d => ({ ts: parseDate(d.date).getTime(), nav: parseFloat(d.nav) }))
-    .filter(d => !isNaN(d.ts) && isFinite(d.nav));
+  return [...navData]
+    .reverse()
+    .map((d) => ({ ts: parseDate(d.date).getTime(), nav: parseFloat(d.nav) }))
+    .filter((d) => !isNaN(d.ts) && isFinite(d.nav));
 }
 
 // Binary search: find index of closest timestamp in sorted ascending array
 function binarySearchClosest(sorted, targetTs) {
-  let lo = 0, hi = sorted.length - 1;
+  let lo = 0,
+    hi = sorted.length - 1;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     if (sorted[mid].ts < targetTs) lo = mid + 1;
     else hi = mid;
   }
-  if (lo > 0 && Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)) {
+  if (
+    lo > 0 &&
+    Math.abs(sorted[lo - 1].ts - targetTs) < Math.abs(sorted[lo].ts - targetTs)
+  ) {
     return lo - 1;
   }
   return lo;
@@ -45,7 +50,8 @@ export function calculateFundMetrics(navData) {
     const targetTs = targetDate.getTime();
     const idx = binarySearchClosest(sorted, targetTs);
     // Tighter tolerance for short periods: 7d for 1Y, 10d for 3Y, 15d for 5Y, 30d for 10Y+
-    const toleranceDays = years <= 1 ? 7 : years <= 3 ? 10 : years <= 5 ? 15 : 30;
+    const toleranceDays =
+      years <= 1 ? 7 : years <= 3 ? 10 : years <= 5 ? 15 : 30;
     const diff = Math.abs(sorted[idx].ts - targetTs);
     if (diff > toleranceDays * 24 * 60 * 60 * 1000) return null;
     return sorted[idx].nav;
@@ -53,7 +59,7 @@ export function calculateFundMetrics(navData) {
 
   const calcCAGR = (pastNav, years) => {
     if (!pastNav) return null;
-    if (years === 1) return ((latestNav / pastNav) - 1) * 100;
+    if (years === 1) return (latestNav / pastNav - 1) * 100;
     return (Math.pow(latestNav / pastNav, 1 / years) - 1) * 100;
   };
 
@@ -68,9 +74,9 @@ export function calculateFundMetrics(navData) {
   }
 
   const volatility = calculateVolatility(navData);
-  const return1Y  = calcCAGR(getNavAgo(1), 1);
-  const return3Y  = calcCAGR(getNavAgo(3), 3);
-  const return5Y  = calcCAGR(getNavAgo(5), 5);
+  const return1Y = calcCAGR(getNavAgo(1), 1);
+  const return3Y = calcCAGR(getNavAgo(3), 3);
+  const return5Y = calcCAGR(getNavAgo(5), 5);
   const return10Y = calcCAGR(getNavAgo(10), 10);
   // Use longest available return period for Sortino so numerator & denominator cover same timespan
   const sortinoReturn = return5Y ?? return3Y ?? return1Y;
@@ -83,7 +89,10 @@ export function calculateFundMetrics(navData) {
     maxDrawdown: maxDrawdown * 100,
     volatility,
     sharpe: calculateSharpeRatio(return1Y, volatility),
-    sortino: sortinoReturn !== null ? calculateSortinoRatio(navData, sortinoReturn) : null,
+    sortino:
+      sortinoReturn !== null
+        ? calculateSortinoRatio(navData, sortinoReturn)
+        : null,
   };
 }
 
@@ -104,7 +113,9 @@ export function calculateVolatility(navData) {
   if (returns.length < 30) return null;
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
   // Use (n-1) for sample variance — statistically correct
-  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (returns.length - 1);
+  const variance =
+    returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) /
+    (returns.length - 1);
   return Math.sqrt(variance) * Math.sqrt(252) * 100;
 }
 
@@ -112,7 +123,11 @@ export function calculateVolatility(navData) {
  * Sharpe Ratio = (Annual Return - Risk Free Rate) / Annualized Volatility
  * Risk-free rate assumed at 6.5% (approx RBI repo rate)
  */
-export function calculateSharpeRatio(annualReturn, volatility, riskFreeRate = 6.5) {
+export function calculateSharpeRatio(
+  annualReturn,
+  volatility,
+  riskFreeRate = 6.5,
+) {
   if (annualReturn === null || !volatility || volatility === 0) return null;
   return parseFloat(((annualReturn - riskFreeRate) / volatility).toFixed(2));
 }
@@ -122,43 +137,60 @@ export function calculateSharpeRatio(annualReturn, volatility, riskFreeRate = 6.
  * Downside deviation uses ALL returns in denominator (not just negative ones),
  * and measures deviations below zero (MAR = 0), as per standard finance practice.
  */
-export function calculateSortinoRatio(navData, annualReturn, riskFreeRate = 6.5) {
+export function calculateSortinoRatio(
+  navData,
+  annualReturn,
+  riskFreeRate = 6.5,
+) {
   if (!navData || annualReturn === null) return null;
   const returns = getDailyReturns(navData);
   if (returns.length < 30) return null;
   // Minimum Acceptable Return (MAR) per day — using 0 (no loss tolerance)
   const MAR = 0;
   // Sum of squared deviations below MAR, divided by TOTAL observations (not just downside days)
-  const downsideVariance = returns.reduce((acc, r) => {
-    const below = Math.min(r - MAR, 0);
-    return acc + below * below;
-  }, 0) / returns.length;
+  const downsideVariance =
+    returns.reduce((acc, r) => {
+      const below = Math.min(r - MAR, 0);
+      return acc + below * below;
+    }, 0) / returns.length;
   if (downsideVariance === 0) return null;
   const downsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(252) * 100;
   if (downsideDeviation === 0) return null;
-  return parseFloat(((annualReturn - riskFreeRate) / downsideDeviation).toFixed(2));
+  return parseFloat(
+    ((annualReturn - riskFreeRate) / downsideDeviation).toFixed(2),
+  );
 }
 
 // Pearson Correlation Coefficient (for overlap)
 export function calculateCorrelation(navData1, navData2) {
   if (!navData1 || !navData2) return null;
   const map2 = {};
-  navData2.forEach(d => map2[d.date] = parseFloat(d.nav));
-  const aligned1 = [], aligned2 = [];
+  navData2.forEach((d) => (map2[d.date] = parseFloat(d.nav)));
+  const aligned1 = [],
+    aligned2 = [];
   for (let i = 0; i < navData1.length - 1; i++) {
-    const today1 = navData1[i], yest1 = navData1[i + 1];
+    const today1 = navData1[i],
+      yest1 = navData1[i + 1];
     if (map2[today1.date] && map2[yest1.date]) {
-      aligned1.push((parseFloat(today1.nav) - parseFloat(yest1.nav)) / parseFloat(yest1.nav));
+      aligned1.push(
+        (parseFloat(today1.nav) - parseFloat(yest1.nav)) /
+          parseFloat(yest1.nav),
+      );
       aligned2.push((map2[today1.date] - map2[yest1.date]) / map2[yest1.date]);
     }
   }
   if (aligned1.length < 30) return null;
   const mean1 = aligned1.reduce((a, b) => a + b, 0) / aligned1.length;
   const mean2 = aligned2.reduce((a, b) => a + b, 0) / aligned2.length;
-  let num = 0, den1 = 0, den2 = 0;
+  let num = 0,
+    den1 = 0,
+    den2 = 0;
   for (let i = 0; i < aligned1.length; i++) {
-    const d1 = aligned1[i] - mean1, d2 = aligned2[i] - mean2;
-    num += d1 * d2; den1 += d1 * d1; den2 += d2 * d2;
+    const d1 = aligned1[i] - mean1,
+      d2 = aligned2[i] - mean2;
+    num += d1 * d2;
+    den1 += d1 * d1;
+    den2 += d2 * d2;
   }
   if (den1 === 0 || den2 === 0) return 0;
   return num / Math.sqrt(den1 * den2);
@@ -190,12 +222,17 @@ export function getFundLensScore(metrics) {
 export function getSmartTags(metrics) {
   if (!metrics) return [];
   const tags = [];
-  if (metrics.maxDrawdown < 15 && metrics.volatility < 15) tags.push('🛡️ Low Volatility');
-  if (metrics.return3Y > 18) tags.push('🚀 High Growth');
-  if (metrics.maxDrawdown < 20 && metrics.return5Y > 12) tags.push('⭐ Long-Term Pick');
-  if (metrics.volatility && metrics.volatility < 12) tags.push('🔰 Beginner Friendly');
-  if (metrics.sharpe !== null && metrics.sharpe > 1.5) tags.push('📐 High Sharpe');
-  if (metrics.sortino !== null && metrics.sortino > 1.5) tags.push('🎯 Low Downside Risk');
+  if (metrics.maxDrawdown < 15 && metrics.volatility < 15)
+    tags.push("🛡️ Low Volatility");
+  if (metrics.return3Y > 18) tags.push("🚀 High Growth");
+  if (metrics.maxDrawdown < 20 && metrics.return5Y > 12)
+    tags.push("⭐ Long-Term Pick");
+  if (metrics.volatility && metrics.volatility < 12)
+    tags.push("🔰 Beginner Friendly");
+  if (metrics.sharpe !== null && metrics.sharpe > 1.5)
+    tags.push("📐 High Sharpe");
+  if (metrics.sortino !== null && metrics.sortino > 1.5)
+    tags.push("🎯 Low Downside Risk");
   return tags;
 }
 
@@ -212,7 +249,8 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   // Pre-sort ascending once — O(n log n)
   const sorted = buildSortedNav(navData);
 
-  let totalInvested = 0, totalUnits = 0;
+  let totalInvested = 0,
+    totalUnits = 0;
   const n = years * 12;
 
   for (let m = 0; m < n; m++) {
@@ -222,7 +260,10 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
     // Binary search — O(log n) per iteration instead of O(n)
     const idx = binarySearchClosest(sorted, targetTs);
     const closestNav = sorted[idx]?.nav;
-    if (closestNav) { totalInvested += monthlyAmount; totalUnits += monthlyAmount / closestNav; }
+    if (closestNav) {
+      totalInvested += monthlyAmount;
+      totalUnits += monthlyAmount / closestNav;
+    }
   }
 
   const currentValue = totalUnits * latestNav;
@@ -233,19 +274,29 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   // Bug-fixed: converge on the RATE interval (not on value match), break correctly
   let xirr = null;
   try {
-    let lo = -0.5, hi = 2.0;
+    let lo = -0.5,
+      hi = 2.0;
     let monthlyRate = (lo + hi) / 2;
     for (let iter = 0; iter < 200; iter++) {
       monthlyRate = (lo + hi) / 2;
-      if (Math.abs(hi - lo) < 1e-9) break;          // converged on rate
-      if (Math.abs(monthlyRate) < 1e-10) { monthlyRate = 0; break; }
-      const fv = monthlyAmount * (1 + monthlyRate) * (Math.pow(1 + monthlyRate, n) - 1) / monthlyRate;
+      if (Math.abs(hi - lo) < 1e-9) break; // converged on rate
+      if (Math.abs(monthlyRate) < 1e-10) {
+        monthlyRate = 0;
+        break;
+      }
+      const fv =
+        (monthlyAmount *
+          (1 + monthlyRate) *
+          (Math.pow(1 + monthlyRate, n) - 1)) /
+        monthlyRate;
       if (fv > currentValue) hi = monthlyRate;
       else lo = monthlyRate;
     }
     xirr = parseFloat(((Math.pow(1 + monthlyRate, 12) - 1) * 100).toFixed(2));
     if (!isFinite(xirr) || xirr < -50 || xirr > 200) xirr = null;
-  } catch { xirr = null; }
+  } catch {
+    xirr = null;
+  }
 
   return {
     invested: totalInvested,
@@ -266,12 +317,12 @@ export function calculateBestWorstMonth(navData) {
 
   // Exclude the current partial month — it distorts best/worst since it's not a complete month
   const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   // Group navs by month (navData is sorted newest first)
-  navData.forEach(d => {
+  navData.forEach((d) => {
     if (!d?.date) return;
-    const parts = d.date.split('-');
+    const parts = d.date.split("-");
     if (parts.length !== 3) return;
     const [, mm, yyyy] = parts;
     if (!mm || !yyyy) return;
@@ -295,6 +346,6 @@ export function calculateBestWorstMonth(navData) {
 
   return {
     worst: monthReturns[0],
-    best: monthReturns[monthReturns.length - 1]
+    best: monthReturns[monthReturns.length - 1],
   };
 }

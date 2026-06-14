@@ -1,19 +1,24 @@
 // hooks/useFunds.js
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { get, set } from 'idb-keyval';
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { get, set } from "idb-keyval";
 
-const BASE_URL = 'https://api.mfapi.in/mf';
-const AMFI_NAV_URL = 'https://portal.amfiindia.com/spages/NAVAll.txt';
+const BASE_URL = "https://api.mfapi.in/mf";
+const AMFI_NAV_URL = "https://portal.amfiindia.com/spages/NAVAll.txt";
 
 async function getWithTimeout(key, timeoutMs = 1000) {
   try {
     return await Promise.race([
       get(key),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('IndexedDB timeout')), timeoutMs))
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("IndexedDB timeout")), timeoutMs),
+      ),
     ]);
   } catch (err) {
-    console.warn(`[FundLens] IndexedDB get timed out or failed for ${key}:`, err.message);
+    console.warn(
+      `[FundLens] IndexedDB get timed out or failed for ${key}:`,
+      err.message,
+    );
     return null;
   }
 }
@@ -22,10 +27,15 @@ async function setWithTimeout(key, value, timeoutMs = 1000) {
   try {
     return await Promise.race([
       set(key, value),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('IndexedDB timeout')), timeoutMs))
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("IndexedDB timeout")), timeoutMs),
+      ),
     ]);
   } catch (err) {
-    console.warn(`[FundLens] IndexedDB set timed out or failed for ${key}:`, err.message);
+    console.warn(
+      `[FundLens] IndexedDB set timed out or failed for ${key}:`,
+      err.message,
+    );
   }
 }
 
@@ -34,11 +44,14 @@ let memoryCachedList = null;
 let activeListFetchPromise = null;
 const activeDetailFetchPromises = new Map();
 
-const FUND_LIST_CACHE_KEY = 'fundlens_all_funds_v2';
+const FUND_LIST_CACHE_KEY = "fundlens_all_funds_v2";
 const FUND_LIST_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 class CappedLRU extends Map {
-  constructor(maxSize) { super(); this.maxSize = maxSize; }
+  constructor(maxSize) {
+    super();
+    this.maxSize = maxSize;
+  }
   get(key) {
     if (!this.has(key)) return undefined;
     const value = super.get(key);
@@ -65,8 +78,11 @@ async function fetchWithRetry(url, options, maxRetries = 2) {
       return await axios.get(url, { ...options, timeout: 8000 });
     } catch (err) {
       lastError = err;
-      if (attempt < maxRetries && (!err.response || err.response.status >= 500)) {
-        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+      if (
+        attempt < maxRetries &&
+        (!err.response || err.response.status >= 500)
+      ) {
+        await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
       } else {
         break;
       }
@@ -77,10 +93,11 @@ async function fetchWithRetry(url, options, maxRetries = 2) {
 
 function parseAmfiNavText(text) {
   const funds = [];
-  for (const raw of text.split('\n')) {
+  for (const raw of text.split("\n")) {
     const line = raw.trim();
-    if (!line || line.startsWith('Scheme Code') || !line.includes(';')) continue;
-    const parts = line.split(';');
+    if (!line || line.startsWith("Scheme Code") || !line.includes(";"))
+      continue;
+    const parts = line.split(";");
     if (parts.length < 4) continue;
     const code = parts[0].trim();
     const name = parts[3].trim();
@@ -94,22 +111,30 @@ async function fetchFundListWithFallback() {
   try {
     const res = await fetchWithRetry(BASE_URL, {}, 1);
     if (Array.isArray(res.data) && res.data.length > 100) {
-      return { data: res.data, source: 'mfapi' };
+      return { data: res.data, source: "mfapi" };
     }
-    throw new Error('mfapi returned empty or invalid list');
+    throw new Error("mfapi returned empty or invalid list");
   } catch (primaryErr) {
-    console.warn('[FundLens] mfapi.in list failed, trying AMFI fallback:', primaryErr.message);
+    console.warn(
+      "[FundLens] mfapi.in list failed, trying AMFI fallback:",
+      primaryErr.message,
+    );
   }
 
   try {
-    const res = await axios.get(AMFI_NAV_URL, { timeout: 12000, responseType: 'text' });
+    const res = await axios.get(AMFI_NAV_URL, {
+      timeout: 12000,
+      responseType: "text",
+    });
     const funds = parseAmfiNavText(res.data);
-    if (funds.length < 100) throw new Error('AMFI returned too few records');
+    if (funds.length < 100) throw new Error("AMFI returned too few records");
     console.info(`[FundLens] Loaded ${funds.length} funds from AMFI fallback.`);
-    return { data: funds, source: 'amfi' };
+    return { data: funds, source: "amfi" };
   } catch (fallbackErr) {
-    console.error('[FundLens] AMFI fallback also failed:', fallbackErr.message);
-    throw new Error('Both mfapi.in and AMFI are unreachable. Please try again later.');
+    console.error("[FundLens] AMFI fallback also failed:", fallbackErr.message);
+    throw new Error(
+      "Both mfapi.in and AMFI are unreachable. Please try again later.",
+    );
   }
 }
 
@@ -135,7 +160,9 @@ export function useFunds() {
     try {
       // 1. Memory cache
       if (memoryCachedList) {
-        if (ref.current) { setFunds(memoryCachedList); }
+        if (ref.current) {
+          setFunds(memoryCachedList);
+        }
         return;
       }
 
@@ -150,7 +177,7 @@ export function useFunds() {
       // 3. IndexedDB cache
       const idbCached = await getWithTimeout(FUND_LIST_CACHE_KEY);
       const now = Date.now();
-      if (idbCached && idbCached.ts && (now - idbCached.ts < FUND_LIST_TTL)) {
+      if (idbCached && idbCached.ts && now - idbCached.ts < FUND_LIST_TTL) {
         memoryCachedList = idbCached.data;
         if (ref.current) setFunds(idbCached.data);
 
@@ -163,7 +190,9 @@ export function useFunds() {
               activeListFetchPromise = null;
               return data;
             })
-            .catch(() => { activeListFetchPromise = null; });
+            .catch(() => {
+              activeListFetchPromise = null;
+            });
         }
         return;
       }
@@ -176,21 +205,26 @@ export function useFunds() {
           activeListFetchPromise = null;
           return data;
         })
-        .catch(err => {
+        .catch((err) => {
           activeListFetchPromise = null;
           throw err;
         });
 
       const data = await activeListFetchPromise;
       if (ref.current) setFunds(data);
-
     } catch (err) {
       if (ref.current) {
-        setError(err.message || 'Unable to load fund list. Please check your connection and try again.');
+        setError(
+          err.message ||
+            "Unable to load fund list. Please check your connection and try again.",
+        );
       }
     } finally {
       clearTimeout(slowTimer);
-      if (ref.current) { setLoading(false); setLoadingSlow(false); }
+      if (ref.current) {
+        setLoading(false);
+        setLoadingSlow(false);
+      }
     }
   }, []);
 
@@ -198,7 +232,9 @@ export function useFunds() {
     // FIX: use a ref object so the async function can observe unmount at any await point.
     const mountedRef = { current: true };
     fetchFunds(mountedRef);
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchFunds]);
 
   // Public refetch: create its own mounted ref (component is still alive when user triggers this)
@@ -224,7 +260,11 @@ export async function fetchFundDetail(schemeCode) {
       const idbCached = await getWithTimeout(idbKey);
       const now = Date.now();
 
-      if (idbCached && idbCached.timestamp && (now - idbCached.timestamp < 12 * 60 * 60 * 1000)) {
+      if (
+        idbCached &&
+        idbCached.timestamp &&
+        now - idbCached.timestamp < 12 * 60 * 60 * 1000
+      ) {
         detailsMemoryCache.set(codeStr, idbCached.data);
         return idbCached.data;
       }
@@ -251,9 +291,9 @@ export async function prefetchTopFunds(fundCodes, signal) {
   for (let i = 0; i < fundCodes.length; i += BATCH_SIZE) {
     if (signal?.aborted) break;
     const chunk = fundCodes.slice(i, i + BATCH_SIZE);
-    await Promise.allSettled(chunk.map(code => fetchFundDetail(code)));
+    await Promise.allSettled(chunk.map((code) => fetchFundDetail(code)));
     if (i + BATCH_SIZE < fundCodes.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+      await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 }

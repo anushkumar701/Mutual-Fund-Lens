@@ -4,9 +4,9 @@
  * Format a number in Indian currency notation (₹X,XX,XXX)
  */
 export function formatINR(value, decimals = 0) {
-  if (value === null || value === undefined || isNaN(value)) return '₹0';
+  if (value === null || value === undefined || isNaN(value)) return "₹0";
   const num = Math.round(Number(value));
-  const formatted = num.toLocaleString('en-IN', {
+  const formatted = num.toLocaleString("en-IN", {
     maximumFractionDigits: decimals,
     minimumFractionDigits: decimals,
   });
@@ -17,7 +17,7 @@ export function formatINR(value, decimals = 0) {
  * Format NAV (show 4 decimal places)
  */
 export function formatNAV(value) {
-  if (!value) return '—';
+  if (!value) return "—";
   return `₹${parseFloat(value).toFixed(4)}`;
 }
 

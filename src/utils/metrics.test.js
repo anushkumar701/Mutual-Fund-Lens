@@ -1,7 +1,7 @@
 // utils/metrics.test.js
 // Comprehensive tests for critical financial calculation functions
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 import {
   calculateFundMetrics,
   calculateVolatility,
@@ -11,7 +11,7 @@ import {
   calculateBestWorstMonth,
   getFundLensScore,
   getSmartTags,
-} from './metrics.js';
+} from "./metrics.js";
 
 // ─── Test Data Factories ────────────────────────────────────────────────────
 
@@ -24,13 +24,13 @@ import {
 function makeNavData(days = 1260, startNav = 100, annualReturnPct = 12) {
   const dailyGrowth = Math.pow(1 + annualReturnPct / 100, 1 / 252);
   const data = [];
-  const start = new Date('2020-01-01');
+  const start = new Date("2020-01-01");
   for (let i = 0; i < days; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
     const nav = startNav * Math.pow(dailyGrowth, i);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yyyy = d.getFullYear();
     data.push({ date: `${dd}-${mm}-${yyyy}`, nav: nav.toFixed(4) });
   }
@@ -52,26 +52,26 @@ function makeNavDataWithDrawdown() {
 
 // ─── CAGR / calculateFundMetrics ──────────────────────────────────────────
 
-describe('calculateFundMetrics', () => {
-  it('returns null for empty navData', () => {
+describe("calculateFundMetrics", () => {
+  it("returns null for empty navData", () => {
     expect(calculateFundMetrics(null)).toBeNull();
     expect(calculateFundMetrics([])).toBeNull();
   });
 
-  it('returns all metric keys for sufficient data', () => {
+  it("returns all metric keys for sufficient data", () => {
     const navData = makeNavData(1260, 100, 12);
     const result = calculateFundMetrics(navData);
     expect(result).not.toBeNull();
-    expect(result).toHaveProperty('return1Y');
-    expect(result).toHaveProperty('return3Y');
-    expect(result).toHaveProperty('return5Y');
-    expect(result).toHaveProperty('maxDrawdown');
-    expect(result).toHaveProperty('volatility');
-    expect(result).toHaveProperty('sharpe');
-    expect(result).toHaveProperty('sortino');
+    expect(result).toHaveProperty("return1Y");
+    expect(result).toHaveProperty("return3Y");
+    expect(result).toHaveProperty("return5Y");
+    expect(result).toHaveProperty("maxDrawdown");
+    expect(result).toHaveProperty("volatility");
+    expect(result).toHaveProperty("sharpe");
+    expect(result).toHaveProperty("sortino");
   });
 
-  it('1Y return is approximately correct for 12% CAGR fund', () => {
+  it("1Y return is approximately correct for 12% CAGR fund", () => {
     const navData = makeNavData(400, 100, 12);
     const result = calculateFundMetrics(navData);
     // With 7-day NAV tolerance, the exact 1Y anchor may be up to a week off.
@@ -82,19 +82,19 @@ describe('calculateFundMetrics', () => {
     }
   });
 
-  it('returns null for return3Y when data is shorter than 3 years', () => {
+  it("returns null for return3Y when data is shorter than 3 years", () => {
     const navData = makeNavData(300, 100, 12); // ~1.2 years only
     const result = calculateFundMetrics(navData);
     expect(result?.return3Y).toBeNull();
   });
 
-  it('maxDrawdown is 0 for monotonically increasing NAV', () => {
+  it("maxDrawdown is 0 for monotonically increasing NAV", () => {
     const navData = makeNavData(500, 100, 12);
     const result = calculateFundMetrics(navData);
     expect(result?.maxDrawdown).toBeGreaterThanOrEqual(0);
   });
 
-  it('maxDrawdown is positive when there is a peak-to-trough drop', () => {
+  it("maxDrawdown is positive when there is a peak-to-trough drop", () => {
     const navData = makeNavDataWithDrawdown();
     const result = calculateFundMetrics(navData);
     if (result) expect(result.maxDrawdown).toBeGreaterThan(0);
@@ -103,46 +103,46 @@ describe('calculateFundMetrics', () => {
 
 // ─── calculateVolatility ──────────────────────────────────────────────────
 
-describe('calculateVolatility', () => {
-  it('returns null for data shorter than 30 days', () => {
+describe("calculateVolatility", () => {
+  it("returns null for data shorter than 30 days", () => {
     const navData = makeNavData(20);
     expect(calculateVolatility(navData)).toBeNull();
   });
 
-  it('returns a positive number for valid data', () => {
+  it("returns a positive number for valid data", () => {
     const navData = makeNavData(500, 100, 12);
     const vol = calculateVolatility(navData);
     expect(vol).toBeGreaterThan(0);
   });
 
-  it('uses Bessel correction (sample variance) — not biased population variance', () => {
+  it("uses Bessel correction (sample variance) — not biased population variance", () => {
     // With only 31 data points: sample variance uses n-1=30, biased uses n=31
     // Both approaches return similar values but we verify no crash and positive result
     const navData = makeNavData(31, 100, 12);
     const vol = calculateVolatility(navData);
-    expect(typeof vol).toBe('number');
+    expect(typeof vol).toBe("number");
     expect(vol).toBeGreaterThan(0);
   });
 });
 
 // ─── calculateSharpeRatio ─────────────────────────────────────────────────
 
-describe('calculateSharpeRatio', () => {
-  it('returns null when annualReturn is null', () => {
+describe("calculateSharpeRatio", () => {
+  it("returns null when annualReturn is null", () => {
     expect(calculateSharpeRatio(null, 15)).toBeNull();
   });
 
-  it('returns null when volatility is 0', () => {
+  it("returns null when volatility is 0", () => {
     expect(calculateSharpeRatio(12, 0)).toBeNull();
   });
 
-  it('returns positive Sharpe for return > risk-free rate', () => {
+  it("returns positive Sharpe for return > risk-free rate", () => {
     const sharpe = calculateSharpeRatio(15, 10); // 15% return, 10% vol, 6.5% rfr
     expect(sharpe).toBeGreaterThan(0);
     expect(sharpe).toBeCloseTo((15 - 6.5) / 10, 1);
   });
 
-  it('returns negative Sharpe for return < risk-free rate', () => {
+  it("returns negative Sharpe for return < risk-free rate", () => {
     const sharpe = calculateSharpeRatio(4, 8); // 4% return < 6.5% rfr
     expect(sharpe).toBeLessThan(0);
   });
@@ -150,23 +150,23 @@ describe('calculateSharpeRatio', () => {
 
 // ─── calculateSortinoRatio ────────────────────────────────────────────────
 
-describe('calculateSortinoRatio', () => {
-  it('returns null for insufficient data', () => {
+describe("calculateSortinoRatio", () => {
+  it("returns null for insufficient data", () => {
     const navData = makeNavData(20);
     expect(calculateSortinoRatio(navData, 12)).toBeNull();
   });
 
-  it('returns a number for valid data and positive return', () => {
+  it("returns a number for valid data and positive return", () => {
     const navData = makeNavData(500, 100, 12);
     const sortino = calculateSortinoRatio(navData, 12);
     // Should be a number (may be null if no downside)
     if (sortino !== null) {
-      expect(typeof sortino).toBe('number');
+      expect(typeof sortino).toBe("number");
       expect(isFinite(sortino)).toBe(true);
     }
   });
 
-  it('returns higher Sortino for fund with fewer down-days', () => {
+  it("returns higher Sortino for fund with fewer down-days", () => {
     // Strong bull fund vs volatile fund — bull fund should have higher Sortino
     const bullFund = makeNavData(500, 100, 20);
     const voltFund = makeNavDataWithDrawdown();
@@ -180,31 +180,31 @@ describe('calculateSortinoRatio', () => {
 
 // ─── calculateHistoricalSIP ───────────────────────────────────────────────
 
-describe('calculateHistoricalSIP', () => {
-  it('returns null for empty navData', () => {
+describe("calculateHistoricalSIP", () => {
+  it("returns null for empty navData", () => {
     expect(calculateHistoricalSIP([], 5000, 5)).toBeNull();
   });
 
-  it('returns null if fund age < requested years', () => {
+  it("returns null if fund age < requested years", () => {
     const navData = makeNavData(365, 100, 12); // 1 year data
     expect(calculateHistoricalSIP(navData, 5000, 3)).toBeNull(); // needs 3 years
   });
 
-  it('returns valid result structure for sufficient data', () => {
+  it("returns valid result structure for sufficient data", () => {
     const navData = makeNavData(1500, 100, 12);
     const result = calculateHistoricalSIP(navData, 5000, 3);
     if (result !== null) {
-      expect(result).toHaveProperty('invested');
-      expect(result).toHaveProperty('currentValue');
-      expect(result).toHaveProperty('profit');
-      expect(result).toHaveProperty('absoluteReturn');
-      expect(result).toHaveProperty('xirr');
+      expect(result).toHaveProperty("invested");
+      expect(result).toHaveProperty("currentValue");
+      expect(result).toHaveProperty("profit");
+      expect(result).toHaveProperty("absoluteReturn");
+      expect(result).toHaveProperty("xirr");
       expect(result.invested).toBeGreaterThan(0);
       expect(result.currentValue).toBeGreaterThan(0);
     }
   });
 
-  it('invested amount equals monthlyAmount * years * 12 (approximately)', () => {
+  it("invested amount equals monthlyAmount * years * 12 (approximately)", () => {
     const navData = makeNavData(1500, 100, 12);
     const result = calculateHistoricalSIP(navData, 5000, 3);
     if (result !== null) {
@@ -214,7 +214,7 @@ describe('calculateHistoricalSIP', () => {
     }
   });
 
-  it('XIRR is in a realistic range (-50% to 200%)', () => {
+  it("XIRR is in a realistic range (-50% to 200%)", () => {
     const navData = makeNavData(1500, 100, 12);
     const result = calculateHistoricalSIP(navData, 5000, 3);
     if (result?.xirr !== null && result?.xirr !== undefined) {
@@ -226,26 +226,28 @@ describe('calculateHistoricalSIP', () => {
 
 // ─── calculateBestWorstMonth ──────────────────────────────────────────────
 
-describe('calculateBestWorstMonth', () => {
-  it('returns null for insufficient data', () => {
+describe("calculateBestWorstMonth", () => {
+  it("returns null for insufficient data", () => {
     expect(calculateBestWorstMonth(null)).toBeNull();
     expect(calculateBestWorstMonth(makeNavData(20))).toBeNull();
   });
 
-  it('returns an object with best and worst keys', () => {
+  it("returns an object with best and worst keys", () => {
     const navData = makeNavData(500, 100, 12);
     const result = calculateBestWorstMonth(navData);
     if (result !== null) {
-      expect(result).toHaveProperty('best');
-      expect(result).toHaveProperty('worst');
-      expect(result.best.returnPct).toBeGreaterThanOrEqual(result.worst.returnPct);
+      expect(result).toHaveProperty("best");
+      expect(result).toHaveProperty("worst");
+      expect(result.best.returnPct).toBeGreaterThanOrEqual(
+        result.worst.returnPct,
+      );
     }
   });
 
-  it('excludes the current month (partial month not included)', () => {
+  it("excludes the current month (partial month not included)", () => {
     const navData = makeNavData(500, 100, 12);
     const now = new Date();
-    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const result = calculateBestWorstMonth(navData);
     if (result) {
       expect(result.best.month).not.toBe(currentMonthKey);
@@ -256,45 +258,80 @@ describe('calculateBestWorstMonth', () => {
 
 // ─── getFundLensScore ─────────────────────────────────────────────────────
 
-describe('getFundLensScore', () => {
-  it('returns null if metrics is null or return3Y is null', () => {
+describe("getFundLensScore", () => {
+  it("returns null if metrics is null or return3Y is null", () => {
     expect(getFundLensScore(null)).toBeNull();
     expect(getFundLensScore({ return3Y: null })).toBeNull();
   });
 
-  it('score is between 10 and 98 inclusive', () => {
-    const metrics = { return3Y: 15, maxDrawdown: 10, volatility: 12, sharpe: 1.5, return5Y: 14 };
+  it("score is between 10 and 98 inclusive", () => {
+    const metrics = {
+      return3Y: 15,
+      maxDrawdown: 10,
+      volatility: 12,
+      sharpe: 1.5,
+      return5Y: 14,
+    };
     const score = getFundLensScore(metrics);
     expect(score).toBeGreaterThanOrEqual(10);
     expect(score).toBeLessThanOrEqual(98);
   });
 
-  it('higher return3Y produces higher score', () => {
-    const low  = getFundLensScore({ return3Y: 5,  maxDrawdown: 20, volatility: 15, sharpe: 0.5 });
-    const high = getFundLensScore({ return3Y: 20, maxDrawdown: 10, volatility: 10, sharpe: 2.0 });
+  it("higher return3Y produces higher score", () => {
+    const low = getFundLensScore({
+      return3Y: 5,
+      maxDrawdown: 20,
+      volatility: 15,
+      sharpe: 0.5,
+    });
+    const high = getFundLensScore({
+      return3Y: 20,
+      maxDrawdown: 10,
+      volatility: 10,
+      sharpe: 2.0,
+    });
     expect(high).toBeGreaterThan(low);
   });
 
-  it('handles partial null metrics without throwing', () => {
-    const metrics = { return3Y: 12, maxDrawdown: 15, volatility: null, sharpe: null };
+  it("handles partial null metrics without throwing", () => {
+    const metrics = {
+      return3Y: 12,
+      maxDrawdown: 15,
+      volatility: null,
+      sharpe: null,
+    };
     expect(() => getFundLensScore(metrics)).not.toThrow();
   });
 });
 
 // ─── getSmartTags ─────────────────────────────────────────────────────────
 
-describe('getSmartTags', () => {
-  it('returns empty array for null metrics', () => {
+describe("getSmartTags", () => {
+  it("returns empty array for null metrics", () => {
     expect(getSmartTags(null)).toEqual([]);
   });
 
-  it('returns Low Volatility tag when appropriate', () => {
-    const tags = getSmartTags({ maxDrawdown: 10, volatility: 10, return3Y: 12, return5Y: 12, sharpe: 1, sortino: 1 });
-    expect(tags).toContain('🛡️ Low Volatility');
+  it("returns Low Volatility tag when appropriate", () => {
+    const tags = getSmartTags({
+      maxDrawdown: 10,
+      volatility: 10,
+      return3Y: 12,
+      return5Y: 12,
+      sharpe: 1,
+      sortino: 1,
+    });
+    expect(tags).toContain("🛡️ Low Volatility");
   });
 
-  it('returns High Growth tag for return3Y > 18', () => {
-    const tags = getSmartTags({ maxDrawdown: 20, volatility: 18, return3Y: 20, return5Y: 18, sharpe: 1.5, sortino: 2 });
-    expect(tags).toContain('🚀 High Growth');
+  it("returns High Growth tag for return3Y > 18", () => {
+    const tags = getSmartTags({
+      maxDrawdown: 20,
+      volatility: 18,
+      return3Y: 20,
+      return5Y: 18,
+      sharpe: 1.5,
+      sortino: 2,
+    });
+    expect(tags).toContain("🚀 High Growth");
   });
 });

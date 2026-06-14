@@ -1,47 +1,58 @@
 // App.jsx
-import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import NavBar from './components/NavBar';
-import { ToastProvider } from './components/Toast';
-import ErrorBoundary from './components/ErrorBoundary';
-import PWAInstallPrompt from './components/PWAInstallPrompt';
+import { lazy, Suspense, useEffect } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
+import NavBar from "./components/NavBar";
+import { ToastProvider } from "./components/Toast";
+import ErrorBoundary from "./components/ErrorBoundary";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
-const Footer = lazy(() => import('./components/Footer'));
-const BackToTop = lazy(() => import('./components/BackToTop'));
+const Footer = lazy(() => import("./components/Footer"));
+const BackToTop = lazy(() => import("./components/BackToTop"));
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Screener = lazy(() => import('./pages/Screener'));
-const Compare = lazy(() => import('./pages/Compare'));
-const SIPCalculator = lazy(() => import('./pages/SIPCalculator'));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Screener = lazy(() => import("./pages/Screener"));
+const Compare = lazy(() => import("./pages/Compare"));
+const SIPCalculator = lazy(() => import("./pages/SIPCalculator"));
 
 // Per-route SEO — updates document.title, meta description, and canonical URL
 const ROUTE_SEO = {
-  '/': {
-    title: 'FundLens — Mutual Fund Research & Analysis',
-    description: 'FundLens — India\'s beginner-friendly mutual fund analysis platform. Search 37,000+ funds, compare performance, and plan investments.',
+  "/": {
+    title: "FundLens — Mutual Fund Research & Analysis",
+    description:
+      "FundLens — India's beginner-friendly mutual fund analysis platform. Search 37,000+ funds, compare performance, and plan investments.",
   },
-  '/screener': {
-    title: 'Fund Screener — Browse 37,000+ Mutual Funds | FundLens',
-    description: 'Filter and browse 37,000+ Indian mutual funds by category, risk, expense ratio, and AMC. Find the right fund for your goals.',
+  "/screener": {
+    title: "Fund Screener — Browse 37,000+ Mutual Funds | FundLens",
+    description:
+      "Filter and browse 37,000+ Indian mutual funds by category, risk, expense ratio, and AMC. Find the right fund for your goals.",
   },
-  '/compare': {
-    title: 'Compare Funds Side-by-Side | FundLens',
-    description: 'Compare up to 4 mutual funds side-by-side with NAV charts, rolling returns, SIP simulation, and overlap analysis.',
+  "/compare": {
+    title: "Compare Funds Side-by-Side | FundLens",
+    description:
+      "Compare up to 4 mutual funds side-by-side with NAV charts, rolling returns, SIP simulation, and overlap analysis.",
   },
-  '/sip': {
-    title: 'SIP & FIRE Calculator | FundLens',
-    description: 'Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.',
+  "/sip": {
+    title: "SIP & FIRE Calculator | FundLens",
+    description:
+      "Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.",
   },
 };
 
-const BASE_URL = 'https://fundlens.netlify.app';
+const BASE_URL = "https://fundlens.netlify.app";
 
 function PageSEOUpdater() {
   const { pathname } = useLocation();
   useEffect(() => {
     const seo = ROUTE_SEO[pathname] ?? {
-      title: 'FundLens — Mutual Fund Analysis Platform',
-      description: 'FundLens — India\'s beginner-friendly mutual fund analysis and screening platform.',
+      title: "FundLens — Mutual Fund Analysis Platform",
+      description:
+        "FundLens — India's beginner-friendly mutual fund analysis and screening platform.",
     };
 
     // Update title
@@ -50,19 +61,25 @@ function PageSEOUpdater() {
     // Update meta description
     let metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute('content', seo.description);
+      metaDesc.setAttribute("content", seo.description);
     }
 
     // Update canonical URL
     let canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) {
-      canonical.setAttribute('href', `${BASE_URL}${pathname === '/' ? '/' : pathname}`);
+      canonical.setAttribute(
+        "href",
+        `${BASE_URL}${pathname === "/" ? "/" : pathname}`,
+      );
     }
 
     // Update Open Graph URL
     let ogUrl = document.querySelector('meta[property="og:url"]');
     if (ogUrl) {
-      ogUrl.setAttribute('content', `${BASE_URL}${pathname === '/' ? '/' : pathname}`);
+      ogUrl.setAttribute(
+        "content",
+        `${BASE_URL}${pathname === "/" ? "/" : pathname}`,
+      );
     }
   }, [pathname]);
   return null;
@@ -84,14 +101,26 @@ export default function App() {
           <header>
             <NavBar />
           </header>
-          <main id="main-content" className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden" aria-label="Main content">
+          <main
+            id="main-content"
+            className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden"
+            aria-label="Main content"
+          >
             <div className="flex-1">
               <ErrorBoundary>
-                <Suspense fallback={
-                  <div className="min-h-[50vh] flex items-center justify-center px-4" role="status" aria-label="Loading page">
-                    <div className="text-sm text-slate-500 dark:text-slate-400">Loading page...</div>
-                  </div>
-                }>
+                <Suspense
+                  fallback={
+                    <div
+                      className="min-h-[50vh] flex items-center justify-center px-4"
+                      role="status"
+                      aria-label="Loading page"
+                    >
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
+                        Loading page...
+                      </div>
+                    </div>
+                  }
+                >
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/screener" element={<Screener />} />
@@ -103,9 +132,13 @@ export default function App() {
                 </Suspense>
               </ErrorBoundary>
             </div>
-            <Suspense fallback={null}><Footer /></Suspense>
+            <Suspense fallback={null}>
+              <Footer />
+            </Suspense>
           </main>
-          <Suspense fallback={null}><BackToTop /></Suspense>
+          <Suspense fallback={null}>
+            <BackToTop />
+          </Suspense>
           <PWAInstallPrompt />
         </BrowserRouter>
       </ToastProvider>

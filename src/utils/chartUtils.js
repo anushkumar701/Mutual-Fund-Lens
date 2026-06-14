@@ -8,13 +8,14 @@
  * special characters in Indian fund names silently break line rendering.
  */
 export function sanitizeDataKey(name) {
-  if (name == null) return 'fund';
+  if (name == null) return "fund";
   // Replace every non-alphanumeric / non-space / non-hyphen char with underscore
-  return String(name)
-    .replace(/[^a-zA-Z0-9 \-_]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    || 'fund';
+  return (
+    String(name)
+      .replace(/[^a-zA-Z0-9 \-_]/g, "_")
+      .replace(/\s+/g, " ")
+      .trim() || "fund"
+  );
 }
 
 /**
@@ -22,7 +23,7 @@ export function sanitizeDataKey(name) {
  */
 export function getFundAgeYears(navData) {
   if (!navData || navData.length === 0) return 0;
-  const parts = navData[navData.length - 1].date.split('-');
+  const parts = navData[navData.length - 1].date.split("-");
   if (parts.length !== 3) return 0;
   const [dd, mm, yyyy] = parts;
   const parsed = new Date(`${yyyy}-${mm}-${dd}`).getTime();
@@ -34,8 +35,8 @@ export function getFundAgeYears(navData) {
  * Parse a DD-MM-YYYY nav date string into a Date object.
  */
 function parseNavDate(s) {
-  if (!s || typeof s !== 'string') return new Date(NaN);
-  const parts = s.split('-');
+  if (!s || typeof s !== "string") return new Date(NaN);
+  const parts = s.split("-");
   if (parts.length !== 3) return new Date(NaN);
   const [dd, mm, yyyy] = parts;
   return new Date(`${yyyy}-${mm}-${dd}`);
@@ -49,18 +50,40 @@ export function filterByRange(data, range) {
   const now = new Date();
   const cutoff = new Date();
   switch (range) {
-    case '1M':  cutoff.setMonth(now.getMonth() - 1); break;
-    case '3M':  cutoff.setMonth(now.getMonth() - 3); break;
-    case '6M':  cutoff.setMonth(now.getMonth() - 6); break;
-    case '1Y':  cutoff.setFullYear(now.getFullYear() - 1); break;
-    case '3Y':  cutoff.setFullYear(now.getFullYear() - 3); break;
-    case '5Y':  cutoff.setFullYear(now.getFullYear() - 5); break;
-    case '10Y': cutoff.setFullYear(now.getFullYear() - 10); break;
-    case '15Y': cutoff.setFullYear(now.getFullYear() - 15); break;
-    case '20Y': cutoff.setFullYear(now.getFullYear() - 20); break;
-    case '25Y': cutoff.setFullYear(now.getFullYear() - 25); break;
-    case 'MAX': return [...data].reverse(); // all data, oldest first
-    default:    cutoff.setMonth(now.getMonth() - 6);
+    case "1M":
+      cutoff.setMonth(now.getMonth() - 1);
+      break;
+    case "3M":
+      cutoff.setMonth(now.getMonth() - 3);
+      break;
+    case "6M":
+      cutoff.setMonth(now.getMonth() - 6);
+      break;
+    case "1Y":
+      cutoff.setFullYear(now.getFullYear() - 1);
+      break;
+    case "3Y":
+      cutoff.setFullYear(now.getFullYear() - 3);
+      break;
+    case "5Y":
+      cutoff.setFullYear(now.getFullYear() - 5);
+      break;
+    case "10Y":
+      cutoff.setFullYear(now.getFullYear() - 10);
+      break;
+    case "15Y":
+      cutoff.setFullYear(now.getFullYear() - 15);
+      break;
+    case "20Y":
+      cutoff.setFullYear(now.getFullYear() - 20);
+      break;
+    case "25Y":
+      cutoff.setFullYear(now.getFullYear() - 25);
+      break;
+    case "MAX":
+      return [...data].reverse(); // all data, oldest first
+    default:
+      cutoff.setMonth(now.getMonth() - 6);
   }
   return data
     .filter((d) => {
@@ -121,14 +144,14 @@ export function buildChartData(funds, range) {
   });
 
   const getSortKey = (s) => {
-    const parts = s.split('-');
+    const parts = s.split("-");
     if (parts.length !== 3) return s;
     const [dd, mm, yyyy] = parts;
     return `${yyyy}${mm}${dd}`;
   };
 
-  return Object.values(dateMap).sort(
-    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  return Object.values(dateMap).sort((a, b) =>
+    getSortKey(a.date).localeCompare(getSortKey(b.date)),
   );
 }
 
@@ -139,7 +162,7 @@ export function buildChartData(funds, range) {
 export function toWeeklyData(chartData) {
   const weekMap = {};
   chartData.forEach((row) => {
-    const parts = row.date.split('-');
+    const parts = row.date.split("-");
     if (parts.length !== 3) return;
     const [dd, mm, yyyy] = parts;
     const d = new Date(`${yyyy}-${mm}-${dd}`);
@@ -150,20 +173,20 @@ export function toWeeklyData(chartData) {
     tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
     const yearStart = new Date(tmp.getFullYear(), 0, 1);
     const weekNum = Math.ceil(((tmp - yearStart) / 86400000 + 1) / 7);
-    const key = `${tmp.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    const key = `${tmp.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
     // Last entry per week wins (data is sorted ascending by date)
     weekMap[key] = row;
   });
 
   const getSortKey = (s) => {
-    const parts = s.split('-');
+    const parts = s.split("-");
     if (parts.length !== 3) return s;
     const [dd, mm, yyyy] = parts;
     return `${yyyy}${mm}${dd}`;
   };
 
-  return Object.values(weekMap).sort(
-    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  return Object.values(weekMap).sort((a, b) =>
+    getSortKey(a.date).localeCompare(getSortKey(b.date)),
   );
 }
 
@@ -175,7 +198,7 @@ export function toMonthlyData(chartData) {
   const monthMap = {};
   chartData.forEach((row) => {
     // row.date is in DD-MM-YYYY format
-    const parts = row.date.split('-');
+    const parts = row.date.split("-");
     if (parts.length !== 3) return;
     const [, mm, yyyy] = parts;
     const key = `${yyyy}-${mm}`;
@@ -184,14 +207,14 @@ export function toMonthlyData(chartData) {
   });
 
   const getSortKey = (s) => {
-    const parts = s.split('-');
+    const parts = s.split("-");
     if (parts.length !== 3) return s;
     const [dd, mm, yyyy] = parts;
     return `${yyyy}${mm}${dd}`;
   };
 
-  return Object.values(monthMap).sort(
-    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  return Object.values(monthMap).sort((a, b) =>
+    getSortKey(a.date).localeCompare(getSortKey(b.date)),
   );
 }
 
@@ -213,7 +236,7 @@ export function get52WeekHL(navData) {
   if (last52W.length === 0) return null;
   return {
     high: last52W.reduce((a, b) => Math.max(a, b), -Infinity),
-    low:  last52W.reduce((a, b) => Math.min(a, b), Infinity),
+    low: last52W.reduce((a, b) => Math.min(a, b), Infinity),
   };
 }
 
@@ -224,7 +247,7 @@ export function getMonthlyWinRate(navData) {
   if (!navData || navData.length < 24) return null;
   const monthMap = {};
   navData.forEach((d) => {
-    const parts = d.date.split('-');
+    const parts = d.date.split("-");
     if (parts.length !== 3) return;
     const [, mm, yyyy] = parts;
     const key = `${yyyy}-${mm}`;
@@ -237,7 +260,9 @@ export function getMonthlyWinRate(navData) {
   for (let i = 1; i < months.length; i++) {
     if (months[i] > months[i - 1]) wins++;
   }
-  return months.length > 1 ? Math.round((wins / (months.length - 1)) * 100) : null;
+  return months.length > 1
+    ? Math.round((wins / (months.length - 1)) * 100)
+    : null;
 }
 
 /**
@@ -246,11 +271,13 @@ export function getMonthlyWinRate(navData) {
 export function guessMinInvestment(schemeName) {
   if (!schemeName) return { sip: 500, lump: 1000 };
   const lower = schemeName.toLowerCase();
-  if (lower.includes('elss') || lower.includes('tax')) return { sip: 500, lump: 500 };
-  if (lower.includes('nifty') || lower.includes('index')) return { sip: 100, lump: 500 };
-  if (lower.includes('parag parikh')) return { sip: 1000, lump: 1000 };
+  if (lower.includes("elss") || lower.includes("tax"))
+    return { sip: 500, lump: 500 };
+  if (lower.includes("nifty") || lower.includes("index"))
+    return { sip: 100, lump: 500 };
+  if (lower.includes("parag parikh")) return { sip: 1000, lump: 1000 };
   return { sip: 500, lump: 1000 };
 }
 
 // Default chart colors for up to 4 funds
-export const CHART_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
+export const CHART_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#ef4444"];

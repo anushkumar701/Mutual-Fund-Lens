@@ -14,88 +14,92 @@
  */
 export const PLATFORMS = [
   {
-    id: 'groww',
-    name: 'Groww',
-    icon: '🟢',
-    color: '#00d09c',
+    id: "groww",
+    name: "Groww",
+    icon: "🟢",
+    color: "#00d09c",
     getUrl: (name) => {
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
       return `https://groww.in/mutual-funds/${slug}`;
     },
-    tip: 'Groww automatically invests in Direct plans. Zero commission.',
+    tip: "Groww automatically invests in Direct plans. Zero commission.",
   },
   {
-    id: 'zerodha',
-    name: 'Zerodha Coin',
-    icon: '🔵',
-    color: '#387ed1',
+    id: "zerodha",
+    name: "Zerodha Coin",
+    icon: "🔵",
+    color: "#387ed1",
     getUrl: (name) => {
-      const q = encodeURIComponent(name.split('-')[0].trim());
+      const q = encodeURIComponent(name.split("-")[0].trim());
       return `https://coin.zerodha.com/explore?q=${q}`;
     },
-    tip: 'Zerodha Coin: Only Direct plans. Funds held in Demat. ₹0 commission.',
+    tip: "Zerodha Coin: Only Direct plans. Funds held in Demat. ₹0 commission.",
   },
   {
-    id: 'kuvera',
-    name: 'Kuvera',
-    icon: '🟣',
-    color: '#6366f1',
+    id: "kuvera",
+    name: "Kuvera",
+    icon: "🟣",
+    color: "#6366f1",
     getUrl: (name) => {
-      const q = encodeURIComponent(name.split('-')[0].trim());
+      const q = encodeURIComponent(name.split("-")[0].trim());
       return `https://kuvera.in/explore?q=${q}`;
     },
-    tip: 'Kuvera: Free Direct plan investing. Great tax harvesting tools.',
+    tip: "Kuvera: Free Direct plan investing. Great tax harvesting tools.",
   },
   {
-    id: 'mfcentral',
-    name: 'MFCentral',
-    icon: '🏛️',
-    color: '#1e3a5f',
-    getUrl: () => 'https://www.mfcentral.com/',
-    tip: 'MFCentral: Official AMFI portal. View all your MF holdings in one place.',
+    id: "mfcentral",
+    name: "MFCentral",
+    icon: "🏛️",
+    color: "#1e3a5f",
+    getUrl: () => "https://www.mfcentral.com/",
+    tip: "MFCentral: Official AMFI portal. View all your MF holdings in one place.",
   },
   {
-    id: 'paytm',
-    name: 'Paytm Money',
-    icon: '💙',
-    color: '#00b9f1',
+    id: "paytm",
+    name: "Paytm Money",
+    icon: "💙",
+    color: "#00b9f1",
     getUrl: (name) => {
-      const q = encodeURIComponent(name.split('-')[0].trim());
+      const q = encodeURIComponent(name.split("-")[0].trim());
       return `https://www.paytmmoney.com/mutual-funds/explore?q=${q}`;
     },
-    tip: 'Paytm Money: UPI-based instant SIP setup. Only Direct plans.',
+    tip: "Paytm Money: UPI-based instant SIP setup. Only Direct plans.",
   },
   {
-    id: 'etmoney',
-    name: 'ET Money',
-    icon: '🟠',
-    color: '#f97316',
-    getUrl: () => 'https://www.etmoney.com/mutual-funds',
-    tip: 'ET Money: Zero-commission Direct plans with smart tax planning.',
+    id: "etmoney",
+    name: "ET Money",
+    icon: "🟠",
+    color: "#f97316",
+    getUrl: () => "https://www.etmoney.com/mutual-funds",
+    tip: "ET Money: Zero-commission Direct plans with smart tax planning.",
   },
   {
-    id: 'mfutility',
-    name: 'MFUtility',
-    icon: '🏦',
-    color: '#059669',
-    getUrl: () => 'https://www.mfuonline.com/',
-    tip: 'MFUtility: Industry utility for investing across all AMCs with a single CAN.',
+    id: "mfutility",
+    name: "MFUtility",
+    icon: "🏦",
+    color: "#059669",
+    getUrl: () => "https://www.mfuonline.com/",
+    tip: "MFUtility: Industry utility for investing across all AMCs with a single CAN.",
   },
   {
-    id: 'other',
-    name: 'Other / AMC Direct',
-    icon: '🌐',
-    color: '#6b7280',
+    id: "other",
+    name: "Other / AMC Direct",
+    icon: "🌐",
+    color: "#6b7280",
     getUrl: (name) => {
       const q = encodeURIComponent(name);
       return `https://www.google.com/search?q=${q}+invest`;
     },
-    tip: 'Invest directly on the AMC website for maximum control.',
+    tip: "Invest directly on the AMC website for maximum control.",
   },
 ];
 
 // localStorage key for the user's preferred platform
-const PLATFORM_KEY = 'fundlens_platform';
+const PLATFORM_KEY = "fundlens_platform";
 
 /**
  * Get the user's preferred platform.
