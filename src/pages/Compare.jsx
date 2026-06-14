@@ -1301,14 +1301,14 @@ export default function Compare() {
                       />
                     </div>
                     <div className="flex gap-1">
-                      {(sipMode === 'lumpsum' ? [10000, 50000, 100000, 500000] : [1000, 5000, 10000, 25000]).map(p => (
+                      {(sipMode === 'lumpsum' ? [10000, 50000, 100000, 500000] : [500, 1000, 5000, 10000]).map(p => (
                         <button key={p} onClick={() => { setSipAmount(p); setSipAmountInput(String(p)); }}
                           className={`text-[10px] px-1.5 py-0.5 rounded border transition-all ${
                             sipAmount === p && sipAmountInput === String(p)
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                               : 'border-slate-200 dark:border-slate-700 text-slate-500'
                           }`}>
-                          {p >= 100000 ? `${p/100000}L` : `${p/1000}K`}
+                          {p >= 100000 ? `${p/100000}L` : p >= 1000 ? `${p/1000}K` : `${p}`}
                         </button>
                       ))}
                     </div>
