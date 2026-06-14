@@ -1017,48 +1017,48 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Highly accurate historical market events for context
+                        // Beginner-friendly historical market events explaining WHY the market moved
                         const MARKET_EVENTS = {
-                          2000: { label: '🔴 Dot-Com Bubble Burst', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2001: { label: '🔴 9/11 Shock & Global Slowdown', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2003: { label: '🟢 Post Dot-Com Recovery Rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2004: { label: '🟢 UPA-1 Election & Growth Surge', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2006: { label: '🟢 Global Liquidity Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2008: { label: '🔴 Global Financial Crisis (Lehman Collapse)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2009: { label: '🟢 Post-GFC Stimulus & V-Shape Recovery', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2010: { label: '🟢 Continued Economic Expansion', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2011: { label: '🟡 Eurozone Debt Crisis & High Inflation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2013: { label: '🟡 "Taper Tantrum" & INR Depreciation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2014: { label: '🟢 Modi 1.0 "Hope Rally" & Oil Price Crash', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2015: { label: '🟡 China Market Crash & Global Sell-off', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2016: { label: '🟡 Demonetisation Shock & US Elections', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2017: { label: '🟢 Synchronized Global Growth & GST Rollout', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2018: { label: '🟡 IL&FS Crisis & Midcap Correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2019: { label: '🟡 Corporate Tax Cut Rally vs NBFC Slowdown', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2020: { label: '🔴 COVID-19 Crash & Historic Liquidity Rally', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2021: { label: '🟢 Post-COVID Tech Boom & Retail Inflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2022: { label: '🔴 Russia-Ukraine War & Rate Hike Cycle', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
-                          2023: { label: '🟢 Peak Interest Rates & Mid/Small-cap Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2024: { label: '🟢 Election Continuity & Broad Market Strength', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2000: { label: '🔴 Tech companies crashed because they were overhyped (Dot-Com Bubble)', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
+                          2001: { label: '🔴 9/11 attacks caused panic and a global slowdown', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
+                          2003: { label: '🟢 Market finally recovered from the 2000-2001 crash', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2004: { label: '🟢 New government elected, boosting investor confidence', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2006: { label: '🟢 Heavy foreign investments pushed the market to new highs', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2008: { label: '🔴 Global banks collapsed causing a worldwide crash (2008 Crisis)', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
+                          2009: { label: '🟢 Governments pumped money to save the economy, causing a huge bounce back', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2010: { label: '🟢 Businesses fully recovered from the 2008 crash', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2011: { label: '🟡 European debt crisis made global investors panic', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2013: { label: '🟡 Indian Rupee lost value fast, causing temporary panic', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2014: { label: '🟢 New government elected with full majority, bringing huge hope', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2015: { label: '🟡 China\'s economy slowed down, dragging global markets with it', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2016: { label: '🟡 Note ban (Demonetisation) temporarily disrupted Indian businesses', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2017: { label: '🟢 GST was launched and global markets were all growing together', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2018: { label: '🟡 A major lending company (IL&FS) went bankrupt, hurting smaller companies', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2019: { label: '🟡 Corporate tax was cut heavily, making companies more profitable', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2020: { label: '🔴 Global lockdown due to COVID-19 caused a severe but short crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
+                          2021: { label: '🟢 Post-COVID recovery, tech boom, and massive investments by regular people', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2022: { label: '🔴 Russia-Ukraine war and rising inflation (high prices) caused a tough market', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
+                          2023: { label: '🟢 Inflation cooled down, causing mid-sized and small companies to explode in value', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2024: { label: '🟢 General elections concluded peacefully, keeping the market stable and growing', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
                         };
 
                         let event = MARKET_EVENTS[year];
 
-                        // Dynamically determine market sentiment for any future or unmapped years based on actual fund performance
+                        // Dynamically determine market sentiment for any future or unmapped years using beginner-friendly language
                         if (!event && defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
                           if (avgReturn >= 25) {
-                            event = { label: '🟢 Exceptional Bull Run', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 An extremely rare year where almost everything went up fast', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= 12) {
-                            event = { label: '🟢 Strong Bull Market', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 A great year for the stock market overall', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= 5) {
-                            event = { label: '🟢 Positive Growth', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                            event = { label: '🟢 A slow and steady positive year', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
                           } else if (avgReturn >= -2) {
-                            event = { label: '🟡 Flat / Consolidation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                            event = { label: '🟡 The market mostly stayed flat with no clear direction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
                           } else if (avgReturn >= -12) {
-                            event = { label: '🟡 Market Correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                            event = { label: '🟡 A tough year where the market lost some value', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
                           } else {
-                            event = { label: '🔴 Bear Market / Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' };
+                            event = { label: '🔴 A major crash year where most funds lost heavy money', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
                           }
                         }
                         return (
