@@ -375,15 +375,15 @@ export default function SIPCalculator() {
                   id="amount-slider"
                   label={isLumpsum ? 'One-time Investment' : 'Monthly SIP Amount'}
                   value={amount} onChange={setAmount}
-                  min={isLumpsum ? 1000 : 500} max={isLumpsum ? 5000000 : 100000}
-                  step={isLumpsum ? 1000 : 500}
+                  min={isLumpsum ? 1000 : 100} max={isLumpsum ? 5000000 : 100000}
+                  step={isLumpsum ? 1000 : 100}
                   prefix="₹" formatFn={(v) => formatINR(v)}
                 />
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {(isLumpsum ? [10000, 50000, 100000, 500000] : [1000, 5000, 10000, 25000]).map((preset) => (
+                  {(isLumpsum ? [10000, 50000, 100000, 500000] : [500, 1000, 5000, 10000]).map((preset) => (
                     <button key={preset} onClick={() => setAmount(preset)}
                       className={`px-3 py-1 text-xs rounded-full border transition-all ${amount === preset ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                      {preset >= 100000 ? `₹${preset / 100000}L` : `₹${preset / 1000}K`}
+                      {preset >= 100000 ? `₹${preset / 100000}L` : preset >= 1000 ? `₹${preset / 1000}K` : `₹${preset}`}
                     </button>
                   ))}
                 </div>
