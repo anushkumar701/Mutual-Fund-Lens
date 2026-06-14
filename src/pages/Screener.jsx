@@ -144,6 +144,8 @@ export default function Screener() {
   const debouncedSearch = useDebounce(search, 250);
   const [tab, setTab] = useState(initialTab);
   const [cat, setCat] = useState(initialCategory);
+  const [subCategory, setSubCategory] = useState('All');
+  const [preset, setPreset] = useState('All');
   const [plan, setPlan] = useState('All');
   const [risk, setRisk] = useState('All');
   const [erMax, setErMax] = useState('All');
@@ -152,10 +154,10 @@ export default function Screener() {
   const [sort, setSort] = useState('az');
   const [page, setPage] = useState(48);
 
-  const clearAll = () => { setSearch(''); setCat('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All AMCs'); setShowClosed(false); };
+  const clearAll = () => { setSearch(''); setCat('All'); setSubCategory('All'); setPreset('All'); setPlan('All'); setRisk('All'); setErMax('All'); setAmc('All AMCs'); setShowClosed(false); };
 
   // Reset pagination whenever filters change
-  useEffect(() => { setPage(48); }, [debouncedSearch, cat, plan, risk, erMax, amc, showClosed, tab]);
+  useEffect(() => { setPage(48); }, [debouncedSearch, cat, subCategory, preset, plan, risk, erMax, amc, showClosed, tab]);
 
   const topAMCs = useMemo(() => {
     const m = {};
@@ -179,7 +181,14 @@ export default function Screener() {
       list = list.filter(f => f.schemeName.toLowerCase().includes(q) || String(f.schemeCode).includes(q));
     }
     if (!showClosed) list = list.filter(f => !isFundClosed(f.schemeName));
+
+    if (preset === 'Tax Saving (80C)') list = list.filter(f => inferCategory(f.schemeName) === 'ELSS');
+    else if (preset === 'Beginner Safe') list = list.filter(f => inferCategory(f.schemeName) === 'Index' || inferCategory(f.schemeName) === 'Liquid');
+    else if (preset === 'High Risk/Return') list = list.filter(f => { const c = inferCategory(f.schemeName); const sc = getSubCat(f.schemeName); return c === 'Equity' && (sc === 'Small Cap' || sc === 'Mid Cap'); });
+    else if (preset === 'Stable Income') list = list.filter(f => inferCategory(f.schemeName) === 'Debt' || inferCategory(f.schemeName) === 'Hybrid');
+
     if (cat !== 'All') list = list.filter(f => inferCategory(f.schemeName) === cat);
+    if (subCategory !== 'All') list = list.filter(f => getSubCat(f.schemeName) === subCategory);
     if (plan !== 'All') list = list.filter(f => getPlanType(f.schemeName) === plan);
     if (risk !== 'All') list = list.filter(f => RISK[inferCategory(f.schemeName)] === risk);
     if (erMax !== 'All') {
@@ -195,10 +204,10 @@ export default function Screener() {
       case 'newest': return [...list].sort((a, b) => b.schemeCode - a.schemeCode);
       default: return [...list].sort((a, b) => a.schemeName.localeCompare(b.schemeName));
     }
-  }, [funds, tab, watchlist, debouncedSearch, showClosed, cat, plan, risk, erMax, amc, sort]);
+  }, [funds, tab, watchlist, debouncedSearch, showClosed, preset, cat, subCategory, plan, risk, erMax, amc, sort]);
 
   const activeCount = useMemo(() => funds.filter(f => !isFundClosed(f.schemeName)).length, [funds]);
-  const activeFilters = [search.trim(), cat !== 'All', plan !== 'All', risk !== 'All', erMax !== 'All', amc !== 'All AMCs', showClosed].filter(Boolean).length;
+  const activeFilters = [search.trim(), cat !== 'All', subCategory !== 'All', preset !== 'All', plan !== 'All', risk !== 'All', erMax !== 'All', amc !== 'All AMCs', showClosed].filter(Boolean).length;
 
   return (
     <div className="min-h-screen pb-32 md:pb-8 md:pt-20 pt-16">
@@ -261,6 +270,21 @@ export default function Screener() {
               </label>
             </div>
 
+            {/* Quick Presets */}
+            <div>
+              <label id="quick-preset-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Quick Presets</label>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1" role="radiogroup" aria-labelledby="quick-preset-label">
+                {['All', 'Tax Saving (80C)', 'Beginner Safe', 'High Risk/Return', 'Stable Income'].map(p => (
+                  <button key={p} onClick={() => { setPreset(p); if (p !== 'All') { setCat('All'); setSubCategory('All'); } }}
+                    role="radio"
+                    aria-checked={preset === p}
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${preset === p ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                    {p === 'All' ? 'None' : p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Category */}
             <div>
               <label id="fund-category-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Fund Category</label>
@@ -278,6 +302,23 @@ export default function Screener() {
               {cat === 'Index' && <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1.5">💡 Index funds track Nifty/Sensex. Very low cost. Best for beginners.</p>}
               {cat === 'Liquid' && <p className="text-[10px] text-teal-600 dark:text-teal-400 mt-1.5">💡 Liquid funds = safe parking for emergency money. Can withdraw anytime.</p>}
             </div>
+
+            {/* Sub-Category (only show if Equity or All) */}
+            {(cat === 'Equity' || cat === 'All') && preset === 'All' && (
+            <div>
+              <label id="fund-subcat-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Equity Sub-Category</label>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1" role="radiogroup" aria-labelledby="fund-subcat-label">
+                {['All', 'Large Cap', 'Mid Cap', 'Small Cap', 'Flexi Cap', 'Large & Mid Cap', 'Multi Cap'].map(sc => (
+                  <button key={sc} onClick={() => setSubCategory(sc)}
+                    role="radio"
+                    aria-checked={subCategory === sc}
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${subCategory === sc ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                    {sc}
+                  </button>
+                ))}
+              </div>
+            </div>
+            )}
 
             {/* Plan + Risk */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
