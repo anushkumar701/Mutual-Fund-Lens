@@ -4,7 +4,7 @@ import ThemeToggle from './ThemeToggle';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { getActivePlatform, setActivePlatform } from '../utils/expenseRatio';
 
-const PLATFORMS = ['Default', 'Zerodha', 'Kuvera', 'Groww', 'INDmoney'];
+const PLATFORMS = ['Default', 'Zerodha', 'Kuvera', 'Groww', 'INDmoney', 'Regular Broker (Banks)'];
 
 const links = [
   {

@@ -79,7 +79,15 @@ function lookupAMFI(schemeName) {
   if (terEntries.length === 0) return null;
 
   const key = normalizeKey(schemeName);
-  const direct = isDirect(schemeName);
+  const platform = getActivePlatform();
+  let direct = isDirect(schemeName);
+  
+  // Force Direct plan ER for known Direct-only platforms to improve accuracy
+  if (['Zerodha', 'Kuvera', 'Groww', 'INDmoney'].includes(platform)) {
+    direct = true;
+  } else if (platform === 'Regular Broker (Banks)') {
+    direct = false;
+  }
 
   // Exact match
   const entry = terFunds[key];
