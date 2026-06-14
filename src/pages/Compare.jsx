@@ -200,6 +200,7 @@ export default function Compare() {
   useEffect(() => {
     const codeParam = searchParams.get('code');
     const fundsParam = searchParams.get('funds');
+    const terParam = searchParams.get('ter');
     
     let codesToAdd = [];
     if (codeParam) codesToAdd.push(codeParam);
@@ -208,10 +209,27 @@ export default function Compare() {
     if (codesToAdd.length > 0) {
       setCompareList((prev) => {
         const unique = new Set([...prev.map(String), ...codesToAdd.map(String)]);
-        return Array.from(unique).slice(0, 4);
+        const finalCodes = Array.from(unique).slice(0, 4);
+
+        if (terParam && fundsParam) {
+          const fundCodes = fundsParam.split(',');
+          const parsedTers = terParam.split(',');
+          const overrides = {};
+          fundCodes.forEach((code, idx) => {
+             if (parsedTers[idx] && parsedTers[idx] !== '') {
+                const val = parseFloat(parsedTers[idx]);
+                if (!isNaN(val)) overrides[String(code)] = val;
+             }
+          });
+          if (Object.keys(overrides).length > 0) {
+             setSipFundTER(prevTER => ({ ...prevTER, ...overrides }));
+          }
+        }
+
+        return finalCodes;
       });
     }
-  }, [searchParams, setCompareList]);
+  }, [searchParams, setCompareList, setSipFundTER]);
 
   // Load all codes in compareList
   useEffect(() => {
@@ -335,6 +353,17 @@ export default function Compare() {
     const url = new URL(window.location.href);
     url.searchParams.delete('code');
     url.searchParams.set('funds', compareList.join(','));
+    
+    const ters = compareList.map(code => {
+       const codeStr = String(code);
+       return sipFundTER[codeStr] !== undefined ? sipFundTER[codeStr] : '';
+    });
+    if (ters.some(t => t !== '')) {
+       url.searchParams.set('ter', ters.join(','));
+    } else {
+       url.searchParams.delete('ter');
+    }
+
     navigator.clipboard.writeText(url.toString()).then(() => {
       toast('Comparison link copied to clipboard!', 'success');
     }).catch(() => {
