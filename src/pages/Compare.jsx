@@ -13,6 +13,7 @@ import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, cal
 import { getER } from '../utils/expenseRatio';
 import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
+import MARKET_EVENTS from '../data/marketReasons.json';
 
 // ── Index Benchmarks ──────────────────────────────────────────────────────────
 const BENCHMARKS = [
@@ -1017,17 +1018,24 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Instead of subjective events, show the actual average market return as the objective "reason" for the fund's performance
-                        let event = null;
-                        if (defined.length > 0) {
+                        let event = MARKET_EVENTS[year];
+
+                        // Dynamically determine market sentiment for any unmapped future years based on actual fund performance
+                        if (!event && defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
-                          const isPositive = avgReturn >= 0;
-                          event = {
-                            label: `Overall Market: ${isPositive ? '+' : ''}${avgReturn.toFixed(1)}%`,
-                            color: isPositive
-                              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
-                          };
+                          if (avgReturn >= 25) {
+                            event = { label: '🟢 An extremely rare year where almost everything went up fast', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          } else if (avgReturn >= 12) {
+                            event = { label: '🟢 A great year for the stock market overall', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          } else if (avgReturn >= 5) {
+                            event = { label: '🟢 A slow and steady positive year', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
+                          } else if (avgReturn >= -2) {
+                            event = { label: '🟡 The market mostly stayed flat with no clear direction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                          } else if (avgReturn >= -12) {
+                            event = { label: '🟡 A tough year where the market lost some value', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
+                          } else {
+                            event = { label: '🔴 A major crash year where most funds lost heavy money', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
+                          }
                         }
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
