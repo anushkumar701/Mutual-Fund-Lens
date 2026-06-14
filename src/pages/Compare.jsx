@@ -709,126 +709,87 @@ export default function Compare() {
                 </ResponsiveContainer>
                 </div>
               ) : (
-                // Period-Returns Summary Table — range-aware
+                // Tabular view of the Relative Performance chart data — range-aware
                 (() => {
-                  const PERIOD_DEFS = [
-                    { label: '1 Month',  months: 1   },
-                    { label: '3 Months', months: 3   },
-                    { label: '6 Months', months: 6   },
-                    { label: '1 Year',   months: 12  },
-                    { label: '2 Years',  months: 24  },
-                    { label: '3 Years',  months: 36  },
-                    { label: '5 Years',  months: 60  },
-                    { label: '7 Years',  months: 84  },
-                    { label: '10 Years', months: 120 },
-                  ];
+                  if (!chartData || chartData.length === 0) {
+                    return (
+                      <div className="h-[260px] sm:h-[340px] flex items-center justify-center text-slate-400">
+                        No performance data available for this range.
+                      </div>
+                    );
+                  }
 
-                  // Map range button value → months so the table reacts to the selector
-                  // MAX maps to Infinity so every period is visible
-                  const RANGE_TO_MONTHS = {
-                    '1M': 1,   '3M': 3,   '6M': 6,
-                    '1Y': 12,  '3Y': 36,  '5Y': 60,
-                    '10Y': 120, '15Y': 180, '20Y': 240, '25Y': 300,
-                    'MAX': Infinity,
-                  };
-                  const selectedMonths = RANGE_TO_MONTHS[range] ?? Infinity;
-
-                  const calcReturn = (navData, months) => {
-                    if (!navData || navData.length === 0) return null;
-                    const latestNav = parseFloat(navData[0].nav);
-                    const latestDate = new Date(navData[0].date.split('-').reverse().join('-'));
-                    const targetDate = new Date(latestDate);
-                    targetDate.setMonth(targetDate.getMonth() - months);
-                    let closest = null, minDiff = Infinity;
-                    for (const d of navData) {
-                      const dt = new Date(d.date.split('-').reverse().join('-'));
-                      const diff = Math.abs(dt - targetDate);
-                      if (diff < minDiff) { minDiff = diff; closest = parseFloat(d.nav); }
-                    }
-                    if (!closest || minDiff > 45 * 86400000) return null;
-                    const ret = ((latestNav - closest) / closest) * 100;
-                    if (months >= 12) {
-                      const years = months / 12;
-                      return (Math.pow(latestNav / closest, 1 / years) - 1) * 100;
-                    }
-                    return ret;
-                  };
-
-                  // Show all standard periods that have data for any fund
-                  const validPeriods = PERIOD_DEFS.filter(p =>
-                    fundData.some(f => calcReturn(f.navData, p.months) !== null)
-                  );
-
-                  // Highlighted row: exact match if possible
-                  const highlightMonths = selectedMonths;
-
-                  // Keep chronological order of the periods
-                  const sorted = validPeriods;
+                  // Sort data in reverse chronological order (newest first)
+                  const tableRows = [...chartData].reverse();
 
                   return (
-                    <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg max-h-[340px]">
                       <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                          <tr>
-                            <th className="px-4 py-3 font-semibold whitespace-nowrap">Period</th>
-                            <th className="px-3 py-3 font-semibold text-slate-500 text-[10px]">Type</th>
+                          <tr className="backdrop-blur-md">
+                            <th className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50">Date</th>
                             {fundData.map((fund, i) => (
-                              <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                              <th key={fund.schemeCode} className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
                                 <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
                                   {fund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || fund.schemeCode}
                                 </div>
                               </th>
                             ))}
-                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-500">Leader</th>}
+                            {fundData.length >= 2 && <th className="px-3 py-3 font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/50">Leader</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                          {sorted.map(p => {
-                            const isSelected = p.months === highlightMonths;
-                            const rets = fundData.map(f => calcReturn(f.navData, p.months));
-                            const defined = rets.filter(r => r !== null);
-                            const bestRet = defined.length > 0 ? Math.max(...defined) : null;
-                            const leaderIdx = rets.indexOf(bestRet);
+                          {tableRows.map((row) => {
+                            let bestPct = -Infinity;
+                            let leaderIdx = -1;
+
+                            fundData.forEach((fund, idx) => {
+                              const key = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
+                              const pct = row[key];
+                              if (pct !== undefined && pct > bestPct) {
+                                bestPct = pct;
+                                leaderIdx = idx;
+                              }
+                            });
+
                             return (
-                              <tr
-                                key={p.label}
-                                className={`transition-all duration-200 ${
-                                  isSelected
-                                    ? 'bg-blue-50 dark:bg-blue-950/50 ring-1 ring-inset ring-blue-200 dark:ring-blue-800'
-                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                                }`}
-                              >
-                                <td className={`px-4 py-3 font-semibold whitespace-nowrap ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                  <div className="flex items-center gap-2">
-                                    {isSelected && (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 inline-block animate-pulse" />
-                                    )}
-                                    {p.label}
-                                  </div>
+                              <tr key={row.date} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                <td className="px-4 py-3 font-medium whitespace-nowrap text-slate-900 dark:text-white">
+                                  {row.date}
                                 </td>
-                                <td className="px-3 py-3 text-[10px] text-slate-500">
-                                  {p.months >= 12 ? 'CAGR' : 'Abs'}
-                                </td>
-                                {rets.map((ret, i) => (
-                                  <td key={i} className={`px-4 py-3 font-bold text-sm tabular-nums ${
-                                    ret === null
-                                      ? 'text-slate-300 dark:text-slate-600'
-                                      : ret >= 0
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : 'text-red-600 dark:text-red-400'
-                                  } ${isSelected ? 'text-base' : ''}`}>
-                                    <span className={i === leaderIdx && defined.length > 1 ? 'bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded' : ''}>
-                                      {ret === null ? '—' : `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`}
-                                    </span>
-                                  </td>
-                                ))}
+                                {fundData.map((fund, idx) => {
+                                  const key = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
+                                  const pct = row[key];
+                                  const rawNav = row[`${key}_raw`];
+
+                                  return (
+                                    <td key={idx} className="px-4 py-3 whitespace-nowrap">
+                                      {pct !== undefined ? (
+                                        <div className="flex flex-col">
+                                          <span className={`font-semibold ${pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                                          </span>
+                                          {rawNav !== undefined && (
+                                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                              ₹{parseFloat(rawNav).toFixed(2)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400">N/A</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
                                 {fundData.length >= 2 && (
-                                  <td className="px-3 py-3 text-[10px]">
-                                    {leaderIdx >= 0 && defined.length > 1 ? (
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                        {fundData[leaderIdx]?.meta?.scheme_name?.split(' ')[0] || `Fund ${leaderIdx + 1}`}
+                                  <td className="px-3 py-3 font-medium whitespace-nowrap text-slate-500">
+                                    {leaderIdx !== -1 ? (
+                                      <span className="flex items-center gap-1">
+                                        👑 <span className="text-[11px] font-bold" style={{ color: CHART_COLORS[leaderIdx % CHART_COLORS.length] }}>
+                                          {fundData[leaderIdx].meta?.scheme_name?.split(' ').slice(0, 2).join(' ') || `Fund ${leaderIdx + 1}`}
+                                        </span>
                                       </span>
-                                    ) : '—'}
+                                    ) : 'N/A'}
                                   </td>
                                 )}
                               </tr>
@@ -836,14 +797,6 @@ export default function Compare() {
                           })}
                         </tbody>
                       </table>
-                      <p className="text-[10px] text-slate-400 p-3 flex flex-wrap gap-x-3 gap-y-1">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-                          Selected period (matches chart range)
-                        </span>
-                        <span>Returns for 1Y+ are CAGR (annualised).</span>
-                        <span>Highlighted cell = best performer for that period.</span>
-                      </p>
                     </div>
                   );
                 })()
