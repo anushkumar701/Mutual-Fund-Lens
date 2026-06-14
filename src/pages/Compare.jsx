@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { getER } from '../utils/expenseRatio';
-import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey, buildRollingChartData } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 import MARKET_EVENTS from '../data/marketReasons.json';
 
@@ -51,7 +51,6 @@ export default function Compare() {
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
-  const [rollingPeriod, setRollingPeriod] = useState(3);
   const toast = useToast();
 
   // ── Benchmark state ──────────────────────────────────────────────────────────
@@ -335,15 +334,6 @@ export default function Compare() {
     }
     return data;
   }, [fundData, range, activeBenchmark, benchmarkData]);
-
-  const rollingChartData = useMemo(() => {
-    const allFunds = [...fundData];
-    if (activeBenchmark && benchmarkData) {
-      const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
-      allFunds.push({ schemeCode: `bm_${activeBenchmark}`, meta: { scheme_name: bm.label }, navData: benchmarkData });
-    }
-    return buildRollingChartData(allFunds, rollingPeriod);
-  }, [fundData, rollingPeriod, activeBenchmark, benchmarkData]);
 
   // Annual calendar-year returns — O(n log n) via binary search
   const annualReturns = useMemo(() => {
@@ -994,139 +984,6 @@ export default function Compare() {
                 </p>
               )}
             </div>
-
-            {/* ── Rolling Returns Chart ── */}
-            {fundData.length > 0 && rollingChartData.length > 0 && (
-              <div className="card p-3 sm:p-5 mt-4 sm:mt-6">
-                <div className="flex flex-col gap-3 mb-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">🔄 Rolling Returns</h2>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Shows the annualized return over rolling periods to visualize consistency</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between border-t border-slate-100 dark:border-slate-800/80 pt-3">
-                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
-                      {[1, 3, 5, 10].map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setRollingPeriod(r)}
-                          className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                            rollingPeriod === r
-                              ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                          }`}
-                        >
-                          {r} Year
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-1" style={{ width: '100%', height: 360 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={rollingChartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
-                      <CartesianGrid vertical={false} stroke={isDark ? 'rgba(148,163,184,0.08)' : 'rgba(148,163,184,0.18)'} />
-                      <XAxis
-                        dataKey="date"
-                        tickLine={false}
-                        axisLine={{ stroke: isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.3)', strokeWidth: 1 }}
-                        minTickGap={52}
-                        dy={6}
-                        tick={(props) => {
-                          const { x, y, payload } = props;
-                          if (!payload?.value) return null;
-                          const [dd, mm, yyyy] = payload.value.split('-');
-                          const d = new Date(`${yyyy}-${mm}-${dd}`);
-                          if (isNaN(d.getTime())) return null;
-                          const textColor = isDark ? '#94a3b8' : '#64748b';
-                          return (
-                            <g transform={`translate(${x},${y})`}>
-                              <text x={0} y={14} textAnchor="middle" fill={textColor} fontSize={11} fontWeight={600} fontFamily="inherit">
-                                {d.toLocaleDateString('en-US', { month: 'short' })}
-                              </text>
-                              <text x={0} y={26} textAnchor="middle" fill={isDark ? '#64748b' : '#94a3b8'} fontSize={10} fontFamily="inherit">
-                                {d.toLocaleDateString('en-US', { year: 'numeric' })}
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        width={62}
-                        dx={-2}
-                        domain={[(dataMin) => Math.floor(dataMin - 2), (dataMax) => Math.ceil(dataMax + 2)]}
-                        tickFormatter={(val) => `${val}%`}
-                        tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                          borderRadius: '12px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                          padding: '12px',
-                          color: isDark ? '#f8fafc' : '#0f172a',
-                          fontSize: '12px',
-                          backdropFilter: 'blur(8px)',
-                        }}
-                        itemStyle={{ fontWeight: 600, padding: '2px 0' }}
-                        labelStyle={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600, marginBottom: '8px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                        formatter={(value) => [`${Number(value).toFixed(2)}%`]}
-                        labelFormatter={(label) => {
-                           const [dd, mm, yyyy] = String(label).split('-');
-                           return `${new Date(`${yyyy}-${mm}-${dd}`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-                        }}
-                      />
-                      
-                      {fundData.map((f, i) => {
-                        const rawKey = f.meta?.scheme_name || String(f.schemeCode);
-                        const dataKey = sanitizeDataKey(rawKey);
-                        return (
-                          <Line
-                            key={f.schemeCode}
-                            type="monotone"
-                            dataKey={dataKey}
-                            name={f.meta?.scheme_name || f.schemeCode}
-                            stroke={activeColors[i % activeColors.length]}
-                            strokeWidth={2}
-                            dot={false}
-                            connectNulls={true}
-                            activeDot={{ r: 4, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff' }}
-                            animationDuration={600}
-                          />
-                        );
-                      })}
-
-                      {/* Benchmark Line */}
-                      {(() => {
-                        if (!activeBenchmark || !benchmarkData) return null;
-                        const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
-                        if (!bm) return null;
-                        return (
-                          <Line
-                            key={bm.id}
-                            type="monotone"
-                            dataKey={sanitizeDataKey(bm.label)}
-                            name={bm.label}
-                            stroke={bm.color}
-                            strokeWidth={1.8}
-                            strokeDasharray="6 4"
-                            dot={false}
-                            connectNulls={true}
-                            activeDot={{ r: 4, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: bm.color }}
-                            animationDuration={600}
-                          />
-                        );
-                      })()}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
 
             {/* ── Annual Returns Table ── */}
             {annualReturns.years.length > 0 && (
