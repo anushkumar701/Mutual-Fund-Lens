@@ -558,6 +558,9 @@ export default function SIPCalculator() {
                   <button
                     id="inflation-toggle"
                     onClick={() => setInflationMode(!inflationMode)}
+                    role="switch"
+                    aria-checked={inflationMode}
+                    aria-label="Toggle inflation adjustment"
                     className={`relative w-11 h-6 rounded-full transition-colors ${inflationMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
                   >
                     <span

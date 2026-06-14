@@ -60,6 +60,58 @@
     color-scheme: dark;
   }
 
+  /* ══ PREMIUM THEMES OVERRIDES ══ */
+  
+  /* Theme: Bloomberg Terminal Black (Pure OLED Black) */
+  html[data-theme="bloomberg"] body {
+    background-color: #000000 !important;
+    color: #e5e5e5 !important;
+  }
+  html[data-theme="bloomberg"] .card,
+  html[data-theme="bloomberg"] .dark\:bg-\[\#161b27\],
+  html[data-theme="bloomberg"] .dark\:bg-slate-800 {
+    background-color: #0a0a0a !important;
+    border-color: #222222 !important;
+  }
+  html[data-theme="bloomberg"] .dark\:bg-[#0d1117],
+  html[data-theme="bloomberg"] .dark\:bg-slate-900 {
+    background-color: #000000 !important;
+  }
+  html[data-theme="bloomberg"] .dark\:bg-slate-700,
+  html[data-theme="bloomberg"] .dark\:hover\:bg-slate-700:hover {
+    background-color: #1a1a1a !important;
+  }
+  html[data-theme="bloomberg"] .dark\:border-slate-700,
+  html[data-theme="bloomberg"] .dark\:border-slate-800,
+  html[data-theme="bloomberg"] .dark\:border-slate-800\/50 {
+    border-color: #222222 !important;
+  }
+
+  /* Theme: Midnight Blue (Deep Rich Blue) */
+  html[data-theme="midnight"] body {
+    background-color: #020617 !important; /* Tailwind slate-950 */
+    color: #f8fafc !important;
+  }
+  html[data-theme="midnight"] .card,
+  html[data-theme="midnight"] .dark\:bg-\[\#161b27\],
+  html[data-theme="midnight"] .dark\:bg-slate-800 {
+    background-color: #0f172a !important; /* Tailwind slate-900 */
+    border-color: #1e293b !important;
+  }
+  html[data-theme="midnight"] .dark\:bg-[#0d1117],
+  html[data-theme="midnight"] .dark\:bg-slate-900 {
+    background-color: #020617 !important;
+  }
+  html[data-theme="midnight"] .dark\:bg-slate-700,
+  html[data-theme="midnight"] .dark\:hover\:bg-slate-700:hover {
+    background-color: #1e293b !important;
+  }
+  html[data-theme="midnight"] .dark\:border-slate-700,
+  html[data-theme="midnight"] .dark\:border-slate-800,
+  html[data-theme="midnight"] .dark\:border-slate-800\/50 {
+    border-color: #1e293b !important;
+  }
+
   * {
     box-sizing: border-box;
   }

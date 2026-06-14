@@ -65,7 +65,7 @@
       DO NOT modify whitespace inside this script without regenerating the hash.
     -->
     <script>
-(function(){var t=localStorage.getItem('fundlens_theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}})();
+(function(){var t=localStorage.getItem('fundlens_theme');var d=t==='dark'||t==='bloomberg'||t==='midnight';if(d||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}if(t==='bloomberg'||t==='midnight'){document.documentElement.setAttribute('data-theme',t);}})();
     </script>
 
     <!--
