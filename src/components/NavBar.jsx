@@ -2,6 +2,9 @@
 import { NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { getActivePlatform, setActivePlatform } from '../utils/expenseRatio';
+
+const PLATFORMS = ['Default', 'Zerodha', 'Kuvera', 'Groww', 'INDmoney'];
 
 const links = [
   {
@@ -132,10 +135,21 @@ export default function NavBar() {
           )}
         </div>
 
+        <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-4">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden lg:block">Broker:</span>
+          <select
+            value={getActivePlatform()}
+            onChange={e => setActivePlatform(e.target.value)}
+            className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500 font-medium transition-colors cursor-pointer"
+          >
+            {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
         <ThemeToggle />
       </nav>
 
-      {/* Mobile header bar (logo + theme toggle) */}
+      {/* Mobile header bar (logo + broker + theme toggle) */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4">
         <NavLink to="/" aria-label="FundLens home" className="flex items-center gap-2">
           <svg className="w-6 h-6 text-blue-600" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -145,7 +159,17 @@ export default function NavBar() {
             Fund<span className="text-blue-600">Lens</span>
           </span>
         </NavLink>
-        <ThemeToggle />
+        
+        <div className="flex items-center gap-3">
+          <select
+            value={getActivePlatform()}
+            onChange={e => setActivePlatform(e.target.value)}
+            className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-1 outline-none font-medium"
+          >
+            {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Mobile bottom navigation */}
