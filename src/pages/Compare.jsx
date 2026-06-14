@@ -44,6 +44,12 @@ export default function Compare() {
   const errorTimerRef = useRef(null);
   const loadingCodesRef = useRef(new Set());
   const isMountedRef = useRef(true);
+  const failedCodesRef = useRef(new Set());
+  const fundDataRef = useRef(fundData);
+
+  useEffect(() => {
+    fundDataRef.current = fundData;
+  }, [fundData]);
 
   useEffect(() => {
     return () => {
@@ -58,9 +64,9 @@ export default function Compare() {
     errorTimerRef.current = setTimeout(() => setFetchError(''), 4000);
   };
 
-    const loadFund = useCallback(async (code) => {
+  const loadFund = useCallback(async (code) => {
     const codeStr = String(code);
-    if (fundData.find((f) => f.schemeCode === codeStr) || loadingCodesRef.current.has(codeStr)) return;
+    if (fundDataRef.current.find((f) => String(f.schemeCode) === codeStr) || loadingCodesRef.current.has(codeStr)) return;
 
     loadingCodesRef.current.add(codeStr);
     setLoadingCode(codeStr);
@@ -74,17 +80,19 @@ export default function Compare() {
 
       setFundData((prev) => {
         const nextFund = { schemeCode: codeStr, meta: data.meta, navData: data.data };
-        return prev.some((f) => f.schemeCode === codeStr)
-          ? prev.map((f) => (f.schemeCode === codeStr ? nextFund : f))
+        return prev.some((f) => String(f.schemeCode) === codeStr)
+          ? prev.map((f) => (String(f.schemeCode) === codeStr ? nextFund : f))
           : [...prev, nextFund];
       });
       setRecentList((prev) => {
-        const list = prev.filter((c) => c !== codeStr);
+        const list = prev.filter((c) => String(c) !== codeStr);
         return [codeStr, ...list].slice(0, 6);
       });
       setFetchError(''); // clear error on success
+      failedCodesRef.current.delete(codeStr);
     } catch (err) {
       if (isMountedRef.current) {
+        failedCodesRef.current.add(codeStr);
         const msg = err?.response?.status === 404
           ? `Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`
           : 'Network error. Please check your connection and try again.';
@@ -97,7 +105,7 @@ export default function Compare() {
         setLoadingCode(null);
       }
     }
-  }, [fundData, toast, setRecentList]);
+  }, [toast, setRecentList]);
 
   // Load from URL param
   useEffect(() => {
@@ -119,7 +127,8 @@ export default function Compare() {
   // Load all codes in compareList
   useEffect(() => {
     compareList.forEach((code) => {
-      if (!fundData.find((f) => String(f.schemeCode) === String(code))) {
+      const codeStr = String(code);
+      if (!failedCodesRef.current.has(codeStr) && !fundData.find((f) => String(f.schemeCode) === codeStr)) {
         loadFund(code);
       }
     });
@@ -127,6 +136,7 @@ export default function Compare() {
 
   const handleAddCode = (code) => {
     const codeStr = String(code);
+    failedCodesRef.current.delete(codeStr);
     if (compareList.length >= 4) {
       showError('You can compare up to 4 funds at a time.');
       return;
