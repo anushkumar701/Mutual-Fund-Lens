@@ -43,7 +43,7 @@ export default function Compare() {
   // Load funds from compareList
   const errorTimerRef = useRef(null);
   const loadingCodesRef = useRef(new Set());
-  const isMountedRef = useRef(true);
+  const isMountedRef = useRef(false);
   const failedCodesRef = useRef(new Set());
   const fundDataRef = useRef(fundData);
 
@@ -51,7 +51,12 @@ export default function Compare() {
     fundDataRef.current = fundData;
   }, [fundData]);
 
+  // Track mount/unmount; also clear stale loading state on each fresh mount
   useEffect(() => {
+    isMountedRef.current = true;
+    // Clear any stale loading codes from a previous Strict-Mode double-invoke
+    loadingCodesRef.current.clear();
+    setLoadingCode(null);
     return () => {
       isMountedRef.current = false;
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
@@ -72,27 +77,30 @@ export default function Compare() {
     setLoadingCode(codeStr);
     setFetchError('');
     let timerId = setTimeout(() => {
-      toast('Fetching live data, please hold on...', 'info', 4000);
+      if (isMountedRef.current) toast('Fetching live data, please hold on...', 'info', 4000);
     }, 5000);
     try {
       const data = await fetchFundDetail(codeStr);
-      if (!isMountedRef.current) return;
 
-      setFundData((prev) => {
-        const nextFund = { schemeCode: codeStr, meta: data.meta, navData: data.data };
-        return prev.some((f) => String(f.schemeCode) === codeStr)
-          ? prev.map((f) => (String(f.schemeCode) === codeStr ? nextFund : f))
-          : [...prev, nextFund];
-      });
+      // Only update state if still mounted
+      if (isMountedRef.current) {
+        setFundData((prev) => {
+          const nextFund = { schemeCode: codeStr, meta: data.meta, navData: data.data };
+          return prev.some((f) => String(f.schemeCode) === codeStr)
+            ? prev.map((f) => (String(f.schemeCode) === codeStr ? nextFund : f))
+            : [...prev, nextFund];
+        });
+        setFetchError('');
+        failedCodesRef.current.delete(codeStr);
+      }
+      // Always update recent list (safe side-effect)
       setRecentList((prev) => {
         const list = prev.filter((c) => String(c) !== codeStr);
         return [codeStr, ...list].slice(0, 6);
       });
-      setFetchError(''); // clear error on success
-      failedCodesRef.current.delete(codeStr);
     } catch (err) {
+      failedCodesRef.current.add(codeStr);
       if (isMountedRef.current) {
-        failedCodesRef.current.add(codeStr);
         const msg = err?.response?.status === 404
           ? `Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`
           : 'Network error. Please check your connection and try again.';
@@ -101,9 +109,8 @@ export default function Compare() {
     } finally {
       clearTimeout(timerId);
       loadingCodesRef.current.delete(codeStr);
-      if (isMountedRef.current) {
-        setLoadingCode(null);
-      }
+      // Always clear loading state — safe to call on unmounted components
+      setLoadingCode(null);
     }
   }, [toast, setRecentList]);
 
