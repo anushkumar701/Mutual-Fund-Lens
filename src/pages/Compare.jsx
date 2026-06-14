@@ -74,9 +74,7 @@ export default function Compare() {
   const [removedFund, setRemovedFund] = useState(null); // { code, meta, navData }
   const undoTimerRef = useRef(null);
 
-  // ── Share card state ─────────────────────────────────────────────────────────
-  const [showShareCard, setShowShareCard] = useState(false);
-  const shareCardRef = useRef(null);
+  // ── Share card state removed — Export PNG now captures full page
 
 
   // SIP comparison state
@@ -268,14 +266,30 @@ export default function Compare() {
     const el = document.getElementById('compare-export-area');
     if (!el) return;
     try {
+      toast('Generating full-page export…', 'info');
       const html2canvasModule = await import('html2canvas');
-      const canvas = await html2canvasModule.default(el, { backgroundColor: document.documentElement.classList.contains('dark') ? '#0f172a' : '#f8fafc' });
+      // Capture the FULL element — not just the visible viewport portion.
+      // scrollWidth/scrollHeight give total rendered dimensions regardless of scroll.
+      const canvas = await html2canvasModule.default(el, {
+        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+        useCORS: true,
+        logging: false,
+        allowTaint: false,
+        // Full element dimensions
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        // Offset for current scroll so off-screen content is included
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
+        windowWidth: Math.max(document.documentElement.scrollWidth, el.scrollWidth),
+        windowHeight: el.scrollHeight,
+      });
       const link = document.createElement('a');
       link.download = `fundlens-comparison-${new Date().toISOString().slice(0, 10)}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch {
-      showError('Failed to generate export image.');
+      toast('Failed to generate export image.', 'error');
     }
   };
 
@@ -332,25 +346,8 @@ export default function Compare() {
       .slice(0, 3);
   }, [funds, compareList]);
 
-  // ── Share card export ────────────────────────────────────────────────────────
-  const exportShareCard = async () => {
-    if (!shareCardRef.current) return;
-    try {
-      const html2canvasModule = await import('html2canvas');
-      const canvas = await html2canvasModule.default(shareCardRef.current, {
-        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        scale: 2,
-      });
-      const link = document.createElement('a');
-      link.download = `fundlens-comparison-${new Date().toISOString().slice(0, 10)}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch {
-      showError('Failed to generate share card.');
-    }
-  };
 
-  // Annual calendar-year returns — O(n log n) via binary search (was O(n²) linear scan)
+  // Annual calendar-year returns — O(n log n) via binary search
   const annualReturns = useMemo(() => {
     if (fundData.length === 0) return { years: [], data: {} };
     const now = new Date();
@@ -577,10 +574,7 @@ export default function Compare() {
                 <button onClick={handleCopyLink} aria-label="Share comparison link" className="btn-secondary text-xs px-3 py-2 border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
                   🔗 Share Link
                 </button>
-                <button onClick={() => setShowShareCard(true)} aria-label="Generate shareable comparison card" className="btn-secondary text-xs px-3 py-2 border-purple-200 text-purple-600 dark:border-purple-800 dark:text-purple-400">
-                  🃏 Share Card
-                </button>
-                <button onClick={handleExport} aria-label="Export comparison as PNG image" className="btn-secondary text-xs px-3 py-2">
+                <button onClick={handleExport} aria-label="Export full comparison as PNG image" className="btn-secondary text-xs px-3 py-2">
                   📸 Export PNG
                 </button>
                 <button id="clear-all-btn" onClick={clearAll} aria-label="Clear all compared funds" className="btn-secondary text-red-500 border-red-200 dark:border-red-800 text-xs px-3 py-2">
@@ -1496,85 +1490,6 @@ export default function Compare() {
 
         </div>
       </div>
-
-      {/* ── Share Card Modal ───────────────────────────────────────────────── */}
-      {showShareCard && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setShowShareCard(false); }}
-        >
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="font-bold text-slate-900 dark:text-white">Share Comparison Card</h3>
-              <button onClick={() => setShowShareCard(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xl leading-none">&times;</button>
-            </div>
-
-            {/* The card that gets exported — inline styles so html2canvas can render the gradient */}
-            <div
-              ref={shareCardRef}
-              style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0c1a3a 50%, #1e1b4b 100%)', padding: '24px', borderRadius: '0 0 0 0' }}
-            >
-              {/* Branding */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                <span style={{ color: '#60a5fa', fontSize: '18px', fontWeight: 'bold' }}>📈 FundLens</span>
-                <span style={{ color: '#64748b', fontSize: '11px' }}>Fund Comparison</span>
-                <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: '11px' }}>
-                  {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </span>
-              </div>
-
-              {/* Fund rows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {fundData.map((fund, i) => {
-                  const m = calculateFundMetrics(fund.navData);
-                  const ret1Y  = m?.return1Y  ?? null;
-                  const ret3Y  = m?.return3Y  ?? null;   // ← correct field name
-                  return (
-                    <div
-                      key={fund.schemeCode}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px 16px', border: '1px solid rgba(255,255,255,0.1)' }}
-                    >
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, backgroundColor: activeColors[i % activeColors.length], display: 'inline-block' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ color: '#fff', fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {fund.meta?.scheme_name || fund.schemeCode}
-                        </p>
-                        <p style={{ color: '#94a3b8', fontSize: '10px', marginTop: '2px' }}>{fund.meta?.scheme_category || ''}</p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '16px', flexShrink: 0, textAlign: 'right' }}>
-                        <div>
-                          <p style={{ color: '#64748b', fontSize: '10px' }}>1Y Return</p>
-                          <p style={{ color: ret1Y !== null && ret1Y >= 0 ? '#34d399' : '#f87171', fontSize: '13px', fontWeight: 700 }}>
-                            {ret1Y !== null ? `${ret1Y >= 0 ? '+' : ''}${ret1Y.toFixed(1)}%` : 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p style={{ color: '#64748b', fontSize: '10px' }}>3Y CAGR</p>
-                          <p style={{ color: ret3Y !== null && ret3Y >= 0 ? '#34d399' : '#f87171', fontSize: '13px', fontWeight: 700 }}>
-                            {ret3Y !== null ? `${ret3Y >= 0 ? '+' : ''}${ret3Y.toFixed(1)}%` : 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Footer */}
-              <p style={{ color: '#475569', fontSize: '9px', textAlign: 'center', marginTop: '20px' }}>
-                Generated by FundLens · Historical returns, not a guarantee of future performance
-              </p>
-            </div>
-
-            {/* Download button */}
-            <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              <button onClick={() => setShowShareCard(false)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
-              <button onClick={exportShareCard} className="btn-primary text-sm px-4 py-2">⬇️ Download PNG</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
