@@ -8,24 +8,7 @@ import ErrorState from '../components/ErrorState';
 import { inferCategory } from '../utils/goalFilters';
 import { extractAMC, getPlanType, isFundClosed } from '../utils/fundFilters';
 import { getExpenseRatio, getER } from '../utils/expenseRatio';
-import { useSparkline } from '../hooks/useSparkline';
 
-// ─── Mini Sparkline SVG ────────────────────────────────────────────
-function MiniSparkline({ navData }) {
-  if (!navData || navData.length < 3) return null;
-  const vals = navData.map(d => parseFloat(d.nav)).filter(v => v > 0);
-  if (vals.length < 3) return null;
-  const min = Math.min(...vals), max = Math.max(...vals);
-  const range = max - min || 1;
-  const W = 80, H = 28;
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * W},${H - ((v - min) / range) * H}`).join(' ');
-  const isUp = vals[vals.length - 1] >= vals[0];
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <polyline points={pts} fill="none" stroke={isUp ? '#10b981' : '#ef4444'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 // lazy must be declared after all static imports
 const FundDetailModal = lazy(() => import('../components/FundDetailModal'));
@@ -60,10 +43,9 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
   const isWL = watchlist.map(String).includes(code);
   const isCmp = compareList.map(String).includes(code);
   const borderColor = CAT_COLOR[cat] || '#94a3b8';
-  const { navData, loading: sparkLoading, ref: sparkRef } = useSparkline(fund.schemeCode);
 
   return (
-    <div ref={sparkRef} className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden transition-all hover:shadow-lg ${closed ? 'opacity-70' : ''}`}
+    <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden transition-all hover:shadow-lg ${closed ? 'opacity-70' : ''}`}
       style={{ borderTop: `3px solid ${borderColor}` }}>
       {/* Closed banner */}
       {closed && (
@@ -103,11 +85,6 @@ function FundCard({ fund, watchlist, setWatchlist, compareList, setCompareList, 
           </div>
         </div>
 
-        {/* Sparkline */}
-        <div className="h-8 -mx-1 mb-1">
-          {sparkLoading && <div className="h-full bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />}
-          {!sparkLoading && navData && <MiniSparkline navData={navData} />}
-        </div>
 
         {/* ER + plan tip */}
         <div className="flex items-center justify-between text-[10px]">
