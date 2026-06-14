@@ -1,5 +1,5 @@
 // hooks/useLocalStorage.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -24,7 +24,7 @@ export function useLocalStorage(key, initialValue) {
     return () => window.removeEventListener('storage', handler);
   }, [key]);
 
-  const setValue = (value) => {
+  const setValue = useCallback((value) => {
     try {
       // Read current persisted value to resolve functional updates correctly
       let current = initialValue;
@@ -36,10 +36,9 @@ export function useLocalStorage(key, initialValue) {
       setStoredValue(valueToStore);
     } catch {
       // Storage quota exceeded / private mode — fall back to in-memory state only
-      const current = storedValue;
-      setStoredValue(value instanceof Function ? value(current) : value);
+      setStoredValue((current) => value instanceof Function ? value(current) : value);
     }
-  };
+  }, [key, initialValue]);
 
   return [storedValue, setValue];
 }
