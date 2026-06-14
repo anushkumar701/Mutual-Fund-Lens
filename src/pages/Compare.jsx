@@ -1017,9 +1017,35 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Dynamically determine market sentiment based on actual fund performance (Future-proof)
-                        let event = null;
-                        if (defined.length > 0) {
+                        // Highly accurate historical market events for context
+                        const MARKET_EVENTS = {
+                          2000: { label: '🔴 Dot-Com Bubble Burst', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2001: { label: '🔴 9/11 Shock & Global Slowdown', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2003: { label: '🟢 Post Dot-Com Recovery Rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2004: { label: '🟢 UPA-1 Election & Growth Surge', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2006: { label: '🟢 Global Liquidity Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2008: { label: '🔴 Global Financial Crisis (Lehman Collapse)', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2009: { label: '🟢 Post-GFC Stimulus & V-Shape Recovery', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2010: { label: '🟢 Continued Economic Expansion', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2011: { label: '🟡 Eurozone Debt Crisis & High Inflation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2013: { label: '🟡 "Taper Tantrum" & INR Depreciation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2014: { label: '🟢 Modi 1.0 "Hope Rally" & Oil Price Crash', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2015: { label: '🟡 China Market Crash & Global Sell-off', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2016: { label: '🟡 Demonetisation Shock & US Elections', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2017: { label: '🟢 Synchronized Global Growth & GST Rollout', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2018: { label: '🟡 IL&FS Crisis & Midcap Correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2019: { label: '🟡 Corporate Tax Cut Rally vs NBFC Slowdown', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+                          2020: { label: '🔴 COVID-19 Crash & Historic Liquidity Rally', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2021: { label: '🟢 Post-COVID Tech Boom & Retail Inflows', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2022: { label: '🔴 Russia-Ukraine War & Rate Hike Cycle', color: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' },
+                          2023: { label: '🟢 Peak Interest Rates & Mid/Small-cap Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                          2024: { label: '🟢 Election Continuity & Broad Market Strength', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+                        };
+
+                        let event = MARKET_EVENTS[year];
+
+                        // Dynamically determine market sentiment for any future or unmapped years based on actual fund performance
+                        if (!event && defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
                           if (avgReturn >= 25) {
                             event = { label: '🟢 Exceptional Bull Run', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
