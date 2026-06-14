@@ -83,6 +83,8 @@ export default function Compare() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [filterDirectOnly, setFilterDirectOnly] = useLocalStorage('fundlens_search_direct', true);
+  const [filterGrowthOnly, setFilterGrowthOnly] = useLocalStorage('fundlens_search_growth', true);
 
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState('');
@@ -276,13 +278,18 @@ export default function Compare() {
   const filteredSearch = useMemo(() => {
     if (!debouncedSearchQuery.trim() || !funds) return [];
     const q = debouncedSearchQuery.toLowerCase();
-    return funds
-      .filter((f) =>
-        f.schemeName.toLowerCase().includes(q) ||
-        f.schemeCode.toString().includes(debouncedSearchQuery)
-      )
-      .slice(0, 20); // Increased slice to show more items across the 3 categories
-  }, [debouncedSearchQuery, funds]);
+    const matches = funds.filter((f) => {
+      const name = f.schemeName.toLowerCase();
+      // Apply the user's smart filters
+      if (filterDirectOnly && !name.includes('direct')) return false;
+      if (filterGrowthOnly && (name.includes('idcw') || name.includes('dividend'))) return false;
+
+      return name.includes(q) || f.schemeCode.toString().includes(debouncedSearchQuery);
+    });
+
+    // Sort to prioritize shortest name length first (usually the main parent fund)
+    return matches.sort((a, b) => a.schemeName.length - b.schemeName.length).slice(0, 15);
+  }, [debouncedSearchQuery, funds, filterDirectOnly, filterGrowthOnly]);
 
   const removeFund = (code) => {
     const codeStr = String(code);
@@ -669,52 +676,18 @@ export default function Compare() {
               
               {/* Autocomplete Dropdown */}
               {showDropdown && searchQuery && filteredSearch.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
-                  {(() => {
-                    const directGrowth = [];
-                    const directIdcw = [];
-                    const regular = [];
-                    filteredSearch.forEach(f => {
-                      const name = f.schemeName.toLowerCase();
-                      const isDirect = name.includes('direct');
-                      const isIdcw = name.includes('idcw') || name.includes('dividend');
-                      if (!isDirect) regular.push(f);
-                      else if (isIdcw) directIdcw.push(f);
-                      else directGrowth.push(f);
-                    });
-
-                    const renderGroup = (title, items) => {
-                      if (items.length === 0) return null;
-                      return (
-                        <div className="py-1">
-                          <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900/50 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center sticky top-0 z-10 backdrop-blur-sm">
-                            {title}
-                          </div>
-                          {items.map((f) => (
-                            <button
-                              key={f.schemeCode}
-                              type="button"
-                              onClick={() => handleAddCode(f.schemeCode)}
-                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center group"
-                            >
-                              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-1 pr-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{f.schemeName}</span>
-                              <span className="text-[10px] text-slate-500 font-mono bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md shrink-0">#{f.schemeCode}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    };
-
-                    return (
-                      <>
-                        {renderGroup("Direct Funds (Growth)", directGrowth)}
-                        {directGrowth.length > 0 && directIdcw.length > 0 && <div className="border-t border-slate-200 dark:border-slate-700" />}
-                        {renderGroup("Direct Funds (IDCW)", directIdcw)}
-                        {(directGrowth.length > 0 || directIdcw.length > 0) && regular.length > 0 && <div className="border-t border-slate-200 dark:border-slate-700" />}
-                        {renderGroup("Regular Funds", regular)}
-                      </>
-                    );
-                  })()}
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
+                  {filteredSearch.map((f) => (
+                    <button
+                      key={f.schemeCode}
+                      type="button"
+                      onClick={() => handleAddCode(f.schemeCode)}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center"
+                    >
+                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-1 pr-4">{f.schemeName}</span>
+                      <span className="text-xs text-slate-500 font-mono shrink-0">#{f.schemeCode}</span>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -726,6 +699,25 @@ export default function Compare() {
               {loadingCode ? (
                 <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Loading…</span>
               ) : '+ Add'}
+            </button>
+          </div>
+          
+          {/* Smart Search Filter Chips */}
+          <div className="flex items-center gap-3 mt-2 px-1">
+            <span className="text-xs text-slate-500 font-medium">Smart Filters:</span>
+            <button
+              type="button"
+              onClick={() => setFilterDirectOnly(!filterDirectOnly)}
+              className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterDirectOnly ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              {filterDirectOnly ? '✓ Direct Only' : 'Direct Only'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterGrowthOnly(!filterGrowthOnly)}
+              className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterGrowthOnly ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              {filterGrowthOnly ? '✓ Growth Only' : 'Growth Only'}
             </button>
           </div>
         </form>
