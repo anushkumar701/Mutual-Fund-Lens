@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { getER } from '../utils/expenseRatio';
-import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, toMonthlyData, toWeeklyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
 export default function Compare() {
@@ -29,7 +29,6 @@ export default function Compare() {
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
   const [viewMode, setViewMode] = useState('chart'); // 'chart' | 'table'
-  const [rollingYears, setRollingYears] = useState(3); // for adjustable rolling returns
   const toast = useToast();
 
   // SIP comparison state
@@ -229,6 +228,22 @@ export default function Compare() {
     }
     return data;
   }, [fundData, range]);
+
+  // Table data: aggregated per selected range for readability
+  // 1M/3M → weekly snapshots | 6M/1Y → monthly | 3Y+ → already monthly via chartData
+  const tableData = useMemo(() => {
+    const raw = buildChartData(fundData, range);
+    if (['1M', '3M'].includes(range)) return toWeeklyData(raw);
+    if (['6M', '1Y'].includes(range)) return toMonthlyData(raw);
+    // 3Y+ already collapsed to monthly in chartData — reuse
+    return toMonthlyData(raw);
+  }, [fundData, range]);
+
+  // Label for table date column based on range
+  const tableDateLabel = useMemo(() => {
+    if (['1M', '3M'].includes(range)) return 'Week of';
+    return 'Month of';
+  }, [range]);
 
   // Annual calendar-year returns — O(n log n) via binary search (was O(n²) linear scan)
   const annualReturns = useMemo(() => {
@@ -728,9 +743,9 @@ export default function Compare() {
                 </ResponsiveContainer>
                 </div>
               ) : (
-                // Tabular view of the Relative Performance chart data — range-aware
+                // Tabular view — aggregated by week (1M/3M) or month (6M+) for readability
                 (() => {
-                  if (!chartData || chartData.length === 0) {
+                  if (!tableData || tableData.length === 0) {
                     return (
                       <div className="h-[260px] sm:h-[340px] flex items-center justify-center text-slate-400">
                         No performance data available for this range.
@@ -738,15 +753,15 @@ export default function Compare() {
                     );
                   }
 
-                  // Sort data in reverse chronological order (newest first)
-                  const tableRows = [...chartData].reverse();
+                  // Newest first
+                  const tableRows = [...tableData].reverse();
 
                   return (
                     <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg max-h-[340px]">
                       <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
                           <tr className="backdrop-blur-md">
-                            <th className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50">Date</th>
+                            <th className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50">{tableDateLabel}</th>
                             {fundData.map((fund, i) => (
                               <th key={fund.schemeCode} className="px-4 py-3 font-semibold bg-slate-50 dark:bg-slate-800/50" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
                                 <div className="line-clamp-1 max-w-[140px]" title={fund.meta?.scheme_name}>
@@ -820,6 +835,7 @@ export default function Compare() {
                   );
                 })()
               )}
+
               {chartData.length === 0 && (
                 <p className="text-center text-sm text-slate-400 dark:text-slate-500 mt-4">
                   No chart data available for selected range.
@@ -957,91 +973,8 @@ export default function Compare() {
               </div>
             )}
 
-            {/* ── Adjustable Rolling Returns ── */}
-            {fundData.length > 0 && (
-              <div className="card p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <div>
-                    <h2 className="font-bold text-slate-900 dark:text-white text-lg">📉 Rolling Returns Analysis</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Shows Min, Avg, and Max returns for every rolling window of the selected duration. Helps you see the worst and best case scenarios.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">Window:</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 5, 7, 10].filter(y => y <= maxSipYears || maxSipYears >= y).map(y => (
-                        <button key={y} onClick={() => setRollingYears(y)}
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
-                            rollingYears === y
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                          }`}>{y}Y</button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold">Metric</th>
-                        {fundData.map((fund, i) => (
-                          <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                            <div className="line-clamp-1 max-w-[160px]" title={fund.meta?.scheme_name}>
-                              {fund.meta?.scheme_name?.split(' ').slice(0, 3).join(' ') || fund.schemeCode}
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                      {[['Min Return', 0], ['Avg Return', 1], ['Max Return', 2]].map(([label, ri]) => (
-                        <tr key={label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
-                            <div className="flex flex-col">
-                              <span className={ri === 0 ? 'text-red-500' : ri === 2 ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-200'}>{label}</span>
-                              <span className="text-[9px] text-slate-400 font-normal">
-                                {ri === 0 ? `Worst ${rollingYears}Y window` : ri === 2 ? `Best ${rollingYears}Y window` : `Average ${rollingYears}Y window`}
-                              </span>
-                            </div>
-                          </td>
-                          {fundData.map(fund => {
-                            const navs = fund.navData || [];
-                            const windowDays = rollingYears * 252;
-                            if (navs.length < windowDays + 10) return (
-                              <td key={fund.schemeCode} className="px-4 py-3 text-slate-400 text-xs">Not enough data</td>
-                            );
-                            let minR = Infinity, maxR = -Infinity, sum = 0, count = 0;
-                            for (let i = 0; i < navs.length - windowDays; i++) {
-                              const endNav = parseFloat(navs[i].nav);
-                              const startNav = parseFloat(navs[i + windowDays].nav);
-                              const cagr = (Math.pow(endNav / startNav, 1 / rollingYears) - 1) * 100;
-                              if (cagr < minR) minR = cagr;
-                              if (cagr > maxR) maxR = cagr;
-                              sum += cagr; count++;
-                            }
-                            const avgR = sum / count;
-                            const val = ri === 0 ? minR : ri === 2 ? maxR : avgR;
-                            const colorClass = ri === 0 ? 'text-red-600 dark:text-red-400' : ri === 2 ? 'text-emerald-600 dark:text-emerald-400' : (val >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-500');
-                            return (
-                              <td key={fund.schemeCode} className={`px-4 py-3 font-bold text-sm tabular-nums ${colorClass}`}>
-                                {val !== Infinity && val !== -Infinity ? `${val >= 0 ? '+' : ''}${val.toFixed(2)}% p.a.` : '—'}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-2">💡 If the Min Return is positive, the fund has NEVER given a loss in any {rollingYears}-year period historically. This is a powerful safety signal for long-term investors.</p>
-              </div>
-            )}
-
-
-
             {/* Historical SIP Comparison */}
+
             <div className="card p-5 mt-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
