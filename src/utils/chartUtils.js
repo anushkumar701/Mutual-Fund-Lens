@@ -133,6 +133,67 @@ export function buildChartData(funds, range) {
 }
 
 /**
+ * Build chart-ready data for SIP mode from fund array.
+ * Simulates a monthly SIP of sipAmount and calculates the % profit of the total invested value
+ * over time, allowing fair side-by-side comparison.
+ */
+export function buildSIPChartData(funds, range, sipAmount = 10000) {
+  if (!funds || !funds.length) return [];
+  const dateMap = {};
+
+  funds.forEach((f) => {
+    if (!f.navData || f.navData.length === 0) return;
+    let filtered = filterByRange(f.navData, range);
+    
+    // Fallback: full history if too young
+    if (filtered.length === 0) filtered = [...f.navData].reverse();
+    if (filtered.length === 0) return;
+
+    const rawKey = f.meta?.scheme_name || String(f.schemeCode);
+    const key = sanitizeDataKey(rawKey);
+
+    let totalUnits = 0;
+    let totalInvested = 0;
+    let currentMonthStr = "";
+
+    filtered.forEach((d) => {
+      const currentNav = parseFloat(d.nav);
+      if (!Number.isFinite(currentNav) || currentNav <= 0) return;
+
+      const parts = d.date.split('-');
+      if (parts.length !== 3) return;
+      const monthStr = `${parts[2]}-${parts[1]}`; // YYYY-MM
+
+      // First trading day seen in a new month triggers the SIP installment
+      if (monthStr !== currentMonthStr) {
+        currentMonthStr = monthStr;
+        totalUnits += sipAmount / currentNav;
+        totalInvested += sipAmount;
+      }
+
+      const currentValue = totalUnits * currentNav;
+      const profitPct = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : 0;
+
+      if (!dateMap[d.date]) dateMap[d.date] = { date: d.date };
+      dateMap[d.date][key] = profitPct;
+      dateMap[d.date][`${key}_raw`] = currentValue; // For tooltip to show actual value
+      dateMap[d.date][`${key}_invested`] = totalInvested;
+    });
+  });
+
+  const getSortKey = (s) => {
+    const parts = s.split('-');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}${mm}${dd}`;
+  };
+
+  return Object.values(dateMap).sort(
+    (a, b) => getSortKey(a.date).localeCompare(getSortKey(b.date))
+  );
+}
+
+/**
  * Collapse daily chart data to weekly (last trading day of each ISO week).
  * Correctly handles DD-MM-YYYY date format.
  */

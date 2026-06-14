@@ -11,7 +11,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { formatINR } from '../utils/formatCurrency';
 import { calculateFundMetrics, calculateHistoricalSIP, calculateCorrelation, calculateBestWorstMonth } from '../utils/metrics';
 import { getER } from '../utils/expenseRatio';
-import { getFundAgeYears, buildChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
+import { getFundAgeYears, buildChartData, buildSIPChartData, toMonthlyData, CHART_COLORS, sanitizeDataKey } from '../utils/chartUtils';
 import ComparedFundCard from '../components/ComparedFundCard';
 
 // ── Index Benchmarks ──────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ export default function Compare() {
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState('');
   const [range, setRange] = useState('6M');
+  const [chartMode, setChartMode] = useState('lumpsum'); // 'lumpsum' or 'sip'
   const toast = useToast();
 
   // ── Benchmark state ──────────────────────────────────────────────────────────
@@ -326,12 +327,15 @@ export default function Compare() {
       const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
       allFunds.push({ schemeCode: `bm_${activeBenchmark}`, meta: { scheme_name: bm.label }, navData: benchmarkData });
     }
-    let data = buildChartData(allFunds, range);
+    let data = chartMode === 'sip'
+      ? buildSIPChartData(allFunds, range, 10000)
+      : buildChartData(allFunds, range);
+
     if (['3Y', '5Y', '10Y', '15Y', '20Y', '25Y', 'MAX'].includes(range)) {
       data = toMonthlyData(data);
     }
     return data;
-  }, [fundData, range, activeBenchmark, benchmarkData]);
+  }, [fundData, range, activeBenchmark, benchmarkData, chartMode]);
 
 
 
@@ -735,46 +739,76 @@ export default function Compare() {
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">% growth from period start — all funds fairly compared</p>
                   </div>
                 </div>
-                {/* Benchmark selector */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">vs Index:</span>
-                  {BENCHMARKS.map(bm => (
-                    <button
-                      key={bm.id}
-                      onClick={() => setActiveBenchmark(prev => prev === bm.id ? null : bm.id)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
-                        activeBenchmark === bm.id
-                          ? 'text-white border-transparent shadow-sm'
-                          : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-400'
-                      }`}
-                      style={activeBenchmark === bm.id ? { backgroundColor: bm.color, borderColor: bm.color } : {}}
-                    >
-                      {loadingBenchmark && activeBenchmark === bm.id
-                        ? <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />
-                        : <span className="w-2 h-2 rounded-full" style={{ backgroundColor: bm.color }} />}
-                      {bm.label}
-                    </button>
-                  ))}
-                  {activeBenchmark && (
-                    <span className="text-[10px] text-slate-400">Click again to hide</span>
-                  )}
-                </div>
-                {/* Range selector — scrollable on mobile */}
-                <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
-                  {availableRanges.map((r) => (
-                    <button
-                      key={r}
-                      id={`range-${r}`}
-                      onClick={() => setRange(r)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                        range === r
-                          ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Benchmark selector */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">vs Index:</span>
+                    {BENCHMARKS.map(bm => (
+                      <button
+                        key={bm.id}
+                        onClick={() => setActiveBenchmark(prev => prev === bm.id ? null : bm.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                          activeBenchmark === bm.id
+                            ? 'text-white border-transparent shadow-sm'
+                            : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                        }`}
+                        style={activeBenchmark === bm.id ? { backgroundColor: bm.color, borderColor: bm.color } : {}}
+                      >
+                        {loadingBenchmark && activeBenchmark === bm.id
+                          ? <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />
+                          : <span className="w-2 h-2 rounded-full" style={{ backgroundColor: bm.color }} />}
+                        {bm.label}
+                      </button>
+                    ))}
+                    {activeBenchmark && (
+                      <span className="text-[10px] text-slate-400 hidden md:inline">Click again to hide</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                    {/* Invest Mode selector */}
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 flex-shrink-0">
+                      <button
+                        onClick={() => setChartMode('lumpsum')}
+                        className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${
+                          chartMode === 'lumpsum'
+                            ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        Lumpsum
+                      </button>
+                      <button
+                        onClick={() => setChartMode('sip')}
+                        className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${
+                          chartMode === 'sip'
+                            ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        Monthly SIP
+                      </button>
+                    </div>
+
+                    {/* Range selector */}
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                      {availableRanges.map((r) => (
+                        <button
+                          key={r}
+                          id={`range-${r}`}
+                          onClick={() => setRange(r)}
+                          className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                            range === r
+                              ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="mt-1" style={{ width: '100%', height: 360 }}>
@@ -1112,8 +1146,95 @@ export default function Compare() {
               </div>
             )}
 
-            {/* Historical SIP Comparison */}
+            {/* ── Advanced Risk & Drawdown Matrix ── */}
+            {fundData.length > 0 && (
+              <div className="card p-5">
+                <div className="mb-4">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-lg">⚖️ Advanced Risk & Drawdown Analysis</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Understand how much risk each fund takes to generate returns. Higher Sharpe/Sortino is better. Lower Drawdown/Volatility is safer.
+                  </p>
+                </div>
+                <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold whitespace-nowrap">Risk Metric</th>
+                        {fundData.map((fund, i) => (
+                          <th key={fund.schemeCode} className="px-4 py-3 font-semibold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                            <div className="line-clamp-1 max-w-[160px]" title={fund.meta?.scheme_name}>
+                              {fund.meta?.scheme_name?.split(' ').slice(0, 4).join(' ') || fund.schemeCode}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {[
+                        { 
+                          key: 'volatility', 
+                          label: 'Volatility (Std Dev)', 
+                          desc: 'Daily price fluctuation. Lower is more stable.',
+                          format: (val) => val ? `${val.toFixed(2)}%` : '—',
+                          isBetter: 'lower'
+                        },
+                        { 
+                          key: 'maxDrawdown', 
+                          label: 'Max Drawdown', 
+                          desc: 'Biggest historical drop from peak. Lower is safer.',
+                          format: (val) => val ? `-${val.toFixed(2)}%` : '—',
+                          isBetter: 'lower'
+                        },
+                        { 
+                          key: 'sharpe', 
+                          label: 'Sharpe Ratio', 
+                          desc: 'Return generated per unit of total risk. Higher is better.',
+                          format: (val) => val ? val.toFixed(2) : '—',
+                          isBetter: 'higher'
+                        },
+                        { 
+                          key: 'sortino', 
+                          label: 'Sortino Ratio', 
+                          desc: 'Return generated per unit of DOWNSIDE risk. Higher is better.',
+                          format: (val) => val ? val.toFixed(2) : '—',
+                          isBetter: 'higher'
+                        }
+                      ].map(metric => {
+                        const vals = fundData.map(f => {
+                          const m = calculateFundMetrics(f.navData);
+                          return m ? m[metric.key] : null;
+                        });
+                        const validVals = vals.filter(v => v !== null && v !== undefined && !isNaN(v));
+                        const bestVal = validVals.length > 0 ? (metric.isBetter === 'higher' ? Math.max(...validVals) : Math.min(...validVals)) : null;
 
+                        return (
+                          <tr key={metric.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
+                              <div className="flex flex-col gap-0.5">
+                                <span>{metric.label}</span>
+                                <span className="text-[10px] text-slate-400 font-normal">{metric.desc}</span>
+                              </div>
+                            </td>
+                            {vals.map((val, idx) => {
+                              const isBest = val !== null && val === bestVal && validVals.length > 1;
+                              return (
+                                <td key={idx} className="px-4 py-3 font-semibold text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                  <span className={isBest ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded' : ''}>
+                                    {metric.format(val)}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Historical SIP Comparison */}
             <div className="card p-5 mt-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
