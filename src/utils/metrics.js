@@ -218,10 +218,12 @@ export function getFundLensScore(metrics) {
   return Math.min(Math.max(Math.round(score), 10), 98);
 }
 
-// Smart Tags — now includes Sharpe and Sortino signals
+// Smart Tags — now includes Sharpe, Sortino signals, and Warning Badges
 export function getSmartTags(metrics) {
   if (!metrics) return [];
   const tags = [];
+  
+  // Positive Badges
   if (metrics.maxDrawdown < 15 && metrics.volatility < 15)
     tags.push("🛡️ Low Volatility");
   if (metrics.return3Y > 18) tags.push("🚀 High Growth");
@@ -233,6 +235,15 @@ export function getSmartTags(metrics) {
     tags.push("📐 High Sharpe");
   if (metrics.sortino !== null && metrics.sortino > 1.5)
     tags.push("🎯 Low Downside Risk");
+    
+  // Warning Badges
+  if (metrics.volatility > 20)
+    tags.push("⚠️ Highly Volatile");
+  if (metrics.maxDrawdown > 30)
+    tags.push("🚨 High Drawdown Risk");
+  if (metrics.return5Y !== null && metrics.return5Y < 8)
+    tags.push("⚠️ Underperformer (5Y)");
+    
   return tags;
 }
 
