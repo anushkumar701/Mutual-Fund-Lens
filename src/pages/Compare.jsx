@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { useToast } from '../components/Toast';
@@ -333,18 +333,7 @@ export default function Compare() {
     return data;
   }, [fundData, range, activeBenchmark, benchmarkData]);
 
-  // ── Similar funds helper ─────────────────────────────────────────────────────
-  const getSimilarFunds = useCallback((fund) => {
-    if (!funds || !fund.meta?.scheme_category) return [];
-    const cat = fund.meta.scheme_category.toLowerCase();
-    return funds
-      .filter(f =>
-        f.schemeName.toLowerCase().includes(cat.split(' ')[0]) &&
-        !compareList.map(String).includes(String(f.schemeCode)) &&
-        String(f.schemeCode) !== String(fund.schemeCode)
-      )
-      .slice(0, 3);
-  }, [funds, compareList]);
+
 
 
   // Annual calendar-year returns — O(n log n) via binary search
@@ -724,39 +713,16 @@ export default function Compare() {
                 </div>
               )}
 
-              {/* Fund cards + similar suggestions */}
+              {/* Fund cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {fundData.map((fund, i) => {
-                  const similarFunds = getSimilarFunds(fund);
-                  return (
-                    <div key={fund.schemeCode} className="flex flex-col gap-2">
-                      <ComparedFundCard
-                        fund={fund}
-                        color={activeColors[i % activeColors.length]}
-                        onRemove={() => removeFund(fund.schemeCode)}
-                      />
-                      {/* Similar fund suggestions */}
-                      {similarFunds.length > 0 && compareList.length < 4 && (
-                        <div className="card p-3 bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700">
-                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Similar funds to add</p>
-                          <div className="space-y-1.5">
-                            {similarFunds.map(sf => (
-                              <button
-                                key={sf.schemeCode}
-                                onClick={() => handleAddCode(sf.schemeCode)}
-                                disabled={!!loadingCode}
-                                className="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors group"
-                              >
-                                <span className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 flex-1">{sf.schemeName}</span>
-                                <span className="text-[10px] font-bold text-blue-500 group-hover:text-blue-600 flex-shrink-0">+ Add</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {fundData.map((fund, i) => (
+                  <ComparedFundCard
+                    key={fund.schemeCode}
+                    fund={fund}
+                    color={activeColors[i % activeColors.length]}
+                    onRemove={() => removeFund(fund.schemeCode)}
+                  />
+                ))}
               </div>
 
             {/* NAV History Chart */}
@@ -813,29 +779,7 @@ export default function Compare() {
               </div>
               <div className="mt-1" style={{ width: '100%', height: 360 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
-                  <defs>
-                    {fundData.map((fund, i) => {
-                      const color = activeColors[i % activeColors.length];
-                      const gradId = `grad_${i}`;
-                      return (
-                        <linearGradient key={gradId} id={gradId} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={color} stopOpacity={isDark ? 0.25 : 0.18} />
-                          <stop offset="80%" stopColor={color} stopOpacity={0.0} />
-                        </linearGradient>
-                      );
-                    })}
-                    {activeBenchmark && benchmarkData && (() => {
-                      const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
-                      return (
-                        <linearGradient key="grad_bm" id="grad_bm" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={bm.color} stopOpacity={0.1} />
-                          <stop offset="80%" stopColor={bm.color} stopOpacity={0.0} />
-                        </linearGradient>
-                      );
-                    })()}
-                  </defs>
-
+                <LineChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
                   <CartesianGrid vertical={false} stroke={isDark ? 'rgba(148,163,184,0.08)' : 'rgba(148,163,184,0.18)'} />
 
                   <XAxis
@@ -984,21 +928,19 @@ export default function Compare() {
                     )}
                   />
 
-                  {/* Fund area fills */}
+                  {/* Fund lines */}
                   {fundData.map((fund, i) => {
                     const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
                     const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
                     const color = activeColors[i % activeColors.length];
                     return (
-                      <Area
+                      <Line
                         key={fund.schemeCode}
                         type="monotoneX"
                         dataKey={lineKey}
                         name={displayName}
                         stroke={color}
                         strokeWidth={2.5}
-                        fill={`url(#grad_${i})`}
-                        baseValue="dataMin"
                         dot={false}
                         connectNulls={true}
                         activeDot={{ r: 5, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: color }}
@@ -1008,12 +950,12 @@ export default function Compare() {
                     );
                   })}
 
-                  {/* Benchmark line — dashed, no fill */}
+                  {/* Benchmark line — dashed */}
                   {activeBenchmark && benchmarkData && (() => {
                     const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
                     const lineKey = sanitizeDataKey(bm.label);
                     return (
-                      <Area
+                      <Line
                         key={`bm_${activeBenchmark}`}
                         type="monotoneX"
                         dataKey={lineKey}
@@ -1021,8 +963,6 @@ export default function Compare() {
                         stroke={bm.color}
                         strokeWidth={1.8}
                         strokeDasharray="6 4"
-                        fill="url(#grad_bm)"
-                        baseValue="dataMin"
                         dot={false}
                         connectNulls={true}
                         activeDot={{ r: 4, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: bm.color }}
@@ -1031,7 +971,7 @@ export default function Compare() {
                     );
                   })()}
 
-                </AreaChart>
+                </LineChart>
               </ResponsiveContainer>
               </div>
 
