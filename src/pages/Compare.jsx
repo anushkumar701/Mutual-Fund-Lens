@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { useToast } from '../components/Toast';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -816,16 +817,39 @@ export default function Compare() {
                   ))}
                 </div>
               </div>
-              <div className="chart-height-sm" style={{ width: '100%' }}>
+              <div className="mt-1" style={{ width: '100%', height: 360 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.15)" />
+                <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
+                  <defs>
+                    {fundData.map((fund, i) => {
+                      const color = activeColors[i % activeColors.length];
+                      const gradId = `grad_${i}`;
+                      return (
+                        <linearGradient key={gradId} id={gradId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor={color} stopOpacity={isDark ? 0.25 : 0.18} />
+                          <stop offset="80%" stopColor={color} stopOpacity={0.0} />
+                        </linearGradient>
+                      );
+                    })}
+                    {activeBenchmark && benchmarkData && (() => {
+                      const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
+                      return (
+                        <linearGradient key="grad_bm" id="grad_bm" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor={bm.color} stopOpacity={0.1} />
+                          <stop offset="80%" stopColor={bm.color} stopOpacity={0.0} />
+                        </linearGradient>
+                      );
+                    })()}
+                  </defs>
+
+                  <CartesianGrid vertical={false} stroke={isDark ? 'rgba(148,163,184,0.08)' : 'rgba(148,163,184,0.18)'} />
+
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 11, fill: '#94a3b8' }}
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={40}
+                    minTickGap={44}
                     tickFormatter={(val) => {
                       if (!val) return '';
                       const [dd, mm, yyyy] = val.split('-');
@@ -841,22 +865,27 @@ export default function Compare() {
                     }}
                     dy={10}
                   />
+
                   <YAxis
                     tick={{ fontSize: 10, fill: '#94a3b8' }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`}
-                    width={52}
+                    width={56}
                     dx={-4}
                   />
-                  <ReferenceLine y={0} stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
+
+                  <ReferenceLine y={0} stroke={isDark ? 'rgba(148,163,184,0.35)' : 'rgba(100,116,139,0.4)'} strokeDasharray="4 3" />
+
+                  {/* Custom rich tooltip */}
                   <Tooltip
+                    cursor={{ stroke: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(100,116,139,0.25)', strokeWidth: 1.5, strokeDasharray: '4 3' }}
                     labelFormatter={(label) => {
                       if (!label) return '';
                       const [dd, mm, yyyy] = label.split('-');
                       const d = new Date(`${yyyy}-${mm}-${dd}`);
                       if (isNaN(d.getTime())) return label;
-                      return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
                     }}
                     formatter={(value, name) => {
                       if (typeof name === 'string' && name.endsWith('_raw')) return null;
@@ -865,56 +894,77 @@ export default function Compare() {
                       return [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name];
                     }}
                     contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#f8fafc',
+                      backgroundColor: isDark ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)',
+                      border: `1px solid ${isDark ? 'rgba(51,65,85,0.8)' : 'rgba(226,232,240,1)'}`,
+                      borderRadius: '12px',
+                      color: isDark ? '#f8fafc' : '#0f172a',
                       fontSize: '12px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                      padding: '10px 14px'
+                      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                      padding: '12px 16px',
+                      backdropFilter: 'blur(12px)',
                     }}
-                    itemStyle={{ color: '#f8fafc', paddingBottom: '4px' }}
-                    labelStyle={{ color: '#94a3b8', marginBottom: '8px', fontWeight: '600' }}
+                    itemStyle={{ color: isDark ? '#e2e8f0' : '#334155', paddingBottom: '3px', fontWeight: 500 }}
+                    labelStyle={{ color: isDark ? '#94a3b8' : '#64748b', marginBottom: '8px', fontWeight: '600', fontSize: '11px' }}
                   />
-                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} iconType="circle" />
-                  {/* Fund lines */}
+
+                  {/* Custom legend with colored dots */}
+                  <Legend
+                    wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(name) => (
+                      <span style={{ color: isDark ? '#cbd5e1' : '#475569', fontWeight: 500 }}>
+                        {name.length > 40 ? name.slice(0, 40) + '…' : name}
+                      </span>
+                    )}
+                  />
+
+                  {/* Fund area fills */}
                   {fundData.map((fund, i) => {
                     const lineKey = sanitizeDataKey(fund.meta?.scheme_name || String(fund.schemeCode));
                     const displayName = fund.meta?.scheme_name || String(fund.schemeCode);
+                    const color = activeColors[i % activeColors.length];
                     return (
-                      <Line
+                      <Area
                         key={fund.schemeCode}
-                        type="monotone"
+                        type="monotoneX"
                         dataKey={lineKey}
                         name={displayName}
-                        stroke={activeColors[i % activeColors.length]}
+                        stroke={color}
                         strokeWidth={2.5}
+                        fill={`url(#grad_${i})`}
                         dot={false}
                         connectNulls={true}
-                        activeDot={{ r: 5, strokeWidth: 0, fill: activeColors[i % activeColors.length] }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: color }}
+                        animationDuration={600}
+                        animationEasing="ease-out"
                       />
                     );
                   })}
-                  {/* Benchmark line — dashed */}
+
+                  {/* Benchmark line — dashed, no fill */}
                   {activeBenchmark && benchmarkData && (() => {
                     const bm = BENCHMARKS.find(b => b.id === activeBenchmark);
                     const lineKey = sanitizeDataKey(bm.label);
                     return (
-                      <Line
+                      <Area
                         key={`bm_${activeBenchmark}`}
-                        type="monotone"
+                        type="monotoneX"
                         dataKey={lineKey}
                         name={`${bm.label} (Index)`}
                         stroke={bm.color}
-                        strokeWidth={2}
-                        strokeDasharray="5 4"
+                        strokeWidth={1.8}
+                        strokeDasharray="6 4"
+                        fill="url(#grad_bm)"
                         dot={false}
                         connectNulls={true}
-                        activeDot={{ r: 4, strokeWidth: 0, fill: bm.color }}
+                        activeDot={{ r: 4, strokeWidth: 2, stroke: isDark ? '#0f172a' : '#fff', fill: bm.color }}
+                        animationDuration={600}
                       />
                     );
                   })()}
-                </LineChart>
+
+                </AreaChart>
               </ResponsiveContainer>
               </div>
 
