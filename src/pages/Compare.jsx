@@ -924,7 +924,7 @@ export default function Compare() {
           </div>
 
           {/* Smart Search Filter Chips */}
-          <div className="flex items-center gap-3 mt-2 px-1">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 px-1">
             <span className="text-xs text-slate-500 font-medium">
               Smart Filters:
             </span>
@@ -1972,6 +1972,9 @@ export default function Compare() {
                           <button
                             id="compare-inflation-toggle"
                             onClick={() => setInflationMode(!inflationMode)}
+                            role="switch"
+                            aria-checked={inflationMode}
+                            aria-label="Toggle inflation adjustment"
                             className={`relative w-10 h-5 rounded-full transition-colors ${inflationMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
                           >
                             <span
@@ -1982,6 +1985,7 @@ export default function Compare() {
                             <div className="flex items-center gap-1 animate-fade-in">
                               <input
                                 type="number"
+                                aria-label="Inflation rate percentage"
                                 value={inflationRate}
                                 onChange={(e) =>
                                   setInflationRate(Number(e.target.value))
