@@ -1019,6 +1019,22 @@ export default function Compare() {
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
                         let event = MARKET_EVENTS[year];
+
+                        // Future-proof: If no historical reason is mapped, generate an exact, unique proper reason based on the math
+                        if (!event && defined.length > 0) {
+                          const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
+                          if (avgReturn >= 0) {
+                            event = { 
+                              label: `🟢 Average market growth of +${avgReturn.toFixed(1)}% lifted overall performance`, 
+                              color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' 
+                            };
+                          } else {
+                            event = { 
+                              label: `🔴 Average market drop of ${avgReturn.toFixed(1)}% dragged down overall performance`, 
+                              color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' 
+                            };
+                          }
+                        }
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
