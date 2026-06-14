@@ -1017,49 +1017,17 @@ export default function Compare() {
                         const vals = fundData.map(f => row[f.meta?.scheme_name || String(f.schemeCode)]);
                         const defined = vals.filter(v => v !== undefined);
                         const bestVal = defined.length > 0 ? Math.max(...defined) : null;
-                        // Extremely simple and understandable market reasons (2-5 words)
-                        const MARKET_EVENTS = {
-                          2000: { label: '🔴 Dot-Com Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-                          2001: { label: '🔴 9/11 Slowdown', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-                          2003: { label: '🟢 Market Recovery', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2004: { label: '🟢 Election Rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2006: { label: '🟢 Global Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2008: { label: '🔴 2008 Financial Crisis', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-                          2009: { label: '🟢 Massive Bounce Back', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2010: { label: '🟢 Economic Recovery', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2011: { label: '🟡 Europe Debt Crisis', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2013: { label: '🟡 Rupee Value Drop', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2014: { label: '🟢 Election Hope Rally', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2015: { label: '🟡 China Market Slowdown', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2016: { label: '🟡 Demonetisation', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2017: { label: '🟢 GST Launched', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2018: { label: '🟡 Midcap Crash', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2019: { label: '🟡 Tax Cut Rally', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-                          2020: { label: '🔴 COVID-19 Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-                          2021: { label: '🟢 Post-COVID Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2022: { label: '🔴 War & High Inflation', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-                          2023: { label: '🟢 Midcap & Smallcap Boom', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                          2024: { label: '🟢 Election Stability', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-                        };
-
-                        let event = MARKET_EVENTS[year];
-
-                        // Dynamically determine market sentiment for any future or unmapped years using ultra-simple language
-                        if (!event && defined.length > 0) {
+                        // Instead of subjective events, show the actual average market return as the objective "reason" for the fund's performance
+                        let event = null;
+                        if (defined.length > 0) {
                           const avgReturn = defined.reduce((sum, v) => sum + v, 0) / defined.length;
-                          if (avgReturn >= 25) {
-                            event = { label: '🟢 Extremely Bullish', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 12) {
-                            event = { label: '🟢 Bull Market', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= 5) {
-                            event = { label: '🟢 Positive Growth', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' };
-                          } else if (avgReturn >= -2) {
-                            event = { label: '🟡 Flat Market', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else if (avgReturn >= -12) {
-                            event = { label: '🟡 Market Correction', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' };
-                          } else {
-                            event = { label: '🔴 Major Crash', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' };
-                          }
+                          const isPositive = avgReturn >= 0;
+                          event = {
+                            label: `Overall Market: ${isPositive ? '+' : ''}${avgReturn.toFixed(1)}%`,
+                            color: isPositive
+                              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                          };
                         }
                         return (
                           <tr key={year} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
