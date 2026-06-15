@@ -19,7 +19,7 @@
 */
 @font-face {
   font-family: "Inter-fallback";
-  src: local("Arial");
+  src: local("Liberation Sans"), local("Arial");
   size-adjust: 107%;
   ascent-override: 90%;
   descent-override: 22%;
@@ -35,15 +35,13 @@
       -apple-system,
       sans-serif;
     -webkit-font-smoothing: antialiased;
+    scrollbar-gutter: stable;
   }
 
   /* ── Light Mode Background: clean off-white ── */
   body {
     background-color: #f0f4f8;
     color: #0f172a;
-    transition:
-      background-color 0.2s,
-      color 0.2s;
   }
 
   /* ── Dark Mode Background: deep professional navy ── */
@@ -187,7 +185,7 @@
            border border-slate-200/80 dark:border-slate-800
            rounded-2xl
            shadow-sm
-           transition-all duration-200;
+           transition-[box-shadow,border-color,transform] duration-200;
   }
 
   .card-hover {

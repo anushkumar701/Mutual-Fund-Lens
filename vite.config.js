@@ -1,8 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+function injectCssAsStyleTag() {
+  return {
+    name: 'inject-css-as-style-tags',
+    enforce: 'post',
+    apply: 'build',
+    transformIndexHtml(html, ctx) {
+      if (!ctx.bundle) return html;
+      const cssAsset = Object.values(ctx.bundle).find((asset) => asset.fileName.endsWith('.css'));
+      if (cssAsset && 'source' in cssAsset) {
+        const cleanHtml = html.replace(/<link[^>]*rel="stylesheet"[^>]*href="[^"]*\.css"[^>]*>/gi, '');
+        return cleanHtml.replace('</head>', `<style>${cssAsset.source}</style></head>`);
+      }
+      return html;
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [react(), injectCssAsStyleTag()],
   build: {
     chunkSizeWarningLimit: 600,
     // Hidden source maps: uploaded to Sentry but not publicly accessible.
@@ -48,10 +65,13 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
       },
     },
-    // Reduce main-thread work: limit the number of parallel CSS inlining workers
-    cssCodeSplit: true,
+    // Disable cssCodeSplit to compile CSS into a single bundle for inlining
+    cssCodeSplit: false,
     // Target modern browsers — reduces polyfill bloat
-    target: ['es2020', 'chrome90', 'firefox88', 'safari14'],
+    target: 'esnext',
+  },
+  esbuild: {
+    drop: ['console', 'debugger'],
   },
   // Optimise dev experience
   optimizeDeps: {
