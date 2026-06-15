@@ -381,10 +381,9 @@ input[type="range"] {
 
 /* ══ Mobile chart container — prevents overflowing on narrow screens ═ */
 @media (max-width: 640px) {
-  .recharts-wrapper {
-    max-width: 100% !important;
-    /* Do NOT hide overflow — it clips the chart content on mobile */
-  }
+  /* Note: Do NOT set max-width on .recharts-wrapper. It conflicts with Recharts'
+     internal inline sizing and ResizeObserver calculations, causing charts
+     to collapse and render as blank on mobile viewports. */
   /* Increase nav touch targets on mobile */
   nav a,
   nav button {
