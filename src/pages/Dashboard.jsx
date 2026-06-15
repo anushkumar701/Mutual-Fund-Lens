@@ -237,7 +237,7 @@ function QuickCalc() {
           <div key={l}>
             <label
               htmlFor={id}
-              className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1"
+              className="text-[10px] text-slate-600 dark:text-slate-400 block mb-1"
             >
               {l}
             </label>
@@ -254,7 +254,7 @@ function QuickCalc() {
       </div>
       <div className="grid grid-cols-3 gap-2 text-center mb-4">
         <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
-          <div className="text-[10px] text-slate-500 mb-1">You Invest</div>
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-1">You Invest</div>
           <div className="font-bold text-sm text-slate-900 dark:text-white">
             {fmt(inv)}
           </div>
@@ -338,35 +338,38 @@ export default function Dashboard() {
           </p>
 
           {/* ── Fund Search — Main Feature ── */}
-          {!loading && funds.length > 0 && (
-            <FundSearchBox funds={funds} onSelectFund={setModalFund} />
-          )}
+          {/* min-h prevents CLS when switching between loading skeleton and search box */}
+          <div className="w-full max-w-2xl mx-auto" style={{ minHeight: '5.5rem' }}>
+            {!loading && funds.length > 0 && (
+              <FundSearchBox funds={funds} onSelectFund={setModalFund} />
+            )}
 
-          {loading && (
-            <div
-              className="w-full max-w-2xl mx-auto space-y-2"
-              role="status"
-              aria-label="Loading funds"
-            >
-              <div className="h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
-                <span className="text-slate-500 text-sm">Loading funds…</span>
-              </div>
-              {loadingSlow && (
-                <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5">
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    ⏳ <strong>Taking longer than usual</strong> — mfapi.in may
-                    be slow. Please wait or retry.
-                  </p>
-                  <button
-                    onClick={refetch}
-                    className="text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 px-3 py-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900 transition-all whitespace-nowrap"
-                  >
-                    Retry
-                  </button>
+            {loading && (
+              <div
+                className="space-y-2"
+                role="status"
+                aria-label="Loading funds"
+              >
+                <div className="h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
+                  <span className="text-slate-600 dark:text-slate-400 text-sm">Loading funds…</span>
                 </div>
-              )}
-            </div>
-          )}
+                {loadingSlow && (
+                  <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5">
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      ⏳ <strong>Taking longer than usual</strong> — mfapi.in may
+                      be slow. Please wait or retry.
+                    </p>
+                    <button
+                      onClick={refetch}
+                      className="text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 px-3 py-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900 transition-all whitespace-nowrap"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-6 w-full max-w-md sm:max-w-none mx-auto">
             <Link
@@ -460,7 +463,7 @@ export default function Dashboard() {
                       <div className="font-semibold text-slate-800 dark:text-slate-200">
                         {item.goal}
                       </div>
-                      <div className="text-slate-500 mt-0.5">
+                      <div className="text-slate-600 dark:text-slate-400 mt-0.5">
                         {item.horizon} · Risk: {item.risk}
                       </div>
                     </div>
@@ -497,7 +500,7 @@ export default function Dashboard() {
                 >
                   Browse by Category
                 </h2>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-700 dark:text-slate-400 mt-0.5">
                   Click any category to explore in Screener
                 </p>
               </div>
@@ -522,7 +525,7 @@ export default function Dashboard() {
                     <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
                       {cat}
                     </div>
-                    <div className="text-[10px] text-slate-500 leading-snug mb-2 hidden sm:block">
+                    <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug mb-2 hidden sm:block">
                       {cfg.desc}
                     </div>
                     <div
@@ -617,7 +620,7 @@ export default function Dashboard() {
               >
                 ⭐ Curated Picks
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                 Editor-selected funds worth keeping on your radar
               </p>
             </div>
@@ -670,14 +673,14 @@ export default function Dashboard() {
                   >
                     {pick.badge}
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
                     {pick.highlight}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1 line-clamp-1">
                   {pick.name}
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3 line-clamp-3">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed mb-3 line-clamp-3">
                   {pick.reason}
                 </p>
                 <div className="flex gap-2">
@@ -703,7 +706,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+          <p className="text-[10px] text-slate-600 dark:text-slate-500 mt-2">
             ⚠️ Curated picks are for educational purposes only. Not investment
             advice. Consult a SEBI-registered advisor before investing.
           </p>
@@ -724,7 +727,7 @@ export default function Dashboard() {
             >
               📊 Category Returns Heatmap
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               Approximate annual returns by fund category — spot market cycles
               at a glance
             </p>
@@ -742,8 +745,8 @@ export default function Dashboard() {
                 Liquid: [6.3, 4.2, 3.6, 4.8, 7.0, 7.2],
               };
               const getColor = (v) => {
-                if (v >= 20) return "bg-emerald-600 text-white";
-                if (v >= 12) return "bg-emerald-400 text-white";
+                if (v >= 20) return "bg-emerald-700 text-white";
+                if (v >= 12) return "bg-emerald-400 text-emerald-950 dark:text-emerald-950";
                 if (v >= 6)
                   return "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300";
                 if (v >= 2)
@@ -792,7 +795,7 @@ export default function Dashboard() {
                   </table>
                   <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                     {[
-                      ["≥20%", "bg-emerald-600"],
+                      ["≥20%", "bg-emerald-700"],
                       ["12–19%", "bg-emerald-400"],
                       ["6–11%", "bg-emerald-100 dark:bg-emerald-900/40"],
                       ["2–5%", "bg-amber-100"],
@@ -800,14 +803,14 @@ export default function Dashboard() {
                     ].map(([l, c]) => (
                       <span
                         key={l}
-                        className="flex items-center gap-1.5 text-[10px] text-slate-500"
+                        className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400"
                       >
                         <span className={`w-3 h-3 rounded ${c} inline-block`} />
                         {l}
                       </span>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-2">
+                  <p className="text-[10px] text-slate-600 dark:text-slate-500 mt-2">
                     * Approximate median category returns. Actual individual
                     fund returns vary. Source: industry estimates.
                   </p>

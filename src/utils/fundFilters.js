@@ -1,5 +1,15 @@
-import { getER } from "./expenseRatio";
 import { inferCategory } from "./goalFilters";
+
+// Lazy-loaded: getER pulls in the 91KB expense ratio JSON, so we only load
+// it when filterFunds actually filters by expense ratio band.
+let _getER = null;
+async function loadGetER() {
+  if (!_getER) {
+    const mod = await import("./expenseRatio");
+    _getER = mod.getER;
+  }
+  return _getER;
+}
 
 const KNOWN_AMCS = [
   "HDFC",
@@ -80,7 +90,7 @@ export function filterFunds(
     list = list.filter((f) => getFundType(f.schemeName) === fundType);
   if (erBand !== "All")
     list = list.filter(
-      (f) => getERBand(getER(f.schemeName, f.schemeCode)) === erBand,
+      (f) => getERBand(_getER ? _getER(f.schemeName, f.schemeCode) : 0) === erBand,
     );
   if (amc !== "All")
     list = list.filter((f) => extractAMC(f.schemeName) === amc);
