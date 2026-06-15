@@ -1190,8 +1190,8 @@ export default function Compare() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-1" style={{ width: "100%", height: 360 }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="mt-1" style={{ width: "100%", height: 360, position: "relative" }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <LineChart
                       data={chartData}
                       margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
