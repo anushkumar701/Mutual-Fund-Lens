@@ -12,10 +12,10 @@ import { ToastProvider } from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
-const Footer = lazy(() => import("./components/Footer"));
-const BackToTop = lazy(() => import("./components/BackToTop"));
+import Footer from "./components/Footer";
+import BackToTop from "./components/BackToTop";
 
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+import Dashboard from "./pages/Dashboard";
 const Screener = lazy(() => import("./pages/Screener"));
 const Compare = lazy(() => import("./pages/Compare"));
 const SIPCalculator = lazy(() => import("./pages/SIPCalculator"));
@@ -103,7 +103,7 @@ export default function App() {
           </header>
           <main
             id="main-content"
-            className="md:mt-16 mt-14 min-h-screen flex flex-col overflow-x-hidden"
+            className="md:pt-16 pt-14 min-h-screen flex flex-col overflow-x-hidden"
             aria-label="Main content"
           >
             <div className="flex-1">

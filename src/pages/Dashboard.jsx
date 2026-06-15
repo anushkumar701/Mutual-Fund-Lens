@@ -43,7 +43,15 @@ const CAT_CFG = {
 };
 
 // ─── Fund Search Box ───────────────────────────────────────────
-function FundSearchBox({ funds, onSelectFund }) {
+function FundSearchBox({
+  funds,
+  onSelectFund,
+  loading,
+  loadingSlow,
+  error,
+  refetch,
+  onFocus,
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -72,6 +80,10 @@ function FundSearchBox({ funds, onSelectFund }) {
     onSelectFund(fund);
   };
 
+  const handleTrigger = () => {
+    if (onFocus) onFocus();
+  };
+
   return (
     <div ref={ref} className="relative w-full max-w-2xl mx-auto">
       <div className="relative">
@@ -97,8 +109,12 @@ function FundSearchBox({ funds, onSelectFund }) {
           onChange={(e) => {
             setQuery(e.target.value.slice(0, 100));
             setOpen(true);
+            handleTrigger();
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            handleTrigger();
+          }}
           placeholder={"Search any fund by name or scheme code..."}
           maxLength={100}
           aria-label="Search mutual funds by name or scheme code"
@@ -121,8 +137,7 @@ function FundSearchBox({ funds, onSelectFund }) {
         🔍 Type to search · Click a fund to view details · No page change needed
       </p>
 
-      {/* Dropdown results */}
-      {/* Announce result count to screen readers */}
+      {/* Dropdown results / Loading / Error states */}
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {open && results.length > 0
           ? `${results.length} funds found`
@@ -131,76 +146,111 @@ function FundSearchBox({ funds, onSelectFund }) {
             : ""}
       </span>
 
-      {open && results.length > 0 && (
+      {open && (
         <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {results.length} results — click to view details
-            </span>
-            <span className="text-[10px] text-blue-500">
-              No page navigation
-            </span>
-          </div>
-          <div className="max-h-96 overflow-y-auto">
-            {results.map((fund) => {
-              const cat = inferCategory(fund.schemeName);
-              const cfg = CAT_CFG[cat] || CAT_CFG.Other;
-              const closed = isFundClosed(fund.schemeName);
-              return (
-                <button
-                  key={fund.schemeCode}
-                  onClick={() => handleSelect(fund)}
-                  className="w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left border-b border-slate-50 dark:border-slate-700/50 last:border-0"
-                >
-                  <span className="text-lg mt-0.5 flex-shrink-0">{cfg.e}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                        style={{ background: cfg.color }}
-                      >
-                        {cat}
-                      </span>
-                      {closed && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400">
-                          CLOSED
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                      {fund.schemeName}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Code #{fund.schemeCode}
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0 mt-1">
-                    View →
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-            <Link
-              to="/screener"
-              className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
-            >
-              See all results in Screener →
-            </Link>
-          </div>
-        </div>
-      )}
+          {loading && (
+            <div className="px-4 py-6 text-center space-y-3">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Loading 4,000+ mutual funds...
+              </p>
+              {loadingSlow && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⏳ Connection is slow. Please wait.
+                </p>
+              )}
+            </div>
+          )}
 
-      {open && query.length >= 2 && results.length === 0 && (
-        <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl z-50 p-6 text-center">
-          <div className="text-3xl mb-2">🔍</div>
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            No funds found for &quot;{debouncedQuery}&quot;
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Try a shorter name or use the fund house name
-          </p>
+          {!loading && error && (
+            <div className="px-4 py-6 text-center space-y-3">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {error}
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (refetch) refetch();
+                }}
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+              >
+                Retry Loading
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && results.length > 0 && (
+            <>
+              <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {results.length} results — click to view details
+                </span>
+                <span className="text-[10px] text-blue-500 font-semibold">
+                  No page navigation
+                </span>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {results.map((fund) => {
+                  const cat = inferCategory(fund.schemeName);
+                  const cfg = CAT_CFG[cat] || CAT_CFG.Other;
+                  const closed = isFundClosed(fund.schemeName);
+                  return (
+                    <button
+                      key={fund.schemeCode}
+                      onClick={() => handleSelect(fund)}
+                      className="w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left border-b border-slate-50 dark:border-slate-700/50 last:border-0"
+                    >
+                      <span className="text-lg mt-0.5 flex-shrink-0">{cfg.e}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                            style={{ background: cfg.color }}
+                          >
+                            {cat}
+                          </span>
+                          {closed && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400">
+                              CLOSED
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                          {fund.schemeName}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          Code #{fund.schemeCode}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0 mt-1">
+                        View →
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <Link
+                  to="/screener"
+                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                >
+                  See all results in Screener →
+                </Link>
+              </div>
+            </>
+          )}
+
+          {!loading && !error && debouncedQuery.trim().length >= 2 && results.length === 0 && (
+            <div className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-sm">
+              No funds found matching &quot;{debouncedQuery}&quot;
+            </div>
+          )}
+
+          {!loading && !error && debouncedQuery.trim().length < 2 && (
+            <div className="px-4 py-6 text-center text-slate-500 dark:text-slate-400 text-xs">
+              Type at least 2 characters to search...
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -288,7 +338,7 @@ function QuickCalc() {
 
 // ─── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
-  const { funds, loading, loadingSlow, error, refetch } = useFunds();
+  const { funds, loading, loadingSlow, error, refetch, triggerFetch } = useFunds({ lazy: true });
   const [watchlist] = useLocalStorage("fundlens_watchlist", []);
   const [modalFund, setModalFund] = useState(null);
 
@@ -322,7 +372,7 @@ export default function Dashboard() {
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-slate-700 dark:text-slate-300 font-medium">
               Live data ·{" "}
-              {loading ? "..." : `${funds.length.toLocaleString("en-IN")}+`}{" "}
+              {funds.length > 0 ? `${funds.length.toLocaleString("en-IN")}+` : "18,000+"}{" "}
               mutual funds
             </span>
           </div>
@@ -338,37 +388,17 @@ export default function Dashboard() {
           </p>
 
           {/* ── Fund Search — Main Feature ── */}
-          {/* min-h prevents CLS when switching between loading skeleton and search box */}
+          {/* min-h prevents CLS when switching states */}
           <div className="w-full max-w-2xl mx-auto" style={{ minHeight: '5.5rem' }}>
-            {!loading && funds.length > 0 && (
-              <FundSearchBox funds={funds} onSelectFund={setModalFund} />
-            )}
-
-            {loading && (
-              <div
-                className="space-y-2"
-                role="status"
-                aria-label="Loading funds"
-              >
-                <div className="h-14 bg-white/50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-200 dark:border-slate-600 animate-pulse flex items-center justify-center">
-                  <span className="text-slate-600 dark:text-slate-400 text-sm">Loading funds…</span>
-                </div>
-                {loadingSlow && (
-                  <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5">
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
-                      ⏳ <strong>Taking longer than usual</strong> — mfapi.in may
-                      be slow. Please wait or retry.
-                    </p>
-                    <button
-                      onClick={refetch}
-                      className="text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 px-3 py-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900 transition-all whitespace-nowrap"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            <FundSearchBox
+              funds={funds}
+              onSelectFund={setModalFund}
+              loading={loading}
+              loadingSlow={loadingSlow}
+              error={error}
+              refetch={refetch}
+              onFocus={triggerFetch}
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-6 w-full max-w-md sm:max-w-none mx-auto">
@@ -760,13 +790,13 @@ export default function Dashboard() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr>
-                        <th className="text-left py-2 pr-3 text-slate-500 dark:text-slate-400 font-semibold w-20">
+                        <th className="text-left py-2 pr-3 text-slate-600 dark:text-slate-300 font-semibold w-20">
                           Category
                         </th>
                         {YEARS.map((y) => (
                           <th
                             key={y}
-                            className="text-center py-2 px-1 text-slate-500 dark:text-slate-400 font-semibold"
+                            className="text-center py-2 px-1 text-slate-600 dark:text-slate-300 font-semibold"
                           >
                             {y}
                           </th>
@@ -776,13 +806,13 @@ export default function Dashboard() {
                     <tbody className="space-y-1">
                       {Object.entries(DATA).map(([cat, vals]) => (
                         <tr key={cat}>
-                          <td className="pr-3 py-1 font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                          <td className="pr-3 py-1 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                             {cat}
                           </td>
                           {vals.map((v, i) => (
                             <td key={i} className="px-1 py-1">
                               <div
-                                className={`rounded-lg px-1 py-1.5 text-center font-bold tabular-nums transition-all ${getColor(v)}`}
+                                className={`rounded-lg px-1 py-1.5 text-center font-bold tabular-nums ${getColor(v)}`}
                               >
                                 {v > 0 ? "+" : ""}
                                 {v}%
@@ -803,14 +833,14 @@ export default function Dashboard() {
                     ].map(([l, c]) => (
                       <span
                         key={l}
-                        className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400"
+                        className="flex items-center gap-1.5 text-[10px] text-slate-700 dark:text-slate-300"
                       >
                         <span className={`w-3 h-3 rounded ${c} inline-block`} />
                         {l}
                       </span>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-600 dark:text-slate-500 mt-2">
+                  <p className="text-[10px] text-slate-700 dark:text-slate-400 mt-2">
                     * Approximate median category returns. Actual individual
                     fund returns vary. Source: industry estimates.
                   </p>

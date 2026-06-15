@@ -1,13 +1,12 @@
 // hooks/useFunds.js
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
-import { get, set } from "idb-keyval";
 
 const BASE_URL = "https://api.mfapi.in/mf";
 const AMFI_NAV_URL = "https://portal.amfiindia.com/spages/NAVAll.txt";
 
 async function getWithTimeout(key, timeoutMs = 1000) {
   try {
+    const { get } = await import("idb-keyval");
     return await Promise.race([
       get(key),
       new Promise((_, reject) =>
@@ -25,6 +24,7 @@ async function getWithTimeout(key, timeoutMs = 1000) {
 
 async function setWithTimeout(key, value, timeoutMs = 1000) {
   try {
+    const { set } = await import("idb-keyval");
     return await Promise.race([
       set(key, value),
       new Promise((_, reject) =>
@@ -72,6 +72,7 @@ class CappedLRU extends Map {
 const detailsMemoryCache = new CappedLRU(50);
 
 async function fetchWithRetry(url, options, maxRetries = 2) {
+  const axios = (await import("axios")).default;
   let lastError;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -122,6 +123,7 @@ async function fetchFundListWithFallback() {
   }
 
   try {
+    const axios = (await import("axios")).default;
     const res = await axios.get(AMFI_NAV_URL, {
       timeout: 12000,
       responseType: "text",
@@ -138,11 +140,22 @@ async function fetchFundListWithFallback() {
   }
 }
 
-export function useFunds() {
+export function useFunds(options = {}) {
+  const lazy = options.lazy ?? false;
   const [funds, setFunds] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [wasTriggered, setWasTriggered] = useState(!lazy);
+  const [loading, setLoading] = useState(!lazy);
   const [loadingSlow, setLoadingSlow] = useState(false);
   const [error, setError] = useState(null);
+
+  const triggerFetch = useCallback(() => {
+    setWasTriggered((prev) => {
+      if (!prev) {
+        setLoading(true);
+      }
+      return true;
+    });
+  }, []);
 
   const fetchFunds = useCallback(async (mountedRef) => {
     // mountedRef is passed from useEffect so unmount sets it to false externally.
@@ -229,18 +242,40 @@ export function useFunds() {
   }, []);
 
   useEffect(() => {
+    if (!wasTriggered) return;
+
     // FIX: use a ref object so the async function can observe unmount at any await point.
     const mountedRef = { current: true };
-    fetchFunds(mountedRef);
+    
+    // Defer the heavy initial fetching to let the main thread clear first,
+    // reducing Total Blocking Time (TBT).
+    const runFetch = () => {
+      if (mountedRef.current) {
+        fetchFunds(mountedRef);
+      }
+    };
+    
+    let handle;
+    if (typeof window.requestIdleCallback === "function") {
+      handle = window.requestIdleCallback(runFetch, { timeout: 2000 });
+    } else {
+      handle = setTimeout(runFetch, 100);
+    }
+    
     return () => {
       mountedRef.current = false;
+      if (typeof window.requestIdleCallback === "function") {
+        window.cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle);
+      }
     };
-  }, [fetchFunds]);
+  }, [fetchFunds, wasTriggered]);
 
   // Public refetch: create its own mounted ref (component is still alive when user triggers this)
   const refetch = useCallback(() => fetchFunds(null), [fetchFunds]);
 
-  return { funds, loading, loadingSlow, error, refetch };
+  return { funds, loading, loadingSlow, error, refetch, triggerFetch };
 }
 
 export async function fetchFundDetail(schemeCode) {

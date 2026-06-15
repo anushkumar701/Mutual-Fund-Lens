@@ -51,11 +51,11 @@
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=optional"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=optional" />
     </noscript>
 
     <!--
@@ -73,7 +73,7 @@
       Ensures the heading renders in correct font metrics before Inter loads.
     -->
     <style>
-      html { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+      html { font-family: 'Inter', system-ui, -apple-system, sans-serif; scrollbar-gutter: stable; }
       body { margin: 0; background: #f0f4f8; }
       .dark body { background: #0d1117; }
       #root { min-height: 100vh; }
