@@ -273,6 +273,8 @@ export default function Compare() {
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState("");
   const [range, setRange] = useState("6M");
+  const [customInput, setCustomInput] = useState("");
+  const [customType, setCustomType] = useState("years"); // "years" | "calendar"
   const toast = useToast();
 
   // ── Benchmark state ──────────────────────────────────────────────────────────
@@ -797,8 +799,49 @@ export default function Compare() {
   if (minFundAge >= 20) availableRanges.push("20Y");
   if (minFundAge >= 25) availableRanges.push("25Y");
   if (minFundAge >= 1) availableRanges.push("MAX");
+  const handleCustomRangeChange = (val) => {
+    setCustomInput(val);
+    if (!val.trim()) {
+      setRange("6M");
+      return;
+    }
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      if (customType === "years") {
+        setRange(`custom_years_${num}`);
+      } else {
+        setRange(`custom_start_year_${num}`);
+      }
+    }
+  };
+
+  const handleCustomTypeChange = (type) => {
+    setCustomType(type);
+    if (customInput.trim()) {
+      const num = parseFloat(customInput);
+      if (!isNaN(num) && num > 0) {
+        if (type === "years") {
+          setRange(`custom_years_${num}`);
+        } else {
+          setRange(`custom_start_year_${num}`);
+        }
+      }
+    }
+  };
+
   // Auto-correct range when funds removed or min age changes
   useEffect(() => {
+    if (range && (range.startsWith("custom_years_") || range.startsWith("custom_start_year_"))) {
+      if (range.startsWith("custom_years_")) {
+        const yrs = parseFloat(range.replace("custom_years_", ""));
+        if (!isNaN(yrs) && yrs > minFundAge && minFundAge > 0) {
+          // Cap custom years to minFundAge
+          setCustomInput(String(Math.floor(minFundAge)));
+          setRange(`custom_years_${Math.floor(minFundAge)}`);
+        }
+      }
+      return;
+    }
     if (!availableRanges.includes(range) && availableRanges.length > 0) {
       const ordered = [
         "1M",
@@ -820,8 +863,7 @@ export default function Compare() {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableRanges.length, range]);
+  }, [availableRanges.length, range, minFundAge]);
 
   // Max SIP years = minimum fund age across all compared funds (floor)
   const maxSipYears =
@@ -1235,21 +1277,53 @@ export default function Compare() {
                     </div>
 
                     {/* Range selector */}
-                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
-                      {availableRanges.map((r) => (
-                        <button
-                          key={r}
-                          id={`range-${r}`}
-                          onClick={() => setRange(r)}
-                          className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                            range === r
-                              ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 overflow-x-auto no-scrollbar">
+                        {availableRanges.map((r) => (
+                          <button
+                            key={r}
+                            id={`range-${r}`}
+                            onClick={() => {
+                              setRange(r);
+                              setCustomInput(""); // Reset custom input when clicking standard range
+                            }}
+                            className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                              range === r
+                                ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Custom input */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Custom:
+                        </span>
+                        <div className="flex items-center rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1">
+                          <input
+                            type="number"
+                            min="1"
+                            max={customType === "calendar" ? new Date().getFullYear() : 35}
+                            value={customInput}
+                            onChange={(e) => handleCustomRangeChange(e.target.value)}
+                            placeholder={customType === "calendar" ? "2021" : "Years"}
+                            className="w-14 bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none placeholder-slate-400"
+                            aria-label="Enter custom duration value"
+                          />
+                          <select
+                            value={customType}
+                            onChange={(e) => handleCustomTypeChange(e.target.value)}
+                            className="bg-transparent text-[11px] font-bold text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer border-l border-slate-200 dark:border-slate-600 pl-1.5 ml-1.5"
+                          >
+                            <option value="years" className="bg-white dark:bg-slate-800">Years</option>
+                            <option value="calendar" className="bg-white dark:bg-slate-800">Year (Start)</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

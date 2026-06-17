@@ -58,41 +58,55 @@ function parseNavDate(s) {
 export function filterByRange(data, range) {
   const now = new Date();
   const cutoff = new Date();
-  switch (range) {
-    case "1M":
-      cutoff.setMonth(now.getMonth() - 1);
-      break;
-    case "3M":
-      cutoff.setMonth(now.getMonth() - 3);
-      break;
-    case "6M":
-      cutoff.setMonth(now.getMonth() - 6);
-      break;
-    case "1Y":
-      cutoff.setFullYear(now.getFullYear() - 1);
-      break;
-    case "3Y":
-      cutoff.setFullYear(now.getFullYear() - 3);
-      break;
-    case "5Y":
-      cutoff.setFullYear(now.getFullYear() - 5);
-      break;
-    case "10Y":
-      cutoff.setFullYear(now.getFullYear() - 10);
-      break;
-    case "15Y":
-      cutoff.setFullYear(now.getFullYear() - 15);
-      break;
-    case "20Y":
-      cutoff.setFullYear(now.getFullYear() - 20);
-      break;
-    case "25Y":
-      cutoff.setFullYear(now.getFullYear() - 25);
-      break;
-    case "MAX":
-      return [...data].reverse(); // all data, oldest first
-    default:
-      cutoff.setMonth(now.getMonth() - 6);
+
+  if (range && typeof range === "string" && range.startsWith("custom_years_")) {
+    const yrs = parseFloat(range.replace("custom_years_", ""));
+    if (!isNaN(yrs) && yrs > 0) {
+      cutoff.setTime(now.getTime() - yrs * 365.25 * 24 * 60 * 60 * 1000);
+    }
+  } else if (range && typeof range === "string" && range.startsWith("custom_start_year_")) {
+    const yr = parseInt(range.replace("custom_start_year_", ""), 10);
+    if (!isNaN(yr) && yr > 0) {
+      cutoff.setFullYear(yr, 0, 1);
+      cutoff.setHours(0, 0, 0, 0);
+    }
+  } else {
+    switch (range) {
+      case "1M":
+        cutoff.setMonth(now.getMonth() - 1);
+        break;
+      case "3M":
+        cutoff.setMonth(now.getMonth() - 3);
+        break;
+      case "6M":
+        cutoff.setMonth(now.getMonth() - 6);
+        break;
+      case "1Y":
+        cutoff.setFullYear(now.getFullYear() - 1);
+        break;
+      case "3Y":
+        cutoff.setFullYear(now.getFullYear() - 3);
+        break;
+      case "5Y":
+        cutoff.setFullYear(now.getFullYear() - 5);
+        break;
+      case "10Y":
+        cutoff.setFullYear(now.getFullYear() - 10);
+        break;
+      case "15Y":
+        cutoff.setFullYear(now.getFullYear() - 15);
+        break;
+      case "20Y":
+        cutoff.setFullYear(now.getFullYear() - 20);
+        break;
+      case "25Y":
+        cutoff.setFullYear(now.getFullYear() - 25);
+        break;
+      case "MAX":
+        return [...data].reverse(); // all data, oldest first
+      default:
+        cutoff.setMonth(now.getMonth() - 6);
+    }
   }
 
   // Since NAV data is sorted descending (newest first), we only need to scan
