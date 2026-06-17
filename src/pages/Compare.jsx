@@ -103,14 +103,7 @@ function TERInput({ codeStr, fundName, initialValue, onSave }) {
   );
 }
 
-export default function Compare() {
-  const [searchParams] = useSearchParams();
-  const { funds } = useFunds();
-  const [compareList, setCompareList] = useLocalStorage("fundlens_compare", []);
-  const [, setRecentList] = useLocalStorage("fundlens_recent", []);
-  const [fundData, setFundData] = useState([]);
-
-  // Search state
+export function FundSearchForm({ handleAddCode, compareList, loadingCode, funds }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [filterDirectOnly, setFilterDirectOnly] = useLocalStorage(
@@ -121,6 +114,161 @@ export default function Compare() {
     "fundlens_search_growth",
     true,
   );
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 250);
+
+  const filteredSearch = useMemo(() => {
+    if (!debouncedSearchQuery.trim() || !funds) return [];
+    const q = debouncedSearchQuery.toLowerCase();
+    const matches = funds.filter((f) => {
+      const name = f.schemeName.toLowerCase();
+      if (filterDirectOnly && !name.includes("direct")) return false;
+      if (
+        filterGrowthOnly &&
+        (name.includes("idcw") || name.includes("dividend"))
+      )
+        return false;
+
+      return (
+        name.includes(q) ||
+        f.schemeCode.toString().includes(debouncedSearchQuery)
+      );
+    });
+
+    return matches
+      .sort((a, b) => a.schemeName.length - b.schemeName.length)
+      .slice(0, 15);
+  }, [debouncedSearchQuery, funds, filterDirectOnly, filterGrowthOnly]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    if (/^\d+$/.test(searchQuery.trim())) {
+      handleAddCode(searchQuery.trim());
+      setSearchQuery("");
+      setShowDropdown(false);
+    }
+  };
+
+  const onSelectFund = (code) => {
+    handleAddCode(code);
+    setSearchQuery("");
+    setShowDropdown(false);
+  };
+
+  // Close dropdown on click outside
+  const containerRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <form onSubmit={handleSubmit} className="relative z-20" ref={containerRef}>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"
+            />
+          </svg>
+          <input
+            type="text"
+            id="compare-search-input"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value.slice(0, 100));
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            placeholder="Search funds by name or code..."
+            className="input-base pl-10"
+            disabled={compareList.length >= 4}
+            maxLength={100}
+            aria-label="Search funds to add to comparison by name or scheme code"
+          />
+
+          {showDropdown && searchQuery && filteredSearch.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
+              {filteredSearch.map((f) => (
+                <button
+                  key={f.schemeCode}
+                  type="button"
+                  onClick={() => onSelectFund(f.schemeCode)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center"
+                >
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-1 pr-4">
+                    {f.schemeName}
+                  </span>
+                  <span className="text-xs text-slate-500 font-mono shrink-0">
+                    #{f.schemeCode}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          type="submit"
+          disabled={
+            compareList.length >= 4 || !searchQuery.trim() || loadingCode
+          }
+          className="btn-primary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+        >
+          {loadingCode ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Loading…
+            </span>
+          ) : (
+            "+ Add"
+          )}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 px-1">
+        <span className="text-xs text-slate-500 font-medium">
+          Smart Filters:
+        </span>
+        <button
+          type="button"
+          onClick={() => setFilterDirectOnly(!filterDirectOnly)}
+          className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterDirectOnly ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+        >
+          {filterDirectOnly ? "✓ Direct Only" : "Direct Only"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterGrowthOnly(!filterGrowthOnly)}
+          className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterGrowthOnly ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+        >
+          {filterGrowthOnly ? "✓ Growth Only" : "Growth Only"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export default function Compare() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { funds } = useFunds();
+  const [compareList, setCompareList] = useLocalStorage("fundlens_compare", []);
+  const [, setRecentList] = useLocalStorage("fundlens_recent", []);
+  const [fundData, setFundData] = useState([]);
 
   const [loadingCode, setLoadingCode] = useState(null);
   const [fetchError, setFetchError] = useState("");
@@ -292,8 +440,10 @@ export default function Compare() {
 
         return finalCodes;
       });
+      // Clear URL params to keep the address bar clean and prevent duplicate logic bugs on reload
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setCompareList, setSipFundTER]);
+  }, [searchParams, setSearchParams, setCompareList, setSipFundTER]);
 
   // Load all codes in compareList
   useEffect(() => {
@@ -321,49 +471,7 @@ export default function Compare() {
     }
     setCompareList((prev) => [...prev, codeStr]);
     loadFund(codeStr);
-    setSearchQuery("");
-    setShowDropdown(false);
   };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    // If it's a numeric code, add directly
-    if (/^\d+$/.test(searchQuery.trim())) {
-      handleAddCode(searchQuery.trim());
-      return;
-    }
-
-    // Otherwise rely on dropdown selection
-  };
-
-  const debouncedSearchQuery = useDebounce(searchQuery, 250);
-
-  const filteredSearch = useMemo(() => {
-    if (!debouncedSearchQuery.trim() || !funds) return [];
-    const q = debouncedSearchQuery.toLowerCase();
-    const matches = funds.filter((f) => {
-      const name = f.schemeName.toLowerCase();
-      // Apply the user's smart filters
-      if (filterDirectOnly && !name.includes("direct")) return false;
-      if (
-        filterGrowthOnly &&
-        (name.includes("idcw") || name.includes("dividend"))
-      )
-        return false;
-
-      return (
-        name.includes(q) ||
-        f.schemeCode.toString().includes(debouncedSearchQuery)
-      );
-    });
-
-    // Sort to prioritize shortest name length first (usually the main parent fund)
-    return matches
-      .sort((a, b) => a.schemeName.length - b.schemeName.length)
-      .slice(0, 15);
-  }, [debouncedSearchQuery, funds, filterDirectOnly, filterGrowthOnly]);
 
   const removeFund = (code) => {
     const codeStr = String(code);
@@ -398,37 +506,71 @@ export default function Compare() {
     setFundData([]);
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format) => {
     const el = document.getElementById("compare-export-area");
     if (!el) return;
     try {
-      toast("Generating full-page export…", "info");
+      toast(`Generating full-page ${format.toUpperCase()} export…`, "info");
       const html2canvasModule = await import("html2canvas");
-      // Capture the FULL element — not just the visible viewport portion.
-      // scrollWidth/scrollHeight give total rendered dimensions regardless of scroll.
+
+      // Save original styles
+      const originalWidth = el.style.width;
+      const originalMaxWidth = el.style.maxWidth;
+
+      // Force a clean desktop layout (1200px width) during capture for high-quality charts
+      el.style.width = "1200px";
+      el.style.maxWidth = "1200px";
+
+      // Let charts redraw at 1200px width
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
       const canvas = await html2canvasModule.default(el, {
         backgroundColor: isDark ? "#0f172a" : "#f8fafc",
         useCORS: true,
+        scale: 2, // High resolution
         logging: false,
-        allowTaint: false,
-        // Full element dimensions
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        // Offset for current scroll so off-screen content is included
-        scrollX: -window.scrollX,
-        scrollY: -window.scrollY,
-        windowWidth: Math.max(
-          document.documentElement.scrollWidth,
-          el.scrollWidth,
-        ),
-        windowHeight: el.scrollHeight,
       });
-      const link = document.createElement("a");
-      link.download = `fundlens-comparison-${new Date().toISOString().slice(0, 10)}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch {
-      toast("Failed to generate export image.", "error");
+
+      // Restore original styles
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      if (format === "pdf") {
+        const { jsPDF } = await import("jspdf");
+        const imgData = canvas.toDataURL("image/png");
+
+        const imgWidth = 210; // A4 width in mm
+        const pageHeight = 297; // A4 height in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        const pdf = new jsPDF("p", "mm", "a4");
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
+        heightLeft -= pageHeight;
+
+        while (heightLeft >= 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
+          heightLeft -= pageHeight;
+        }
+
+        pdf.save(`fundlens-comparison-${dateStr}.pdf`);
+      } else {
+        const link = document.createElement("a");
+        link.download = `fundlens-comparison-${dateStr}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      }
+
+      toast("Export complete!", "success");
+    } catch (err) {
+      console.error(err);
+      toast(`Failed to generate ${format.toUpperCase()} export.`, "error");
     }
   };
 
@@ -858,9 +1000,16 @@ export default function Compare() {
                   🔗 Share Link
                 </button>
                 <button
-                  onClick={handleExport}
+                  onClick={() => handleExport("pdf")}
+                  aria-label="Export full comparison as PDF document"
+                  className="btn-secondary text-xs px-3 py-2 border-emerald-200 text-emerald-600 dark:border-emerald-800 dark:text-emerald-400"
+                >
+                  📄 Export PDF
+                </button>
+                <button
+                  onClick={() => handleExport("png")}
                   aria-label="Export full comparison as PNG image"
-                  className="btn-secondary text-xs px-3 py-2"
+                  className="btn-secondary text-xs px-3 py-2 border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400"
                 >
                   📸 Export PNG
                 </button>
@@ -887,98 +1036,12 @@ export default function Compare() {
         </div>
 
         {/* Add fund search */}
-        <form onSubmit={handleSearchSubmit} className="relative z-20">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"
-                />
-              </svg>
-              <input
-                type="text"
-                id="compare-search-input"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value.slice(0, 100));
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                placeholder="Search funds by name or code..."
-                className="input-base pl-10"
-                disabled={compareList.length >= 4}
-                maxLength={100}
-                aria-label="Search funds to add to comparison by name or scheme code"
-              />
-
-              {/* Autocomplete Dropdown */}
-              {showDropdown && searchQuery && filteredSearch.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
-                  {filteredSearch.map((f) => (
-                    <button
-                      key={f.schemeCode}
-                      type="button"
-                      onClick={() => handleAddCode(f.schemeCode)}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center"
-                    >
-                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-1 pr-4">
-                        {f.schemeName}
-                      </span>
-                      <span className="text-xs text-slate-500 font-mono shrink-0">
-                        #{f.schemeCode}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={
-                compareList.length >= 4 || !searchQuery.trim() || loadingCode
-              }
-              className="btn-primary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-            >
-              {loadingCode ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Loading…
-                </span>
-              ) : (
-                "+ Add"
-              )}
-            </button>
-          </div>
-
-          {/* Smart Search Filter Chips */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 px-1">
-            <span className="text-xs text-slate-500 font-medium">
-              Smart Filters:
-            </span>
-            <button
-              type="button"
-              onClick={() => setFilterDirectOnly(!filterDirectOnly)}
-              className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterDirectOnly ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
-            >
-              {filterDirectOnly ? "✓ Direct Only" : "Direct Only"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterGrowthOnly(!filterGrowthOnly)}
-              className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors border ${filterGrowthOnly ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-transparent text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
-            >
-              {filterGrowthOnly ? "✓ Growth Only" : "Growth Only"}
-            </button>
-          </div>
-        </form>
+        <FundSearchForm
+          handleAddCode={handleAddCode}
+          compareList={compareList}
+          loadingCode={loadingCode}
+          funds={funds}
+        />
 
         {fetchError && (
           <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-lg">

@@ -19,6 +19,15 @@ export function sanitizeDataKey(name) {
 }
 
 /**
+ * Fast sort key generation from DD-MM-YYYY date format.
+ * Avoids allocating arrays via split() or regex inside hot loops (like array sorting).
+ */
+export function getSortKey(s) {
+  if (!s || s.length !== 10) return s;
+  return s.slice(6, 10) + s.slice(3, 5) + s.slice(0, 2);
+}
+
+/**
  * Calculate fund age in years from NAV data.
  */
 export function getFundAgeYears(navData) {
@@ -85,12 +94,20 @@ export function filterByRange(data, range) {
     default:
       cutoff.setMonth(now.getMonth() - 6);
   }
-  return data
-    .filter((d) => {
-      const dt = parseNavDate(d.date);
-      return !isNaN(dt.getTime()) && dt >= cutoff;
-    })
-    .reverse(); // oldest → newest
+
+  // Since NAV data is sorted descending (newest first), we only need to scan
+  // and parse dates until we cross the cutoff date.
+  let limitIndex = data.length;
+  for (let i = 0; i < data.length; i++) {
+    const dt = parseNavDate(data[i].date);
+    if (!isNaN(dt.getTime()) && dt < cutoff) {
+      limitIndex = i;
+      break;
+    }
+  }
+
+  // Slice up to the limitIndex and reverse to return oldest -> newest
+  return data.slice(0, limitIndex).reverse();
 }
 
 /**
@@ -143,13 +160,6 @@ export function buildChartData(funds, range) {
     });
   });
 
-  const getSortKey = (s) => {
-    const parts = s.split("-");
-    if (parts.length !== 3) return s;
-    const [dd, mm, yyyy] = parts;
-    return `${yyyy}${mm}${dd}`;
-  };
-
   return Object.values(dateMap).sort((a, b) =>
     getSortKey(a.date).localeCompare(getSortKey(b.date)),
   );
@@ -178,13 +188,6 @@ export function toWeeklyData(chartData) {
     weekMap[key] = row;
   });
 
-  const getSortKey = (s) => {
-    const parts = s.split("-");
-    if (parts.length !== 3) return s;
-    const [dd, mm, yyyy] = parts;
-    return `${yyyy}${mm}${dd}`;
-  };
-
   return Object.values(weekMap).sort((a, b) =>
     getSortKey(a.date).localeCompare(getSortKey(b.date)),
   );
@@ -205,13 +208,6 @@ export function toMonthlyData(chartData) {
     // Last entry per month wins (data is sorted ascending by date)
     monthMap[key] = row;
   });
-
-  const getSortKey = (s) => {
-    const parts = s.split("-");
-    if (parts.length !== 3) return s;
-    const [dd, mm, yyyy] = parts;
-    return `${yyyy}${mm}${dd}`;
-  };
 
   return Object.values(monthMap).sort((a, b) =>
     getSortKey(a.date).localeCompare(getSortKey(b.date)),

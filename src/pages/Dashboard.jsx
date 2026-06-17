@@ -14,32 +14,68 @@ import { isFundClosed } from "../utils/fundFilters";
 // ─── Category config ───────────────────────────────────────────
 const CAT_CFG = {
   Equity: {
-    e: "📈",
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+    ),
     color: "#1d4ed8",
     desc: "Long-term wealth. Best for 7+ years.",
   },
   Debt: {
-    e: "🏛️",
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
     color: "#047857",
     desc: "Stable returns. Good for 1–3 years.",
   },
   Hybrid: {
-    e: "⚖️",
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
     color: "#b45309",
     desc: "Balanced equity & debt exposure.",
   },
   ELSS: {
-    e: "🧾",
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
     color: "#6d28d9",
     desc: "Tax saving under 80C. 3-yr lock-in.",
   },
-  Index: { e: "📊", color: "#4338ca", desc: "Low cost. Tracks Nifty/Sensex." },
+  Index: {
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+    color: "#4338ca",
+    desc: "Low cost. Tracks Nifty/Sensex.",
+  },
   Liquid: {
-    e: "💧",
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
     color: "#0f766e",
     desc: "Like savings account. Emergency fund.",
   },
-  Other: { e: "📁", color: "#64748b", desc: "Specialty & sector funds." },
+  Other: {
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      </svg>
+    ),
+    color: "#64748b",
+    desc: "Specialty & sector funds.",
+  },
 };
 
 // ─── Fund Search Box ───────────────────────────────────────────
@@ -134,7 +170,7 @@ function FundSearchBox({
         )}
       </div>
       <p className="text-xs text-slate-600 dark:text-slate-500 mt-2 text-center">
-        🔍 Type to search · Click a fund to view details · No page change needed
+        Type to search · Click a fund to view details · No page change needed
       </p>
 
       {/* Dropdown results / Loading / Error states */}
@@ -156,7 +192,7 @@ function FundSearchBox({
               </p>
               {loadingSlow && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  ⏳ Connection is slow. Please wait.
+                  Connection is slow. Please wait.
                 </p>
               )}
             </div>
@@ -200,7 +236,7 @@ function FundSearchBox({
                       onClick={() => handleSelect(fund)}
                       className="w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left border-b border-slate-50 dark:border-slate-700/50 last:border-0"
                     >
-                      <span className="text-lg mt-0.5 flex-shrink-0">{cfg.e}</span>
+                      <span className="mt-0.5 flex-shrink-0 text-slate-400 dark:text-slate-500">{cfg.icon("w-5 h-5")}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span
@@ -276,7 +312,8 @@ function QuickCalc() {
   return (
     <div className="card p-4 sm:p-5 h-full">
       <h3 className="font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
-        🧮 Quick Wealth Simulator
+        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 00-2-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <span>Quick Wealth Simulator</span>
       </h3>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {[
@@ -404,21 +441,24 @@ export default function Dashboard() {
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-6 w-full max-w-md sm:max-w-none mx-auto">
             <Link
               to="/screener"
-              className="btn-primary px-5 py-3 shadow-md w-full sm:w-auto text-center"
+              className="btn-primary px-5 py-3 shadow-md w-full sm:w-auto text-center flex items-center justify-center gap-2"
             >
-              🔍 Browse & Filter Funds
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/></svg>
+              <span>Browse & Filter Funds</span>
             </Link>
             <Link
               to="/compare"
-              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center"
+              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center flex items-center justify-center gap-2"
             >
-              ⚖️ Compare Funds
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <span>Compare Funds</span>
             </Link>
             <Link
               to="/sip"
-              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center"
+              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center flex items-center justify-center gap-2"
             >
-              🔥 SIP + FIRE Calc
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Wealth Simulator</span>
             </Link>
           </div>
         </div>
@@ -444,8 +484,9 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <QuickCalc />
             <div className="card p-5 h-full">
-              <h3 className="font-bold text-slate-900 dark:text-white mb-4">
-                🎯 Which Fund for Which Goal?
+              <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19a7 7 0 100-14 7 7 0 000 14zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>
+                <span>Goal-Based Fund Matching</span>
               </h3>
               <div className="space-y-3">
                 {[
@@ -551,7 +592,7 @@ export default function Dashboard() {
                     to={`/screener?cat=${cat}`}
                     className="card p-4 text-center hover:shadow-md hover:-translate-y-0.5 transition-all group"
                   >
-                    <div className="text-2xl mb-2">{cfg.e}</div>
+                    <div className="mb-2 flex justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-500 transition-colors">{cfg.icon("w-7 h-7")}</div>
                     <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
                       {cat}
                     </div>
@@ -608,7 +649,10 @@ export default function Dashboard() {
                       className="text-xs font-bold mb-2"
                       style={{ color: cfg.color }}
                     >
-                      {cfg.e} {cat}
+                      <span className="flex items-center gap-1.5">
+                        {cfg.icon("w-3.5 h-3.5")}
+                        <span>{cat}</span>
+                      </span>
                     </div>
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 mb-3 leading-snug">
                       {fund.schemeName}
@@ -665,7 +709,7 @@ export default function Dashboard() {
                 name: "Parag Parikh Flexi Cap",
                 category: "Equity",
                 badge: "Flexi Cap",
-                highlight: "🌍 Global Diversification",
+                highlight: "Global Diversification",
                 reason:
                   "Strong multi-cap fund with ~35% overseas allocation. Low overlap with Nifty-heavy peers. Consistent top-quartile 5Y returns.",
                 color: "#1d4ed8",
@@ -675,7 +719,7 @@ export default function Dashboard() {
                 name: "Mirae Asset Large Cap",
                 category: "Equity",
                 badge: "Large Cap",
-                highlight: "🏆 Category Leader",
+                highlight: "Category Leader",
                 reason:
                   "One of the lowest expense ratios in large-cap category. Consistent alpha over benchmark across market cycles.",
                 color: "#047857",
@@ -685,7 +729,7 @@ export default function Dashboard() {
                 name: "Axis Small Cap",
                 category: "Equity",
                 badge: "Small Cap",
-                highlight: "🚀 High Growth",
+                highlight: "High Growth",
                 reason:
                   "Top-performing small cap with disciplined portfolio. Ideal for aggressive investors with 7+ year horizon.",
                 color: "#6d28d9",
@@ -736,9 +780,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-slate-600 dark:text-slate-500 mt-2">
-            ⚠️ Curated picks are for educational purposes only. Not investment
-            advice. Consult a SEBI-registered advisor before investing.
+          <p className="text-[10px] text-slate-600 dark:text-slate-500 mt-2 flex items-start gap-1.5">
+            <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <span>Curated picks are for educational purposes only. Not investment advice. Consult a SEBI-registered advisor before investing.</span>
           </p>
         </section>
 
@@ -753,9 +797,10 @@ export default function Dashboard() {
           <div className="mb-4">
             <h2
               id="heatmap-heading"
-              className="text-xl font-bold text-slate-900 dark:text-white"
+              className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2"
             >
-              📊 Category Returns Heatmap
+              <svg className="w-5 h-5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <span>Category Returns Heatmap</span>
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               Approximate annual returns by fund category — spot market cycles
