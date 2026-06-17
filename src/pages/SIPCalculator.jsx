@@ -138,6 +138,35 @@ function resolveRules(sellFY) {
  * Computes tax and returns a plain-English explanation.
  * Adding new budget rules only requires adding to TAX_RULES above — this function stays unchanged.
  */
+function renderStepIcon(name, cls) {
+  switch (name) {
+    case "loss":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>;
+    case "refresh":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.75 8.25M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    case "info":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    case "clock":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    case "fee":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    case "trophy":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>;
+    case "gift":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>;
+    case "calculator":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 00-2-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>;
+    case "scale":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>;
+    case "bank":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>;
+    case "calendar":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>;
+    default:
+      return null;
+  }
+}
+
 function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
   const sellFY = getSellFY(sellDate);
   const { rules, fyKey, fyLabel } = resolveRules(sellFY);
@@ -149,23 +178,23 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
   // ── Loss ──────────────────────────────────────────────────────────────────
   if (gain <= 0) {
     return {
-      taxType: "✅ Capital Loss — No Tax",
+      taxType: "Capital Loss (No Tax)",
       taxAmount: 0,
       fyLabel,
       rulesNote: rules.note,
       steps: [
         {
-          icon: "📉",
+          icon: "loss",
           title: "You made a loss",
           body: `You sold for ${fmt(Math.abs(gain))} less than you bought. No tax is due.`,
         },
         {
-          icon: "🔄",
+          icon: "refresh",
           title: "Carry-forward benefit",
           body: "This loss can be carried forward for up to 8 financial years and set off against future capital gains.",
         },
         {
-          icon: "💡",
+          icon: "info",
           title: "Tip",
           body: "Short-term capital loss can offset both short-term and long-term gains. Long-term loss can only offset long-term gains.",
         },
@@ -181,23 +210,23 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
       const tax = gain * rules.equity.stcgRate;
       const ratePct = (rules.equity.stcgRate * 100).toFixed(0);
       return {
-        taxType: `⚡ STCG @ ${ratePct}%`,
+        taxType: `STCG @ ${ratePct}%`,
         taxAmount: tax,
         fyLabel,
         rulesNote: rules.note,
         steps: [
           {
-            icon: "⏱️",
+            icon: "clock",
             title: `Held only ${holdMo} months`,
             body: `Less than 12 months = Short-Term. The government treats this like a quick profit and taxes it more heavily.`,
           },
           {
-            icon: `💸`,
+            icon: `fee`,
             title: `STCG rate is ${ratePct}% flat`,
             body: `Your profit of ${fmt(gain)} is fully taxable. Tax = ${fmt(gain)} × ${ratePct}% = ${fmt(tax)}.`,
           },
           {
-            icon: "💡",
+            icon: "info",
             title: "Money-saving tip",
             body: `If you wait until this fund completes 12 months, the STCG rate of ${ratePct}% drops to LTCG rate of ${(rules.equity.ltcgRate * 100).toFixed(1)}% — and first ${fmt(rules.equity.ltcgExemption)} is tax-free!`,
           },
@@ -211,23 +240,23 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
       const tax = taxableGain * rules.equity.ltcgRate;
       const ratePct = (rules.equity.ltcgRate * 100).toFixed(1);
       return {
-        taxType: `🟢 LTCG @ ${ratePct}%`,
+        taxType: `LTCG @ ${ratePct}%`,
         taxAmount: tax,
         fyLabel,
         rulesNote: rules.note,
         steps: [
           {
-            icon: "🏆",
+            icon: "trophy",
             title: `Held ${holdYrs} years — LTCG applies`,
             body: `You held for more than 12 months. This qualifies as Long-Term Capital Gain (LTCG), which is taxed at a lower rate.`,
           },
           {
-            icon: "🎁",
+            icon: "gift",
             title: `First ${fmt(exemption)} is tax-free`,
             body: `Every financial year, the government gives a free exemption of ${fmt(exemption)} on equity LTCG. You don't pay even 1 rupee on this portion.`,
           },
           {
-            icon: "🧮",
+            icon: "calculator",
             title: "How tax is calculated",
             body:
               taxableGain <= 0
@@ -248,23 +277,23 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
   if (useSlabRate) {
     const tax = gain * (taxSlab / 100);
     return {
-      taxType: `🏦 Slab Rate @ ${taxSlab}%`,
+      taxType: `Slab Rate @ ${taxSlab}%`,
       taxAmount: tax,
       fyLabel,
       rulesNote: rules.note,
       steps: [
         {
-          icon: "⚖️",
+          icon: "scale",
           title: "Debt funds lost LTCG benefit (Apr 2023)",
           body: `From April 1, 2023, all debt fund gains — whether you held for 1 month or 10 years — are added to your income and taxed at your income tax slab rate.`,
         },
         {
-          icon: "🏦",
+          icon: "bank",
           title: `Your slab rate is ${taxSlab}%`,
           body: `Tax = ${fmt(gain)} × ${taxSlab}% = ${fmt(tax)}. This is the same as how Fixed Deposit interest is taxed.`,
         },
         {
-          icon: "💡",
+          icon: "info",
           title: "Smarter alternatives",
           body: `If you want lower tax, consider Equity Savings Funds (65%+ equity) which qualify for equity LTCG, or Tax-Free Bonds for post-tax efficiency.`,
         },
@@ -288,7 +317,7 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
     rulesNote: rules.note,
     steps: [
       {
-        icon: "📅",
+        icon: "calendar",
         title: "Old debt rules applied",
         body: `Your sell date falls under older tax rules (${fyLabel}). LTCG on debt was ${(rules.debt.ltcgRate * 100).toFixed(0)}% with indexation for holds > ${rules.debt.ltcgMonths} months.`,
       },
@@ -296,6 +325,29 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
     pillColor:
       "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
   };
+}
+
+function renderTabIcon(id, cls) {
+  switch (id) {
+    case "calc":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>;
+    case "swp":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V6.125c0-.621.504-1.125 1.125-1.125H9.75M9 5.25h6m-6 3h6m-6 3h6m-6 3h6"/></svg>;
+    case "goal":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    case "elss":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>;
+    case "fire":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/></svg>;
+    case "tax":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21V10m0 10a2 2 0 01-2-2V8a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2m-6-3a2 2 0 002 2h2a2 2 0 002-2m0-3a2 2 0 00-2-2H9a2 2 0 00-2 2v3zm12-3a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2h-2z"/></svg>;
+    case "date":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>;
+    case "clock":
+      return <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    default:
+      return null;
+  }
 }
 
 export default function SIPCalculator() {
@@ -544,20 +596,21 @@ export default function SIPCalculator() {
         {/* Page Tabs */}
         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
           {[
-            ["calc", "📈 SIP / Lumpsum"],
-            ["swp", "💸 SWP"],
-            ["goal", "🎯 Goal"],
-            ["elss", "🧾 ELSS Tax"],
-            ["fire", "🔥 FIRE"],
-            ["tax", "🏛️ Tax P&L"],
-            ["date", "📅 SIP Date"],
+            ["calc", "SIP / Lumpsum"],
+            ["swp", "SWP"],
+            ["goal", "Goal"],
+            ["elss", "ELSS Tax"],
+            ["fire", "FIRE"],
+            ["tax", "Tax P&L"],
+            ["date", "SIP Date"],
           ].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setPageTab(id)}
-              className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${pageTab === id ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+              className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 ${pageTab === id ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
             >
-              {label}
+              {renderTabIcon(id, `w-4 h-4 ${pageTab === id ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500"}`)}
+              <span>{label}</span>
             </button>
           ))}
         </div>
@@ -678,15 +731,22 @@ export default function SIPCalculator() {
                     className={`flex items-center justify-between text-xs rounded-lg px-3 py-2 ${effectiveReturnWarning ? "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800" : "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800"}`}
                   >
                     <span
-                      className={
+                      className={`flex items-center gap-1 ${
                         effectiveReturnWarning
                           ? "text-red-700 dark:text-red-300"
                           : "text-amber-700 dark:text-amber-300"
-                      }
+                      }`}
                     >
-                      {effectiveReturnWarning
-                        ? "🚫 Expense ratio cancels all returns!"
-                        : "⚠️ Effective Return"}
+                      {effectiveReturnWarning ? (
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                      )}
+                      <span>
+                        {effectiveReturnWarning
+                          ? "Expense ratio cancels all returns!"
+                          : "Effective Return"}
+                      </span>
                     </span>
                     <span
                       className={`font-bold ${effectiveReturnWarning ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}
@@ -922,11 +982,13 @@ export default function SIPCalculator() {
                   onClick={() => setShowTable(!showTable)}
                   className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
                 >
-                  <span className="font-bold text-slate-900 dark:text-white text-sm">
-                    📋{" "}
-                    {showTable
-                      ? "Hide Breakdown ▲"
-                      : "Show Year-by-Year Breakdown ▼"}
+                  <span className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+                    <span>
+                      {showTable
+                        ? "Hide Breakdown"
+                        : "Show Year-by-Year Breakdown"}
+                    </span>
                   </span>
                 </button>
                 {showTable && (
@@ -985,7 +1047,7 @@ export default function SIPCalculator() {
 
               <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <span className="text-amber-500 text-lg mt-0.5">⚠️</span>
+                  <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                   <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                     <strong>Disclaimer:</strong> Estimated returns are based on
                     assumed rates and are not guaranteed. Past performance does
@@ -1004,7 +1066,7 @@ export default function SIPCalculator() {
             <div className="card p-6 space-y-6">
               <div>
                 <h2 className="font-bold text-slate-900 dark:text-white mb-1">
-                  💸 Systematic Withdrawal Plan (SWP)
+                  Systematic Withdrawal Plan (SWP)
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Calculate how much regular income you can withdraw from your
@@ -1093,8 +1155,8 @@ export default function SIPCalculator() {
                   accent={swpResult.finalValue > 0}
                   sub={
                     swpResult.finalValue === 0
-                      ? "🚫 Corpus exhausted early"
-                      : "💼 Portfolio left"
+                      ? "Corpus exhausted early"
+                      : "Portfolio left"
                   }
                 />
                 <ResultCard
@@ -1107,7 +1169,7 @@ export default function SIPCalculator() {
               {swpResult.ranOutYear !== null ? (
                 <div className="card p-5 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300">
                   <div className="flex gap-3 items-start">
-                    <span className="text-2xl">⚠️</span>
+                    <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     <div>
                       <p className="font-bold text-sm">
                         Corpus Exhausted Early!
@@ -1124,9 +1186,9 @@ export default function SIPCalculator() {
                         </strong>
                         .
                       </p>
-                      <p className="text-xs mt-2 text-slate-500">
-                        💡 Try lowering monthly withdrawal or a higher return
-                        allocation.
+                      <p className="text-xs mt-2 text-slate-500 flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Try lowering monthly withdrawal or a higher return allocation.</span>
                       </p>
                     </div>
                   </div>
@@ -1134,7 +1196,7 @@ export default function SIPCalculator() {
               ) : (
                 <div className="card p-5 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
                   <div className="flex gap-3 items-start">
-                    <span className="text-2xl">🎉</span>
+                    <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
                     <div>
                       <p className="font-bold text-sm">
                         Highly Sustainable Plan!
@@ -1511,28 +1573,30 @@ export default function SIPCalculator() {
                 <div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-600 dark:text-slate-400">
                   {[
                     [
-                      "⏱️",
+                      "clock",
                       "Shortest Lock-in",
                       "Only 3 years — vs 5 years for PPF/NSC",
                     ],
                     [
-                      "📈",
+                      "calc",
                       "Equity Returns",
                       "Historically 12–15% CAGR over 10+ years",
                     ],
                     [
-                      "💸",
+                      "elss",
                       "Tax Efficient",
                       "LTCG up to ₹1L is tax-free annually",
                     ],
                     [
-                      "🔄",
+                      "swp",
                       "SIP Friendly",
                       "Start with ₹500/month in ELSS funds",
                     ],
-                  ].map(([icon, title, desc]) => (
+                  ].map(([id, title, desc]) => (
                     <div key={title} className="flex gap-2">
-                      <span className="text-lg flex-shrink-0">{icon}</span>
+                      <span className="flex-shrink-0 mt-0.5">
+                        {renderTabIcon(id, "w-4 h-4 text-violet-600 dark:text-violet-400")}
+                      </span>
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">
                           {title}
@@ -1543,10 +1607,11 @@ export default function SIPCalculator() {
                   ))}
                 </div>
               </div>
-              <div className="card p-4 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
-                ⚠️ Tax savings shown are indicative. Actual savings depend on
+              <div className="card p-4 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span>Tax savings shown are indicative. Actual savings depend on
                 total 80C investments and your income. Consult a CA for precise
-                calculations.
+                calculations.</span>
               </div>
             </div>
           </div>
@@ -2140,12 +2205,12 @@ export default function SIPCalculator() {
                   {/* Step-by-step plain English explanation */}
                   <div className="card p-4 space-y-3">
                     <p className="font-bold text-slate-900 dark:text-white text-sm">
-                      📖 Why this tax? (Simple explanation)
+                      Why this tax? (Simple explanation)
                     </p>
                     {steps.map((step, i) => (
                       <div key={i} className="flex gap-3 items-start">
                         <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-base flex-shrink-0">
-                          {step.icon}
+                          {renderStepIcon(step.icon, "w-4 h-4 text-blue-600 dark:text-blue-400")}
                         </div>
                         <div className="flex-1">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-0.5">
@@ -2162,7 +2227,7 @@ export default function SIPCalculator() {
                   {/* Tax summary table */}
                   <div className="card p-4 space-y-2 text-xs text-slate-600 dark:text-slate-400">
                     <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                      📋 Complete Tax Breakdown
+                      Complete Tax Breakdown
                     </p>
                     {[
                       ["Amount Invested", formatINR(taxBuyAmount)],
