@@ -37,26 +37,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!-- Preconnect to external origins (reduces DNS + TLS handshake time) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://api.mfapi.in" />
     <link rel="dns-prefetch" href="https://api.mfapi.in" />
-
-    <!--
-      Font: loaded as non-render-blocking via preload + onload swap.
-      This eliminates the render-blocking stylesheet penalty from Lighthouse
-      while keeping the font available quickly. The <noscript> fallback
-      ensures no-JS environments still load the font.
-    -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=optional"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=optional" />
-    </noscript>
 
     <!--
       Theme flash prevention — inlined so it runs synchronously before any paint.
