@@ -90,6 +90,29 @@ const links = [
       </svg>
     ),
   },
+  {
+    to: "/portfolio",
+    label: "Portfolio",
+    badgeKey: "fundlens_portfolio",
+    badgeColor: "bg-emerald-500",
+    icon: (
+      <svg
+        className="w-5 h-5"
+        aria-hidden="true"
+        focusable="false"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M16 8v8m-4-5v5m-4-2v2M2 5a2 2 0 012-2h16a2 2 0 012 2v14a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"
+        />
+      </svg>
+    ),
+  },
 ];
 
 function NavBadge({ storageKey, color }) {
