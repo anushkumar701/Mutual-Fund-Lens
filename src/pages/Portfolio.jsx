@@ -228,22 +228,41 @@ export default function Portfolio() {
   // Autocomplete fund matching
   const searchResults = useMemo(() => {
     if (!debouncedQuery.trim() || debouncedQuery.length < 2 || !funds) return [];
-    const q = debouncedQuery.toLowerCase();
-    return funds
-      .filter((f) => {
-        const name = f.schemeName.toLowerCase();
-        if (filterDirectOnly && !name.includes("direct")) return false;
-        if (
-          filterGrowthOnly &&
-          (name.includes("idcw") || name.includes("dividend"))
-        )
-          return false;
-        return (
-          name.includes(q) ||
-          f.schemeCode.toString().includes(debouncedQuery)
-        );
-      })
-      .sort((a, b) => a.schemeName.length - b.schemeName.length)
+    const q = debouncedQuery.trim().toLowerCase();
+    const matches = funds.filter((f) => {
+      const name = f.schemeName.toLowerCase();
+      if (filterDirectOnly && !name.includes("direct")) return false;
+      if (
+        filterGrowthOnly &&
+        (name.includes("idcw") || name.includes("dividend"))
+      )
+        return false;
+      return (
+        name.includes(q) ||
+        f.schemeCode.toString().includes(q)
+      );
+    });
+
+    const scoredMatches = matches.map((f) => {
+      const name = f.schemeName.toLowerCase();
+      const code = f.schemeCode.toString();
+
+      let score = 0;
+      if (code === q) {
+        score = 1000;
+      } else if (name.startsWith(q)) {
+        score = 500 - name.length;
+      } else {
+        const index = name.indexOf(q);
+        score = 100 - index - name.length;
+      }
+
+      return { fund: f, score };
+    });
+
+    return scoredMatches
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.fund)
       .slice(0, 10);
   }, [debouncedQuery, funds, filterDirectOnly, filterGrowthOnly]);
 
