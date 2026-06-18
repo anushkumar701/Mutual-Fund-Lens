@@ -748,21 +748,32 @@ export default function Portfolio() {
                   </p>
                 </div>
                 {/* Time Range Selector */}
-                <div className="flex self-start sm:self-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
-                  {["30d", "90d", "180d", "365d", "all"].map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setChartRange(r)}
-                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-                        chartRange === r
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-                      }`}
-                    >
-                      {r === "all" ? "ALL" : r.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const RANGE_LABELS = {
+                    "30d": "1M",
+                    "90d": "3M",
+                    "180d": "6M",
+                    "365d": "1Y",
+                    "all": "ALL"
+                  };
+                  return (
+                    <div className="flex self-start sm:self-center bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
+                      {["30d", "90d", "180d", "365d", "all"].map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setChartRange(r)}
+                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                            chartRange === r
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                          }`}
+                        >
+                          {RANGE_LABELS[r]}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex-1 min-h-[260px]">
                 {detailsLoading ? (
