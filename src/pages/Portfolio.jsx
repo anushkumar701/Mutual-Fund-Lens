@@ -514,8 +514,25 @@ export default function Portfolio() {
 
   // Update cached total portfolio value in localStorage for Navbar and Dashboard usage
   useEffect(() => {
-    localStorage.setItem("fundlens_portfolio_total_value", String(portfolioSummary.totalCurrent));
-  }, [portfolioSummary.totalCurrent]);
+    if (holdings.length === 0) {
+      localStorage.setItem("fundlens_portfolio_total_value", "0");
+      return;
+    }
+
+    const hasAnyApiHolding = holdings.some(
+      (h) => !(typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-"))
+    );
+    const hasLoadedAllApiHoldings = holdings.every((h) => {
+      const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
+      return isManual || detailsCache[h.schemeCode]?.data?.[0]?.nav;
+    });
+
+    if (!hasAnyApiHolding || hasLoadedAllApiHoldings) {
+      if (portfolioSummary.totalCurrent > 0) {
+        localStorage.setItem("fundlens_portfolio_total_value", String(portfolioSummary.totalCurrent));
+      }
+    }
+  }, [portfolioSummary.totalCurrent, holdings, detailsCache]);
 
   // Reconstruct portfolio valuation chart data over time
   const historicalChartData = useMemo(() => {
