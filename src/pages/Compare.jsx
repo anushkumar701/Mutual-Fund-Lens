@@ -119,7 +119,7 @@ export function FundSearchForm({ handleAddCode, compareList, loadingCode, funds 
 
   const filteredSearch = useMemo(() => {
     if (!debouncedSearchQuery.trim() || !funds) return [];
-    const q = debouncedSearchQuery.toLowerCase();
+    const q = debouncedSearchQuery.trim().toLowerCase();
     const matches = funds.filter((f) => {
       const name = f.schemeName.toLowerCase();
       if (filterDirectOnly && !name.includes("direct")) return false;
@@ -131,12 +131,30 @@ export function FundSearchForm({ handleAddCode, compareList, loadingCode, funds 
 
       return (
         name.includes(q) ||
-        f.schemeCode.toString().includes(debouncedSearchQuery)
+        f.schemeCode.toString().includes(q)
       );
     });
 
-    return matches
-      .sort((a, b) => a.schemeName.length - b.schemeName.length)
+    const scoredMatches = matches.map((f) => {
+      const name = f.schemeName.toLowerCase();
+      const code = f.schemeCode.toString();
+
+      let score = 0;
+      if (code === q) {
+        score = 1000;
+      } else if (name.startsWith(q)) {
+        score = 500 - name.length;
+      } else {
+        const index = name.indexOf(q);
+        score = 100 - index - name.length;
+      }
+
+      return { fund: f, score };
+    });
+
+    return scoredMatches
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.fund)
       .slice(0, 15);
   }, [debouncedSearchQuery, funds, filterDirectOnly, filterGrowthOnly]);
 

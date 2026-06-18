@@ -108,11 +108,26 @@ function parseAmfiNavText(text) {
   return funds;
 }
 
+function deduplicateFunds(fundsArray) {
+  if (!Array.isArray(fundsArray)) return [];
+  const seen = new Set();
+  const unique = [];
+  for (const fund of fundsArray) {
+    if (!fund || !fund.schemeCode) continue;
+    const code = String(fund.schemeCode);
+    if (!seen.has(code)) {
+      seen.add(code);
+      unique.push(fund);
+    }
+  }
+  return unique;
+}
+
 async function fetchFundListWithFallback() {
   try {
     const res = await fetchWithRetry(BASE_URL, {}, 1);
     if (Array.isArray(res.data) && res.data.length > 100) {
-      return { data: res.data, source: "mfapi" };
+      return { data: deduplicateFunds(res.data), source: "mfapi" };
     }
     throw new Error("mfapi returned empty or invalid list");
   } catch (primaryErr) {
@@ -131,7 +146,7 @@ async function fetchFundListWithFallback() {
     const funds = parseAmfiNavText(res.data);
     if (funds.length < 100) throw new Error("AMFI returned too few records");
     console.info(`[FundLens] Loaded ${funds.length} funds from AMFI fallback.`);
-    return { data: funds, source: "amfi" };
+    return { data: deduplicateFunds(funds), source: "amfi" };
   } catch (fallbackErr) {
     console.error("[FundLens] AMFI fallback also failed:", fallbackErr.message);
     throw new Error(
@@ -174,7 +189,7 @@ export function useFunds(options = {}) {
       // 1. Memory cache
       if (memoryCachedList) {
         if (ref.current) {
-          setFunds(memoryCachedList);
+          setFunds(deduplicateFunds(memoryCachedList));
         }
         return;
       }
@@ -183,7 +198,7 @@ export function useFunds(options = {}) {
       if (activeListFetchPromise) {
         // FIX: propagate rejection so this component also calls setError
         const data = await activeListFetchPromise;
-        if (ref.current) setFunds(data);
+        if (ref.current) setFunds(deduplicateFunds(data));
         return;
       }
 
@@ -191,8 +206,8 @@ export function useFunds(options = {}) {
       const idbCached = await getWithTimeout(FUND_LIST_CACHE_KEY);
       const now = Date.now();
       if (idbCached && idbCached.ts && now - idbCached.ts < FUND_LIST_TTL) {
-        memoryCachedList = idbCached.data;
-        if (ref.current) setFunds(idbCached.data);
+        memoryCachedList = deduplicateFunds(idbCached.data);
+        if (ref.current) setFunds(memoryCachedList);
 
         // Background refresh if >12h old
         if (!activeListFetchPromise && now - idbCached.ts > FUND_LIST_TTL / 2) {
@@ -224,7 +239,7 @@ export function useFunds(options = {}) {
         });
 
       const data = await activeListFetchPromise;
-      if (ref.current) setFunds(data);
+      if (ref.current) setFunds(deduplicateFunds(data));
     } catch (err) {
       if (ref.current) {
         setError(
