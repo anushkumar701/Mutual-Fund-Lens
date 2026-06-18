@@ -19,6 +19,8 @@ import Dashboard from "./pages/Dashboard";
 const Screener = lazy(() => import("./pages/Screener"));
 const Compare = lazy(() => import("./pages/Compare"));
 const SIPCalculator = lazy(() => import("./pages/SIPCalculator"));
+const Portfolio = lazy(() => import("./pages/Portfolio"));
+import { usePortfolioNotifications } from "./hooks/usePortfolioNotifications";
 
 // Per-route SEO — updates document.title, meta description, and canonical URL
 const ROUTE_SEO = {
@@ -41,6 +43,11 @@ const ROUTE_SEO = {
     title: "SIP & FIRE Calculator | FundLens",
     description:
       "Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.",
+  },
+  "/portfolio": {
+    title: "Portfolio Tracker — Live Mutual Fund Valuation | FundLens",
+    description:
+      "Track your mutual fund holdings, view real-time valuation gains/losses, analyze historical performance curves, and get daily updates.",
   },
 };
 
@@ -86,6 +93,7 @@ function PageSEOUpdater() {
 }
 
 export default function App() {
+  usePortfolioNotifications();
   return (
     <>
       {/* Skip-to-content link for keyboard/accessibility */}
@@ -126,6 +134,7 @@ export default function App() {
                     <Route path="/screener" element={<Screener />} />
                     <Route path="/compare" element={<Compare />} />
                     <Route path="/sip" element={<SIPCalculator />} />
+                    <Route path="/portfolio" element={<Portfolio />} />
                     {/* Catch-all: redirect any unknown URL to home */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

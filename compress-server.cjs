@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const PORT = 9222;
+const PORT = 3000;
 const DIST_DIR = path.join(__dirname, 'dist');
 
 const MIME_TYPES = {
