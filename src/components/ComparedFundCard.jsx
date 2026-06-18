@@ -49,8 +49,8 @@ const ComparedFundCard = memo(function ComparedFundCard({
         <h3 className="font-semibold text-sm text-slate-900 dark:text-white leading-snug">
           {schemeName}
         </h3>
-        <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">
-          AMFI: {fund.schemeCode}
+        <p className="text-[11px] font-semibold font-mono tracking-wide text-slate-600 dark:text-slate-300 flex items-center gap-1">
+          AMFI Code: <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-blue-600 dark:text-blue-400 font-bold border border-slate-200 dark:border-slate-700/50">#{fund.schemeCode}</span>
         </p>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
