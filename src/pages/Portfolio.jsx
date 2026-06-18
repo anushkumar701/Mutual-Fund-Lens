@@ -493,6 +493,11 @@ export default function Portfolio() {
     };
   }, [holdings, detailsCache]);
 
+  // Update cached total portfolio value in localStorage for Navbar and Dashboard usage
+  useEffect(() => {
+    localStorage.setItem("fundlens_portfolio_total_value", String(portfolioSummary.totalCurrent));
+  }, [portfolioSummary.totalCurrent]);
+
   // Reconstruct portfolio valuation chart data over time
   const historicalChartData = useMemo(() => {
     if (holdings.length === 0) return [];

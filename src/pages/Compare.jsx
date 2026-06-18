@@ -48,7 +48,7 @@ const LIGHT_CHART_COLORS = CHART_COLORS; // ['#2563eb','#10b981','#f59e0b','#ef4
 // Popular funds for the empty-state quick-add chips
 const POPULAR_FUNDS = [
   { name: "Parag Parikh Flexi Cap", code: "122639" },
-  { name: "Mirae Asset Large Cap", code: "118989" },
+  { name: "ICICI Prudential Bluechip", code: "120586" },
   { name: "SBI Small Cap", code: "125497" },
   { name: "Axis Bluechip", code: "120503" },
   { name: "HDFC Mid-Cap Opportunities", code: "118989" },
@@ -449,6 +449,13 @@ export default function Compare() {
 
   // Load all codes in compareList
   useEffect(() => {
+    // Unique check to prevent duplicates
+    const uniqueCodes = Array.from(new Set(compareList.map(String)));
+    if (uniqueCodes.length !== compareList.length) {
+      setCompareList(uniqueCodes);
+      return;
+    }
+
     compareList.forEach((code) => {
       const codeStr = String(code);
       if (
@@ -458,7 +465,7 @@ export default function Compare() {
         loadFund(code);
       }
     });
-  }, [compareList, fundData, loadFund]);
+  }, [compareList, fundData, loadFund, setCompareList]);
 
   const handleAddCode = (code) => {
     const codeStr = String(code);
@@ -1091,10 +1098,7 @@ export default function Compare() {
           </div>
         )}
 
-        <p className="text-xs text-slate-400 dark:text-slate-500">
-          {compareList.length}/4 funds added. You can find scheme codes on the
-          Screener page.
-        </p>
+
 
         {/* Undo remove banner */}
         {removedFund && (
