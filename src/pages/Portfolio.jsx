@@ -112,6 +112,7 @@ export default function Portfolio() {
   const [editCustomUnits, setEditCustomUnits] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmModalDelete, setConfirmModalDelete] = useState(false);
+  const [chartRange, setChartRange] = useState("all");
 
   // Helper to convert 24h format (HH:MM) to 12h parts
   const get12HourParts = (timeStr) => {
@@ -464,12 +465,29 @@ export default function Portfolio() {
   const historicalChartData = useMemo(() => {
     if (holdings.length === 0) return [];
     
-    // Check if details are loaded for all holdings
-    const allLoaded = holdings.every((h) => detailsCache[h.schemeCode]?.sortedNavs);
+    // Check if details are loaded for all holdings (manual ones don't need fetching)
+    const allLoaded = holdings.every((h) => {
+      const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
+      return isManual || detailsCache[h.schemeCode]?.sortedNavs;
+    });
     if (!allLoaded) return [];
 
     return generateHistoricalData(holdings, detailsCache);
   }, [holdings, detailsCache]);
+
+  // Filter historical growth data by time range
+  const filteredChartData = useMemo(() => {
+    if (chartRange === "all" || historicalChartData.length === 0) return historicalChartData;
+    
+    const cutoffDate = new Date();
+    if (chartRange === "30d") cutoffDate.setDate(cutoffDate.getDate() - 30);
+    else if (chartRange === "90d") cutoffDate.setDate(cutoffDate.getDate() - 90);
+    else if (chartRange === "180d") cutoffDate.setDate(cutoffDate.getDate() - 180);
+    else if (chartRange === "365d") cutoffDate.setDate(cutoffDate.getDate() - 365);
+
+    const cutoffTs = cutoffDate.getTime();
+    return historicalChartData.filter((item) => item.timestamp >= cutoffTs);
+  }, [historicalChartData, chartRange]);
 
   // Pie chart data for fund weight allocation (grouped by scheme name)
   const pieChartData = useMemo(() => {
@@ -649,24 +667,42 @@ export default function Portfolio() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Historical Growth Chart */}
             <div className="lg:col-span-2 bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
-              <div className="mb-4">
-                <h3 className="text-base font-bold">Historical Valuation Growth</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  Portfolio current value vs step-line of invested capital over time.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div>
+                  <h3 className="text-base font-bold">Historical Valuation Growth</h3>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                    Portfolio current value vs step-line of invested capital over time.
+                  </p>
+                </div>
+                {/* Time Range Selector */}
+                <div className="flex self-start sm:self-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
+                  {["30d", "90d", "180d", "365d", "all"].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setChartRange(r)}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                        chartRange === r
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+                      }`}
+                    >
+                      {r === "all" ? "ALL" : r.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex-1 min-h-[260px]">
                 {detailsLoading ? (
                   <div className="h-full flex items-center justify-center text-xs text-slate-500">
                     Loading historical valuation curves...
                   </div>
-                ) : historicalChartData.length === 0 ? (
+                ) : filteredChartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-slate-400 text-center px-4">
-                    Fetching NAV historical points. Chart will display in a moment.
+                    No historical valuation data within the selected range.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={historicalChartData}>
+                    <AreaChart data={filteredChartData}>
                       <defs>
                         <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -680,6 +716,7 @@ export default function Portfolio() {
                         fontSize={10}
                         tickLine={false}
                         axisLine={false}
+                        minTickGap={45}
                       />
                       <YAxis
                         stroke="#94a3b8"
@@ -1434,8 +1471,11 @@ export default function Portfolio() {
 function generateHistoricalData(holdings, detailsMap) {
   let oldestDate = new Date();
   holdings.forEach((h) => {
-    const d = new Date(h.investedDate);
-    if (d < oldestDate) oldestDate = d;
+    if (h.investedDate) {
+      const [yyyy, mm, dd] = h.investedDate.split("-");
+      const d = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10));
+      if (d < oldestDate) oldestDate = d;
+    }
   });
 
   const today = new Date();
@@ -1461,22 +1501,26 @@ function generateHistoricalData(holdings, detailsMap) {
     let totalInvestedValue = 0;
 
     holdings.forEach((h) => {
-      const buyDate = new Date(h.investedDate);
-      if (currentDate >= buyDate) {
-        totalInvestedValue += h.amount;
+      if (h.investedDate) {
+        const [yyyy, mm, dd] = h.investedDate.split("-");
+        const buyDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10));
+        if (currentDate >= buyDate) {
+          totalInvestedValue += h.amount;
 
-        const details = detailsMap[h.schemeCode];
-        if (details?.sortedNavs) {
-          const navVal = getNavOnDate(details.sortedNavs, ts);
-          totalCurrentValue += h.units * navVal;
-        } else {
-          totalCurrentValue += h.amount;
+          const details = detailsMap[h.schemeCode];
+          if (details?.sortedNavs) {
+            const navVal = getNavOnDate(details.sortedNavs, ts);
+            totalCurrentValue += h.units * navVal;
+          } else {
+            totalCurrentValue += h.amount;
+          }
         }
       }
     });
 
     dataPoints.push({
       date: dateStr,
+      timestamp: ts,
       "Portfolio Value": Math.round(totalCurrentValue),
       "Invested Capital": Math.round(totalInvestedValue),
     });
@@ -1506,6 +1550,7 @@ function generateHistoricalData(holdings, detailsMap) {
     });
     dataPoints.push({
       date: todayStr,
+      timestamp: today.getTime(),
       "Portfolio Value": Math.round(totalCurrentValue),
       "Invested Capital": Math.round(totalInvestedValue),
     });
