@@ -1,5 +1,6 @@
 // components/NavBar.jsx
 import { NavLink } from "react-router-dom";
+import { useMemo } from "react";
 import ThemeToggle from "./ThemeToggle";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
@@ -49,8 +50,6 @@ const links = [
   {
     to: "/compare",
     label: "Compare",
-    badgeKey: "fundlens_compare",
-    badgeColor: "bg-blue-500",
     icon: (
       <svg
         className="w-5 h-5"
@@ -93,8 +92,6 @@ const links = [
   {
     to: "/portfolio",
     label: "Portfolio",
-    badgeKey: "fundlens_portfolio",
-    badgeColor: "bg-emerald-500",
     icon: (
       <svg
         className="w-5 h-5"
@@ -115,19 +112,6 @@ const links = [
   },
 ];
 
-function NavBadge({ storageKey, color }) {
-  const [list] = useLocalStorage(storageKey, []);
-  if (!list.length) return null;
-  return (
-    <span
-      aria-label={`${list.length} items`}
-      className={`absolute -top-0.5 -right-0.5 ${color} text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none shadow-sm`}
-    >
-      {list.length}
-    </span>
-  );
-}
-
 // Slug helper: replaces ALL spaces (not just the first) so multi-word labels
 // like "SIP Calc" produce "sip-calc" instead of "sip calc".
 function toSlug(str) {
@@ -135,8 +119,24 @@ function toSlug(str) {
 }
 
 export default function NavBar() {
-  const [compareList] = useLocalStorage("fundlens_compare", []);
   const [watchlist] = useLocalStorage("fundlens_watchlist", []);
+  const [portfolioList] = useLocalStorage("fundlens_portfolio", []);
+  const [totalValRaw] = useLocalStorage("fundlens_portfolio_total_value", 0);
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
+
+  const totalValue = useMemo(() => {
+    const parsedVal = parseFloat(totalValRaw);
+    if (parsedVal > 0) return parsedVal;
+    return portfolioList.reduce((acc, h) => acc + (parseFloat(h.amount) || 0), 0);
+  }, [portfolioList, totalValRaw]);
 
   return (
     <>
@@ -174,7 +174,7 @@ export default function NavBar() {
 
         {/* Nav links */}
         <div className="flex items-center gap-1 flex-1">
-          {links.map(({ to, label, icon, badgeKey, badgeColor }) => (
+          {links.map(({ to, label, icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -191,34 +191,29 @@ export default function NavBar() {
             >
               {icon}
               <span>{label}</span>
-              {badgeKey && (
-                <NavBadge
-                  storageKey={badgeKey}
-                  color={badgeColor || "bg-blue-500"}
-                />
-              )}
             </NavLink>
           ))}
         </div>
 
-        {/* Desktop watchlist + compare pill indicators */}
+        {/* Desktop watchlist + total portfolio value indicators */}
         <div className="flex items-center gap-2 text-xs">
           {watchlist.length > 0 && (
             <span
               aria-label={`${watchlist.length} funds saved to watchlist`}
               className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 rounded-full px-2.5 py-1 font-medium"
             >
-              <svg className="w-3.5 h-3.5 text-amber-500 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+              <svg className="w-3.5 h-3.5 text-amber-500 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
               <span>{watchlist.length} saved</span>
             </span>
           )}
-          {compareList.length > 0 && (
+          {portfolioList.length > 0 && (
             <span
-              aria-label={`${compareList.length} funds being compared`}
-              className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-full px-2.5 py-1 font-medium"
+              className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-full px-3 py-1 font-bold shadow-sm"
             >
-              <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              <span>{compareList.length} comparing</span>
+              <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Portfolio: {formatCurrency(totalValue)}</span>
             </span>
           )}
         </div>
@@ -264,7 +259,7 @@ export default function NavBar() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1117] border-t border-slate-200 dark:border-slate-800 bottom-nav-safe"
       >
         <div className="flex items-stretch">
-          {links.map(({ to, label, icon, badgeKey, badgeColor }) => (
+          {links.map(({ to, label, icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -286,12 +281,6 @@ export default function NavBar() {
                   )}
                   <span className="relative">
                     {icon}
-                    {badgeKey && (
-                      <NavBadge
-                        storageKey={badgeKey}
-                        color={badgeColor || "bg-blue-500"}
-                      />
-                    )}
                   </span>
                   <span className="leading-none">{label}</span>
                 </>
