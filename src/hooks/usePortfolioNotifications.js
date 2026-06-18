@@ -6,7 +6,8 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(val);
 };
 
@@ -78,22 +79,48 @@ export function usePortfolioNotifications() {
         const detailsList = [];
 
         for (const h of holdings) {
-          const details = await fetchFundDetail(h.schemeCode);
-          if (details?.data) {
-            const currentNav = parseFloat(details.data[0].nav);
-            const prevNav = details.data[1] ? parseFloat(details.data[1].nav) : currentNav;
-            
+          const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
+          if (isManual) {
+            const currentNav = h.buyNav;
             const currentValue = h.units * currentNav;
-            const dailyChange = h.units * (currentNav - prevNav);
-            const dailyChangePct = prevNav > 0 ? ((currentNav - prevNav) / prevNav) * 100 : 0;
-
             totalCurrent += currentValue;
             totalInvested += h.amount;
-            totalDailyChange += dailyChange;
-
             detailsList.push({
               name: h.schemeName,
-              changePct: dailyChangePct,
+              changePct: 0,
+              currentValue,
+            });
+            continue;
+          }
+
+          try {
+            const details = await fetchFundDetail(h.schemeCode);
+            if (details?.data) {
+              const currentNav = parseFloat(details.data[0].nav);
+              const prevNav = details.data[1] ? parseFloat(details.data[1].nav) : currentNav;
+              
+              const currentValue = h.units * currentNav;
+              const dailyChange = h.units * (currentNav - prevNav);
+              const dailyChangePct = prevNav > 0 ? ((currentNav - prevNav) / prevNav) * 100 : 0;
+
+              totalCurrent += currentValue;
+              totalInvested += h.amount;
+              totalDailyChange += dailyChange;
+
+              detailsList.push({
+                name: h.schemeName,
+                changePct: dailyChangePct,
+                currentValue,
+              });
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch NAV for ${h.schemeCode}:`, err);
+            const currentValue = h.units * h.buyNav;
+            totalCurrent += currentValue;
+            totalInvested += h.amount;
+            detailsList.push({
+              name: h.schemeName,
+              changePct: 0,
               currentValue,
             });
           }
@@ -116,19 +143,15 @@ export function usePortfolioNotifications() {
             tag: "fundlens-portfolio-daily-total",
           });
         } else {
-          // Detail mode: list individual fund changes
-          const summaryText = detailsList
-            .map((item) => {
-              const nameAbbr = item.name.length > 20 ? item.name.slice(0, 20) + "..." : item.name;
-              const sign = item.changePct >= 0 ? "+" : "";
-              return `${nameAbbr}: ${sign}${item.changePct.toFixed(1)}%`;
-            })
-            .join("\n");
-
-          new Notification("Portfolio Fund Updates", {
-            body: summaryText,
-            icon: "/favicon.svg",
-            tag: "fundlens-portfolio-daily-details",
+          // Detail mode: trigger a separate browser notification for each individual fund
+          detailsList.forEach((item, index) => {
+            const nameAbbr = item.name.length > 25 ? item.name.slice(0, 25) + "..." : item.name;
+            const sign = item.changePct >= 0 ? "+" : "";
+            new Notification(`${nameAbbr}`, {
+              body: `Current Value: ${formatCurrency(item.currentValue)}\nToday's Returns: ${sign}${item.changePct.toFixed(2)}%`,
+              icon: "/favicon.svg",
+              tag: `fundlens-fund-detail-${index}-${Date.now()}`,
+            });
           });
         }
 
@@ -139,15 +162,18 @@ export function usePortfolioNotifications() {
       }
     };
 
+    let intervalId = null;
+
     // Defer the execution to let the app finish rendering and clear task queue
     const timer = setTimeout(() => {
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(runNotificationCheck, { timeout: 10000 });
-      } else {
-        runNotificationCheck();
-      }
+      runNotificationCheck();
+      // Setup periodic checks every 30 seconds to catch when custom time rolls over
+      intervalId = setInterval(runNotificationCheck, 30000);
     }, 4000); // 4 seconds delay
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 }

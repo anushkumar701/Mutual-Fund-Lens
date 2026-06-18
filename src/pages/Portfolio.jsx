@@ -56,8 +56,40 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(val);
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const portfolioVal = payload[0]?.value || 0;
+    const investedVal = payload[1]?.value || 0;
+    const gain = portfolioVal - investedVal;
+    const gainPct = investedVal > 0 ? (gain / investedVal) * 100 : 0;
+    const isProfit = gain >= 0;
+
+    return (
+      <div className="bg-[#0f172a]/95 border border-slate-800 backdrop-blur-md p-3 rounded-xl shadow-xl text-xs space-y-1.5 min-w-[180px]">
+        <p className="text-slate-400 font-semibold mb-1">{label}</p>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-300">Portfolio Value:</span>
+          <span className="font-bold text-blue-400">{formatCurrency(portfolioVal)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-300">Invested Capital:</span>
+          <span className="font-bold text-slate-400">{formatCurrency(investedVal)}</span>
+        </div>
+        <div className="border-t border-slate-800/80 pt-1.5 mt-1.5 flex items-center justify-between gap-4">
+          <span className="text-slate-400">Total Profit:</span>
+          <span className={`font-bold ${isProfit ? "text-emerald-500" : "text-rose-500"}`}>
+            {isProfit ? "+" : ""}{formatCurrency(gain)} ({gainPct.toFixed(2)}%)
+          </span>
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 export default function Portfolio() {
@@ -415,11 +447,11 @@ export default function Portfolio() {
       const prevNav = details?.data?.[1]?.nav ? parseFloat(details.data[1].nav) : currentNav;
       
       const investedValue = h.amount;
-      const currentValue = Math.round(h.units * currentNav);
+      const currentValue = h.units * currentNav;
       const gainLoss = currentValue - investedValue;
       const gainLossPct = investedValue > 0 ? (gainLoss / investedValue) * 100 : 0;
       
-      const dailyChange = Math.round(h.units * (currentNav - prevNav));
+      const dailyChange = h.units * (currentNav - prevNav);
       const dailyChangePct = prevNav > 0 ? ((currentNav - prevNav) / prevNav) * 100 : 0;
 
       totalInvested += investedValue;
@@ -723,33 +755,32 @@ export default function Portfolio() {
                         fontSize={10}
                         tickLine={false}
                         axisLine={false}
-                        domain={[0, "auto"]}
+                        domain={[(min) => Math.max(0, Math.floor(min * 0.95)), (max) => Math.ceil(max * 1.05)]}
                         tickFormatter={(v) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >= 1000 ? `₹${(v/1000).toFixed(0)}k` : `₹${v}`}
                       />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#0f172a",
-                          border: "none",
-                          borderRadius: "12px",
-                          color: "#fff",
-                          fontSize: "12px",
-                        }}
-                        formatter={(value) => [formatCurrency(value), ""]}
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="circle"
+                        formatter={(value) => <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{value}</span>}
                       />
                       <Area
                         type="monotone"
                         dataKey="Portfolio Value"
                         stroke="#3b82f6"
-                        strokeWidth={2}
+                        strokeWidth={2.5}
+                        activeDot={{ r: 6, strokeWidth: 0, fill: "#3b82f6" }}
                         fillOpacity={1}
                         fill="url(#valGrad)"
                       />
                       <Area
                         type="step"
                         dataKey="Invested Capital"
-                        stroke="#8b5cf6"
-                        strokeWidth={1.5}
+                        stroke="#10b981"
+                        strokeWidth={1.8}
                         strokeDasharray="4 4"
+                        activeDot={{ r: 4, strokeWidth: 0, fill: "#10b981" }}
                         fill="none"
                       />
                     </AreaChart>
