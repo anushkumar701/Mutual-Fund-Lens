@@ -1774,10 +1774,14 @@ export default function Compare() {
                                   String(fund.schemeCode);
                                 const val = row[name];
                                 const isGain = val !== undefined && val >= 0;
-                                const isBest =
-                                  val !== undefined &&
-                                  val === bestVal &&
-                                  defined.length > 1;
+                                
+                                // Calculate rank for this cell among defined values for this year
+                                let rank = null;
+                                if (val !== undefined && defined.length > 1) {
+                                  const sortedUniqueVals = Array.from(new Set(defined)).sort((a, b) => b - a);
+                                  rank = sortedUniqueVals.indexOf(val) + 1;
+                                }
+
                                 return (
                                   <td
                                     key={fund.schemeCode}
@@ -1789,17 +1793,26 @@ export default function Compare() {
                                           : "text-red-600 dark:text-red-400"
                                     }`}
                                   >
-                                    <span
-                                      className={
-                                        isBest
-                                          ? "bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded"
-                                          : ""
-                                      }
-                                    >
-                                      {val === undefined
-                                        ? "—"
-                                        : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
-                                    </span>
+                                    <div className="flex flex-col gap-1">
+                                      <span>
+                                        {val === undefined
+                                          ? "—"
+                                          : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
+                                      </span>
+                                      {rank && (
+                                        <span className={`text-[10px] w-fit font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                                          rank === 1
+                                            ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40 shadow-sm"
+                                            : rank === 2
+                                              ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                              : rank === 3
+                                                ? "bg-orange-100 dark:bg-orange-950/40 text-orange-850 dark:text-orange-300 border border-orange-200 dark:border-orange-900/40"
+                                                : "bg-slate-50 dark:bg-slate-800/25 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/50"
+                                        }`}>
+                                          {rank === 1 ? "🥇 1st" : rank === 2 ? "🥈 2nd" : rank === 3 ? "🥉 3rd" : `${rank}th`}
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                 );
                               })}

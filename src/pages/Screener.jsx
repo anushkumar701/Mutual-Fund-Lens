@@ -916,8 +916,7 @@ export default function Screener() {
         <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 bg-blue-600 text-white rounded-2xl px-5 py-3 shadow-2xl shadow-blue-900/40">
             <span className="text-sm font-semibold">
-              {compareList.length}/4 fund{compareList.length > 1 ? "s" : ""}{" "}
-              selected
+              Compare Selected Funds
             </span>
             <button
               onClick={() => navigate("/compare")}
