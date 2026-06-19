@@ -462,7 +462,7 @@ export default function Portfolio() {
     }
   };
 
-  const triggerTestNotification = () => {
+  const triggerTestNotification = async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       addToast("Notifications are not supported by this browser.", "warning");
       return;
@@ -474,32 +474,50 @@ export default function Portfolio() {
     }
 
     const totalVal = portfolioSummary.totalCurrent;
-    const totalChange = portfolioSummary.totalDailyChange;
-    const totalChangePct = portfolioSummary.totalDailyChangePct;
     const holdingsCount = portfolioSummary.holdings.length;
+
+    const showNotification = async (title, options) => {
+      if ("serviceWorker" in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          if (reg && "showNotification" in reg) {
+            await reg.showNotification(title, options);
+            return;
+          }
+        } catch (e) {
+          console.warn("SW showNotification failed:", e);
+        }
+      }
+      try {
+        new Notification(title, options);
+      } catch (e) {
+        console.error("Notification constructor failed:", e);
+      }
+    };
 
     if (notifyConfig.type === "total") {
       const valStr = holdingsCount > 0 ? formatCurrency(totalVal) : "₹1,24,532.80";
 
-      new Notification(`Portfolio: ${valStr}`, {
+      await showNotification(`Portfolio: ${valStr}`, {
         icon: "/favicon.svg",
         tag: "fundlens-portfolio-daily-total-test",
       });
       addToast("Test notification sent!", "success");
     } else {
       if (holdingsCount === 0) {
-        new Notification("Parag Parikh Flexi Cap Fund: ₹50,710.00", {
+        await showNotification("Parag Parikh Flexi Cap Fund: ₹50,710.00", {
           icon: "/favicon.svg",
           tag: "fundlens-fund-detail-test-mock",
         });
         addToast("Demo test notification sent!", "success");
       } else {
-        consolidatedHoldings.forEach((item, index) => {
-          new Notification(`${item.schemeName}: ${formatCurrency(item.currentValue)}`, {
+        for (let index = 0; index < consolidatedHoldings.length; index++) {
+          const item = consolidatedHoldings[index];
+          await showNotification(`${item.schemeName}: ${formatCurrency(item.currentValue)}`, {
             icon: "/favicon.svg",
             tag: `fundlens-fund-detail-${index}-test`,
           });
-        });
+        }
         addToast(`Sent test notification for ${consolidatedHoldings.length} fund(s)!`, "success");
       }
     }
