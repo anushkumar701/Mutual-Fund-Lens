@@ -4,6 +4,7 @@ import { useFunds, fetchFundDetail } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
 import { useToast } from "../components/Toast";
+import { formatCurrencyINR } from "../utils/formatCurrency";
 import {
   AreaChart,
   Area,
@@ -52,14 +53,7 @@ const getNavOnDate = (sortedNavs, targetTs) => {
   return sortedNavs[lo].nav;
 };
 
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(val);
-};
+
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -74,16 +68,16 @@ const CustomTooltip = ({ active, payload, label }) => {
         <p className="text-slate-400 font-semibold mb-1">{label}</p>
         <div className="flex items-center justify-between gap-4">
           <span className="text-slate-300">Portfolio Value:</span>
-          <span className="font-bold text-blue-400">{formatCurrency(portfolioVal)}</span>
+          <span className="font-bold text-blue-400">{formatCurrencyINR(portfolioVal)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="text-slate-300">Invested Capital:</span>
-          <span className="font-bold text-slate-400">{formatCurrency(investedVal)}</span>
+          <span className="font-bold text-slate-400">{formatCurrencyINR(investedVal)}</span>
         </div>
         <div className="border-t border-slate-800/80 pt-1.5 mt-1.5 flex items-center justify-between gap-4">
           <span className="text-slate-400">Total Profit:</span>
           <span className={`font-bold ${isProfit ? "text-emerald-500" : "text-rose-500"}`}>
-            {isProfit ? "+" : ""}{formatCurrency(gain)} ({gainPct.toFixed(2)}%)
+            {isProfit ? "+" : ""}{formatCurrencyINR(gain)} ({gainPct.toFixed(2)}%)
           </span>
         </div>
       </div>
@@ -244,32 +238,58 @@ export default function Portfolio() {
     let isMounted = true;
     const fetchAllDetails = async () => {
       setDetailsLoading(true);
-      const updatedCache = { ...detailsCache };
-      let neededFetch = false;
+      
+      // Determine which holdings actually need to be fetched (not manual and not in cache)
+      let currentCache;
+      setDetailsCache(prev => {
+        currentCache = prev;
+        return prev;
+      });
 
-      for (const holding of holdings) {
-        if (typeof holding.schemeCode === "string" && holding.schemeCode.startsWith("manual-")) {
-          continue;
-        }
-        if (!updatedCache[holding.schemeCode]) {
-          try {
-            const data = await fetchFundDetail(holding.schemeCode);
-            if (data) {
-              updatedCache[holding.schemeCode] = {
+      const neededHoldings = holdings.filter(h => {
+        const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
+        return !isManual && (!currentCache || !currentCache[h.schemeCode]);
+      });
+
+      if (neededHoldings.length === 0) {
+        setDetailsLoading(false);
+        return;
+      }
+
+      const fetchPromises = neededHoldings.map(async (h) => {
+        try {
+          const data = await fetchFundDetail(h.schemeCode);
+          if (data) {
+            return {
+              code: h.schemeCode,
+              data: {
                 ...data,
                 sortedNavs: processNavData(data),
-              };
-              neededFetch = true;
-            }
-          } catch (err) {
-            console.error(`Failed to load details for ${holding.schemeCode}:`, err);
+              }
+            };
           }
+        } catch (err) {
+          console.error(`Failed to load details for ${h.schemeCode}:`, err);
         }
-      }
+        return null;
+      });
 
-      if (isMounted && neededFetch) {
-        setDetailsCache(updatedCache);
-      }
+      const results = await Promise.all(fetchPromises);
+      
+      if (!isMounted) return;
+
+      setDetailsCache(prev => {
+        const next = { ...prev };
+        let updated = false;
+        results.forEach(res => {
+          if (res) {
+            next[res.code] = res.data;
+            updated = true;
+          }
+        });
+        return updated ? next : prev;
+      });
+      
       setDetailsLoading(false);
     };
 
@@ -277,7 +297,7 @@ export default function Portfolio() {
     return () => {
       isMounted = false;
     };
-  }, [holdings, detailsCache]);
+  }, [holdings]);
 
   // Autocomplete fund matching
   const searchResults = useMemo(() => {
@@ -615,7 +635,7 @@ export default function Portfolio() {
     };
 
     if (notifyConfig.type === "total") {
-      const valStr = holdingsCount > 0 ? formatCurrency(totalVal) : "₹1,24,532.80";
+      const valStr = holdingsCount > 0 ? formatCurrencyINR(totalVal) : "₹1,24,532.80";
 
       await showNotification(`Portfolio: ${valStr}`, {
         icon: "/favicon.svg",
@@ -634,7 +654,7 @@ export default function Portfolio() {
         for (let index = 0; index < consolidatedHoldings.length; index++) {
           const item = consolidatedHoldings[index];
           await showNotification(item.schemeName, {
-            body: `Current Value: ${formatCurrency(item.currentValue)}`,
+            body: `Current Value: ${formatCurrencyINR(item.currentValue)}`,
             icon: "/favicon.svg",
             tag: `fundlens-fund-detail-${index}-test`,
           });
@@ -933,13 +953,13 @@ export default function Portfolio() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Current Portfolio Value</span>
-              <div className="text-2xl font-black mt-1.5">{formatCurrency(portfolioSummary.totalCurrent)}</div>
+              <div className="text-2xl font-black mt-1.5">{formatCurrencyINR(portfolioSummary.totalCurrent)}</div>
               <div className="mt-2 text-xs font-medium text-slate-400">Live Valuation</div>
             </div>
 
             <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Invested</span>
-              <div className="text-2xl font-black mt-1.5">{formatCurrency(portfolioSummary.totalInvested)}</div>
+              <div className="text-2xl font-black mt-1.5">{formatCurrencyINR(portfolioSummary.totalInvested)}</div>
               <div className="mt-2 text-xs font-medium text-slate-400">Total Capital Deployed</div>
             </div>
 
@@ -947,7 +967,7 @@ export default function Portfolio() {
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Gain / Loss</span>
               <div className={`text-2xl font-black mt-1.5 ${portfolioSummary.totalGainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                 {portfolioSummary.totalGainLoss >= 0 ? "+" : ""}
-                {formatCurrency(portfolioSummary.totalGainLoss)}
+                {formatCurrencyINR(portfolioSummary.totalGainLoss)}
               </div>
               <div className={`mt-2 text-xs font-bold flex items-center gap-1 ${portfolioSummary.totalGainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                 {portfolioSummary.totalGainLoss >= 0 ? "▲" : "▼"}{" "}
@@ -960,7 +980,7 @@ export default function Portfolio() {
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Today's Returns</span>
               <div className={`text-2xl font-black mt-1.5 ${portfolioSummary.totalDailyChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                 {portfolioSummary.totalDailyChange >= 0 ? "+" : ""}
-                {formatCurrency(portfolioSummary.totalDailyChange)}
+                {formatCurrencyINR(portfolioSummary.totalDailyChange)}
               </div>
               <div className={`mt-2 text-xs font-bold flex items-center gap-1 ${portfolioSummary.totalDailyChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                 {portfolioSummary.totalDailyChange >= 0 ? "▲" : "▼"}{" "}
@@ -1112,7 +1132,7 @@ export default function Portfolio() {
                               color: "#fff",
                               fontSize: "12px",
                             }}
-                            formatter={(value) => [formatCurrency(value), ""]}
+                            formatter={(value) => [formatCurrencyINR(value), ""]}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -1388,15 +1408,15 @@ export default function Portfolio() {
                               {c.totalUnits.toFixed(4)}
                             </td>
                             <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                              {formatCurrency(c.totalInvested)}
+                              {formatCurrencyINR(c.totalInvested)}
                             </td>
                             <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                              {formatCurrency(c.currentValue)}
+                              {formatCurrencyINR(c.currentValue)}
                             </td>
                             <td className="px-5 py-4 text-right font-bold">
                               <span className={c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
                                 {c.gainLoss >= 0 ? "+" : ""}
-                                {formatCurrency(c.gainLoss)}
+                                {formatCurrencyINR(c.gainLoss)}
                               </span>
                               <div className={`text-[10px] font-bold mt-1 ${c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                 {c.gainLoss >= 0 ? "▲" : "▼"} {c.gainLossPct.toFixed(2)}%
@@ -1442,15 +1462,15 @@ export default function Portfolio() {
                                               {t.units.toFixed(4)}
                                             </td>
                                             <td className="py-2.5 text-right font-bold text-slate-800 dark:text-slate-200 pr-4">
-                                              {formatCurrency(t.amount)}
+                                              {formatCurrencyINR(t.amount)}
                                             </td>
                                             <td className="py-2.5 text-right font-bold text-slate-800 dark:text-slate-200 pr-4">
-                                              {formatCurrency(t.currentValue)}
+                                              {formatCurrencyINR(t.currentValue)}
                                             </td>
                                             <td className="py-2.5 text-right font-bold pr-4">
                                               <span className={t.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
                                                 {t.gainLoss >= 0 ? "+" : ""}
-                                                {formatCurrency(t.gainLoss)}
+                                                {formatCurrencyINR(t.gainLoss)}
                                               </span>
                                               <span className={`text-[10px] font-bold block ${t.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                                 {t.gainLossPct.toFixed(2)}%
@@ -1587,15 +1607,15 @@ export default function Portfolio() {
                           ₹{h.currentNav.toFixed(4)}
                         </td>
                         <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                          {formatCurrency(h.amount)}
+                          {formatCurrencyINR(h.amount)}
                         </td>
                         <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                          {formatCurrency(h.currentValue)}
+                          {formatCurrencyINR(h.currentValue)}
                         </td>
                         <td className="px-5 py-4 text-right font-bold">
                           <span className={h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
                             {h.gainLoss >= 0 ? "+" : ""}
-                            {formatCurrency(h.gainLoss)}
+                            {formatCurrencyINR(h.gainLoss)}
                           </span>
                           <div className={`text-[10px] font-bold mt-1 ${h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                             {h.gainLoss >= 0 ? "▲" : "▼"} {h.gainLossPct.toFixed(2)}%

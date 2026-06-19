@@ -15,7 +15,7 @@ import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import Footer from "./components/Footer";
 import BackToTop from "./components/BackToTop";
 
-import Dashboard from "./pages/Dashboard";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Screener = lazy(() => import("./pages/Screener"));
 const Compare = lazy(() => import("./pages/Compare"));
 const SIPCalculator = lazy(() => import("./pages/SIPCalculator"));
