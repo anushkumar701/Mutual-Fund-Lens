@@ -1,15 +1,9 @@
 // hooks/usePortfolioNotifications.js
 import { useEffect } from "react";
 import { fetchFundDetail } from "./useFunds";
+import { formatCurrencyINR } from "../utils/formatCurrency";
 
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(val);
-};
+
 
 export function usePortfolioNotifications() {
   useEffect(() => {
@@ -31,26 +25,23 @@ export function usePortfolioNotifications() {
 
       // 2. Fetch NAV updates for all holdings and compute total current value
       let totalCurrent = 0;
-      let totalInvested = 0;
       let totalDailyChange = 0;
       const detailsList = [];
 
       try {
-        for (const h of holdings) {
+        const fetchPromises = holdings.map(async (h) => {
           const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
           if (isManual) {
             const currentNav = h.buyNav;
             const currentValue = h.units * currentNav;
-            totalCurrent += currentValue;
-            totalInvested += h.amount;
-            detailsList.push({
+            return {
               name: h.schemeName,
               code: h.schemeCode,
               changePct: 0,
               changeValue: 0,
               currentValue,
-            });
-            continue;
+              amount: h.amount,
+            };
           }
 
           try {
@@ -63,32 +54,38 @@ export function usePortfolioNotifications() {
               const dailyChange = h.units * (currentNav - prevNav);
               const dailyChangePct = prevNav > 0 ? ((currentNav - prevNav) / prevNav) * 100 : 0;
 
-              totalCurrent += currentValue;
-              totalInvested += h.amount;
-              totalDailyChange += dailyChange;
-
-              detailsList.push({
+              return {
                 name: h.schemeName,
                 code: h.schemeCode,
                 changePct: dailyChangePct,
                 changeValue: dailyChange,
                 currentValue,
-              });
+                amount: h.amount,
+              };
             }
           } catch (err) {
             console.warn(`Failed to fetch NAV for ${h.schemeCode}:`, err);
-            const currentValue = h.units * h.buyNav;
-            totalCurrent += currentValue;
-            totalInvested += h.amount;
-            detailsList.push({
-              name: h.schemeName,
-              code: h.schemeCode,
-              changePct: 0,
-              changeValue: 0,
-              currentValue,
-            });
           }
-        }
+
+          // Fallback if details load failed
+          const currentValue = h.units * h.buyNav;
+          return {
+            name: h.schemeName,
+            code: h.schemeCode,
+            changePct: 0,
+            changeValue: 0,
+            currentValue,
+            amount: h.amount,
+          };
+        });
+
+        const results = await Promise.all(fetchPromises);
+
+        results.forEach((res) => {
+          totalCurrent += res.currentValue;
+          totalDailyChange += res.changeValue;
+          detailsList.push(res);
+        });
 
         // Save computed total current value so Navbar can display it immediately
         if (totalCurrent > 0) {
@@ -138,10 +135,6 @@ export function usePortfolioNotifications() {
         }
 
         if (detailsList.length === 0) return;
-
-        // Calculate aggregate daily percentage
-        const prevTotalValue = totalCurrent - totalDailyChange;
-        const totalDailyChangePct = prevTotalValue > 0 ? (totalDailyChange / prevTotalValue) * 100 : 0;
 
         // Group individual transactions by fund to prevent duplicate notifications
         const consolidatedMap = {};
@@ -202,7 +195,7 @@ export function usePortfolioNotifications() {
 
         // 4. Trigger corresponding Notification
         if (notifyConfig.type === "total") {
-          await showNotification(`Portfolio: ${formatCurrency(totalCurrent)}`, {
+          await showNotification(`Portfolio: ${formatCurrencyINR(totalCurrent)}`, {
             icon: "/favicon.svg",
             tag: "fundlens-portfolio-daily-total",
           });
@@ -211,7 +204,7 @@ export function usePortfolioNotifications() {
           for (let index = 0; index < consolidatedList.length; index++) {
             const item = consolidatedList[index];
             await showNotification(item.name, {
-              body: `Current Value: ${formatCurrency(item.currentValue)}`,
+              body: `Current Value: ${formatCurrencyINR(item.currentValue)}`,
               icon: "/favicon.svg",
               tag: `fundlens-fund-detail-${index}-${Date.now()}`,
             });

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense, memo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFunds } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -68,8 +68,7 @@ function getSubCat(name) {
   return null;
 }
 
-// ─── Fund Card ───────────────────────────────────────────────
-function FundCard({
+const FundCard = memo(function FundCard({
   fund,
   watchlist,
   setWatchlist,
@@ -221,7 +220,21 @@ function FundCard({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  const prevCode = String(prevProps.fund.schemeCode);
+  const nextCode = String(nextProps.fund.schemeCode);
+  if (prevCode !== nextCode) return false;
+
+  const prevIsWL = prevProps.watchlist.map(String).includes(prevCode);
+  const nextIsWL = nextProps.watchlist.map(String).includes(nextCode);
+  if (prevIsWL !== nextIsWL) return false;
+
+  const prevIsCmp = prevProps.compareList.map(String).includes(prevCode);
+  const nextIsCmp = nextProps.compareList.map(String).includes(nextCode);
+  if (prevIsCmp !== nextIsCmp) return false;
+
+  return true;
+});
 
 // ─── Main Screener ───────────────────────────────────────────
 export default function Screener() {

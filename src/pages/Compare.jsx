@@ -990,6 +990,17 @@ export default function Compare() {
     });
   }, [fundData]);
 
+  // Memoize fund metrics to prevent recalculating O(N) daily data in nested render loops
+  const fundMetricsMap = useMemo(() => {
+    const map = {};
+    fundData.forEach((f) => {
+      if (f?.navData) {
+        map[f.schemeCode] = calculateFundMetrics(f.navData);
+      }
+    });
+    return map;
+  }, [fundData]);
+
   // Memoize multi-factor verdict analysis calculations
   const verdictData = useMemo(() => {
     if (fundData.length < 2) return null;
@@ -2019,7 +2030,7 @@ export default function Compare() {
                           },
                         ].map((metric) => {
                           const vals = fundData.map((f) => {
-                            const m = calculateFundMetrics(f.navData);
+                            const m = fundMetricsMap[f.schemeCode];
                             return m ? m[metric.key] : null;
                           });
                           const validVals = vals.filter(

@@ -30,3 +30,19 @@ export function formatCompact(value) {
   if (num >= 1e5) return `₹${(num / 1e5).toFixed(2)} L`;
   return formatINR(num);
 }
+
+// Module-level cached formatter — avoids re-creating Intl.NumberFormat on every call
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/**
+ * Format a value as Indian Rupees with 2 decimal places (₹1,24,532.80).
+ * Uses a module-level cached Intl.NumberFormat instance for performance.
+ */
+export function formatCurrencyINR(val) {
+  return currencyFormatter.format(val);
+}

@@ -48,20 +48,30 @@ self.addEventListener("fetch", (e) => {
   }
 
   e.respondWith(
-    fetch(e.request)
-      .then((response) => {
-        // If response is valid, clone and store in cache
-        if (response && response.status === 200 && response.type === "basic") {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache when offline
-        return caches.match(e.request).then((cachedResponse) => {
+    caches.match(e.request).then((cachedResponse) => {
+      const url = new URL(e.request.url);
+      const isAsset = url.pathname.includes("/assets/") || 
+                      url.pathname.endsWith(".png") || 
+                      url.pathname.endsWith(".svg") || 
+                      url.pathname.endsWith(".ico") || 
+                      url.pathname.endsWith(".woff2");
+
+      if (isAsset && cachedResponse) {
+        return cachedResponse;
+      }
+
+      // Otherwise fetch from network
+      return fetch(e.request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === "basic") {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
           if (cachedResponse) {
             return cachedResponse;
           }
@@ -70,6 +80,6 @@ self.addEventListener("fetch", (e) => {
             return caches.match("/");
           }
         });
-      })
+    })
   );
 });

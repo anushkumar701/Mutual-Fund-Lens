@@ -436,7 +436,7 @@ export default function SIPCalculator() {
       .map((d) => {
         const [dd, mm, yyyy] = d.date.split("-");
         return {
-          ts: new Date(`${yyyy}-${mm}-${dd}`).getTime(),
+          ts: Date.UTC(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10)),
           nav: parseFloat(d.nav),
         };
       })
@@ -445,7 +445,6 @@ export default function SIPCalculator() {
     if (sortedNavs.length === 0) return [];
 
     const latest = sortedNavs[sortedNavs.length - 1];
-    const latestDate = new Date(latest.ts);
     const oldestTs = sortedNavs[0].ts;
 
     // Binary search to find the NAV on or immediately after the target date (mimicking weekend/holiday delays)
@@ -465,17 +464,25 @@ export default function SIPCalculator() {
     const out = [];
     const monthsBack = dateSipYears * 12;
 
+    // Precompute target year and month in UTC to avoid creating Date objects inside the days loop
+    const monthsInfo = [];
+    for (let m = 0; m < monthsBack; m++) {
+      const targetDate = new Date(latest.ts);
+      targetDate.setUTCMonth(targetDate.getUTCMonth() - m);
+      monthsInfo.push({
+        year: targetDate.getUTCFullYear(),
+        month: targetDate.getUTCMonth(),
+      });
+    }
+
     for (let day = 1; day <= 28; day++) {
       let totalInvested = 0;
       let totalUnits = 0;
       let validMonths = 0;
 
       for (let m = 0; m < monthsBack; m++) {
-        // Calculate the exact target SIP date for this specific month in the past
-        const targetDate = new Date(latestDate);
-        targetDate.setMonth(targetDate.getMonth() - m);
-        targetDate.setDate(day);
-        const targetTs = targetDate.getTime();
+        const { year, month } = monthsInfo[m];
+        const targetTs = Date.UTC(year, month, day);
 
         const nav = getNextAvailableNav(targetTs);
         if (nav !== null) {
