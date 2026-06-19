@@ -434,13 +434,18 @@ export default function Portfolio() {
     setShowAddForm(false);
 
     // Show notification permission prompt if enabled is off and permission is default
-    if (Notification.permission === "default") {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       requestNotificationPermission();
     }
   };
 
   const requestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      addToast("Notifications are not supported by this browser. On iOS, you must first 'Add to Home Screen' (Install).", "warning");
+      return;
+    }
     try {
+      // Modern Promise-based request
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         setNotifyConfig((prev) => ({ ...prev, enabled: true }));
@@ -449,11 +454,33 @@ export default function Portfolio() {
         addToast("Notification permission denied by browser.", "warning");
       }
     } catch (err) {
-      console.error("Error requesting permission:", err);
+      console.warn("Promise-based notification request failed, trying callback fallback:", err);
+      // Fallback for older Safari/WebKit browsers using callbacks
+      try {
+        Notification.requestPermission((permission) => {
+          if (permission === "granted") {
+            setNotifyConfig((prev) => ({ ...prev, enabled: true }));
+            addToast("Daily notifications enabled!", "success");
+          } else {
+            addToast("Notification permission denied by browser.", "warning");
+          }
+        });
+      } catch (innerErr) {
+        console.error("Callback-based notification request failed:", innerErr);
+        addToast("Failed to request notification permission.", "error");
+      }
     }
   };
 
   const handleNotificationToggle = () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      addToast("Notifications are not supported by this browser. On iOS, you must first 'Add to Home Screen' (Install).", "warning");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      addToast("Notification permission is blocked. Please reset permissions in your browser settings.", "warning");
+      return;
+    }
     if (!notifyConfig.enabled) {
       requestNotificationPermission();
     } else {
