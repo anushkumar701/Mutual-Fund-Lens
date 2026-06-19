@@ -485,7 +485,25 @@ export default function Portfolio() {
     }
   };
 
-  const requestNotificationPermission = async () => {
+   const requestNotificationPermission = async () => {
+    if (window.Capacitor) {
+      try {
+        const { LocalNotifications } = await import("@capacitor/local-notifications");
+        const perm = await LocalNotifications.requestPermissions();
+        if (perm.display === "granted") {
+          setNotifyConfig((prev) => ({ ...prev, enabled: true }));
+          addToast("Daily notifications enabled!", "success");
+        } else {
+          addToast("Notification permission denied.", "warning");
+        }
+        return;
+      } catch (err) {
+        console.error("Capacitor notification permission request failed:", err);
+        addToast("Failed to request notification permission.", "error");
+        return;
+      }
+    }
+
     if (typeof window === "undefined" || !("Notification" in window)) {
       addToast("Notifications are not supported by this browser. On iOS, you must first 'Add to Home Screen' (Install).", "warning");
       return;
@@ -519,13 +537,15 @@ export default function Portfolio() {
   };
 
   const handleNotificationToggle = () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      addToast("Notifications are not supported by this browser. On iOS, you must first 'Add to Home Screen' (Install).", "warning");
-      return;
-    }
-    if (Notification.permission === "denied") {
-      addToast("Notification permission is blocked. Please reset permissions in your browser settings.", "warning");
-      return;
+    if (!window.Capacitor) {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        addToast("Notifications are not supported by this browser. On iOS, you must first 'Add to Home Screen' (Install).", "warning");
+        return;
+      }
+      if (Notification.permission === "denied") {
+        addToast("Notification permission is blocked. Please reset permissions in your browser settings.", "warning");
+        return;
+      }
     }
     if (!notifyConfig.enabled) {
       requestNotificationPermission();
@@ -536,20 +556,41 @@ export default function Portfolio() {
   };
 
   const triggerTestNotification = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      addToast("Notifications are not supported by this browser.", "warning");
-      return;
-    }
+    if (!window.Capacitor) {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        addToast("Notifications are not supported by this browser.", "warning");
+        return;
+      }
 
-    if (Notification.permission !== "granted") {
-      addToast("Please enable notifications in your browser first.", "warning");
-      return;
+      if (Notification.permission !== "granted") {
+        addToast("Please enable notifications in your browser first.", "warning");
+        return;
+      }
     }
 
     const totalVal = portfolioSummary.totalCurrent;
     const holdingsCount = portfolioSummary.holdings.length;
 
     const showNotification = async (title, options) => {
+      if (window.Capacitor) {
+        try {
+          const { LocalNotifications } = await import("@capacitor/local-notifications");
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title: title,
+                body: options?.body || "Portfolio Valuation Update",
+                id: Math.floor(Math.random() * 100000),
+                extra: null,
+              },
+            ],
+          });
+          return;
+        } catch (e) {
+          console.warn("Capacitor LocalNotifications failed: ", e);
+        }
+      }
+
       let shown = false;
       if ("serviceWorker" in navigator) {
         try {

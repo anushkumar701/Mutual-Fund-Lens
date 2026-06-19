@@ -14,7 +14,7 @@ const formatCurrency = (val) => {
 export function usePortfolioNotifications() {
   useEffect(() => {
     // Only run on the client
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || (!window.Capacitor && !("Notification" in window))) return;
 
     const runNotificationCheck = async () => {
       // 1. Load portfolio holdings
@@ -96,7 +96,7 @@ export function usePortfolioNotifications() {
         }
 
         // 3. Notification Guards
-        if (Notification.permission !== "granted") return;
+        if (!window.Capacitor && Notification.permission !== "granted") return;
 
         const notifyRaw = localStorage.getItem("fundlens_portfolio_notify");
         let notifyConfig = { enabled: false, type: "total", time: "evening" };
@@ -158,6 +158,25 @@ export function usePortfolioNotifications() {
         const consolidatedList = Object.values(consolidatedMap);
 
         const showNotification = async (title, options) => {
+          if (window.Capacitor) {
+            try {
+              const { LocalNotifications } = await import("@capacitor/local-notifications");
+              await LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: title,
+                    body: options?.body || "Portfolio Valuation Update",
+                    id: Math.floor(Math.random() * 100000),
+                    extra: null,
+                  },
+                ],
+              });
+              return;
+            } catch (e) {
+              console.warn("Capacitor LocalNotifications failed: ", e);
+            }
+          }
+
           let shown = false;
           if ("serviceWorker" in navigator) {
             try {
