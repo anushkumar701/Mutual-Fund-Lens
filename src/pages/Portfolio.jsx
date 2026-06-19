@@ -5,6 +5,7 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
 import { useToast } from "../components/Toast";
 import { formatCurrencyINR } from "../utils/formatCurrency";
+import { syncPortfolioWidget } from "../utils/portfolioWidget";
 import {
   AreaChart,
   Area,
@@ -784,9 +785,16 @@ export default function Portfolio() {
     if (!hasAnyApiHolding || hasLoadedAllApiHoldings) {
       if (portfolioSummary.totalCurrent > 0) {
         localStorage.setItem("fundlens_portfolio_total_value", String(portfolioSummary.totalCurrent));
+
+        // Sync data to the Android home screen widget (safe no-op on web/PWA)
+        syncPortfolioWidget({
+          totalCurrent:   portfolioSummary.totalCurrent,
+          dailyChange:    portfolioSummary.totalDailyChange,
+          dailyChangePct: portfolioSummary.totalDailyChangePct,
+        });
       }
     }
-  }, [portfolioSummary.totalCurrent, holdings, detailsCache]);
+  }, [portfolioSummary.totalCurrent, portfolioSummary.totalDailyChange, portfolioSummary.totalDailyChangePct, holdings, detailsCache]);
 
   // Reconstruct portfolio valuation chart data over time
   const historicalChartData = useMemo(() => {
