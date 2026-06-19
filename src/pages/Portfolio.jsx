@@ -624,7 +624,8 @@ export default function Portfolio() {
       addToast("Test notification sent!", "success");
     } else {
       if (holdingsCount === 0) {
-        await showNotification("Parag Parikh Flexi Cap Fund: ₹50,710.00", {
+        await showNotification("Parag Parikh Flexi Cap Fund", {
+          body: "Current Value: ₹50,710.00",
           icon: "/favicon.svg",
           tag: "fundlens-fund-detail-test-mock",
         });
@@ -632,7 +633,8 @@ export default function Portfolio() {
       } else {
         for (let index = 0; index < consolidatedHoldings.length; index++) {
           const item = consolidatedHoldings[index];
-          await showNotification(`${item.schemeName}: ${formatCurrency(item.currentValue)}`, {
+          await showNotification(item.schemeName, {
+            body: `Current Value: ${formatCurrency(item.currentValue)}`,
             icon: "/favicon.svg",
             tag: `fundlens-fund-detail-${index}-test`,
           });
