@@ -549,21 +549,26 @@ export default function Portfolio() {
     const holdingsCount = portfolioSummary.holdings.length;
 
     const showNotification = async (title, options) => {
+      let shown = false;
       if ("serviceWorker" in navigator) {
         try {
-          const reg = await navigator.serviceWorker.ready;
+          const swReady = navigator.serviceWorker.ready;
+          const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 800));
+          const reg = await Promise.race([swReady, timeout]);
           if (reg && "showNotification" in reg) {
             await reg.showNotification(title, options);
-            return;
+            shown = true;
           }
         } catch (e) {
           console.warn("SW showNotification failed:", e);
         }
       }
-      try {
-        new Notification(title, options);
-      } catch (e) {
-        console.error("Notification constructor failed:", e);
+      if (!shown) {
+        try {
+          new Notification(title, options);
+        } catch (e) {
+          console.error("Notification constructor failed:", e);
+        }
       }
     };
 
