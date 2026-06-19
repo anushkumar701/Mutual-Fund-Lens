@@ -100,14 +100,18 @@ const deferredInit = () => {
     }
   }
 
-  // Service Worker cleanup
+  // Service Worker registration
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((registrations) => {
-        registrations.forEach((registration) => registration.unregister());
-      })
-      .catch(() => {});
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          console.debug("Service Worker registered successfully:", reg.scope);
+        })
+        .catch((err) => {
+          console.error("Service Worker registration failed:", err);
+        });
+    });
   }
 };
 

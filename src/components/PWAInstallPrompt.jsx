@@ -7,16 +7,35 @@ export default function PWAInstallPrompt() {
     () => localStorage.getItem("fundlens_pwa_dismissed") === "1",
   );
 
+  const [isInstalled, setIsInstalled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone ||
+      localStorage.getItem("fundlens_pwa_installed") === "1"
+    );
+  });
+
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
+    const handleAppInstalled = () => {
+      localStorage.setItem("fundlens_pwa_installed", "1");
+      setIsInstalled(true);
+    };
+
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
   }, []);
 
-  if (!deferredPrompt || dismissed) return null;
+  if (isInstalled || !deferredPrompt || dismissed) return null;
 
   const handleInstall = async () => {
     deferredPrompt.prompt();

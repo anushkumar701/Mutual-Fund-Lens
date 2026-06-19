@@ -1,5 +1,5 @@
 // pages/Portfolio.jsx
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { useFunds, fetchFundDetail } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
@@ -145,6 +145,14 @@ export default function Portfolio() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmModalDelete, setConfirmModalDelete] = useState(false);
   const [chartRange, setChartRange] = useState("all");
+  const [viewMode, setViewMode] = useState("fund"); // "fund" or "transaction"
+  const [expandedFunds, setExpandedFunds] = useState({});
+  const toggleFundExpand = (code) => {
+    setExpandedFunds((prev) => ({
+      ...prev,
+      [code]: !prev[code],
+    }));
+  };
 
   // Helper to convert 24h format (HH:MM) to 12h parts
   const get12HourParts = (timeStr) => {
@@ -454,6 +462,49 @@ export default function Portfolio() {
     }
   };
 
+  const triggerTestNotification = () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      addToast("Notifications are not supported by this browser.", "warning");
+      return;
+    }
+
+    if (Notification.permission !== "granted") {
+      addToast("Please enable notifications in your browser first.", "warning");
+      return;
+    }
+
+    const totalVal = portfolioSummary.totalCurrent;
+    const totalChange = portfolioSummary.totalDailyChange;
+    const totalChangePct = portfolioSummary.totalDailyChangePct;
+    const holdingsCount = portfolioSummary.holdings.length;
+
+    if (notifyConfig.type === "total") {
+      const valStr = holdingsCount > 0 ? formatCurrency(totalVal) : "₹1,24,532.80";
+
+      new Notification(`Portfolio: ${valStr}`, {
+        icon: "/favicon.svg",
+        tag: "fundlens-portfolio-daily-total-test",
+      });
+      addToast("Test notification sent!", "success");
+    } else {
+      if (holdingsCount === 0) {
+        new Notification("Parag Parikh Flexi Cap Fund: ₹50,710.00", {
+          icon: "/favicon.svg",
+          tag: "fundlens-fund-detail-test-mock",
+        });
+        addToast("Demo test notification sent!", "success");
+      } else {
+        consolidatedHoldings.forEach((item, index) => {
+          new Notification(`${item.schemeName}: ${formatCurrency(item.currentValue)}`, {
+            icon: "/favicon.svg",
+            tag: `fundlens-fund-detail-${index}-test`,
+          });
+        });
+        addToast(`Sent test notification for ${consolidatedHoldings.length} fund(s)!`, "success");
+      }
+    }
+  };
+
   // Compute live portfolio metrics
   const portfolioSummary = useMemo(() => {
     let totalInvested = 0;
@@ -511,6 +562,50 @@ export default function Portfolio() {
       holdings: holdingRows,
     };
   }, [holdings, detailsCache]);
+
+  const consolidatedHoldings = useMemo(() => {
+    const groups = {};
+    portfolioSummary.holdings.forEach((h) => {
+      if (!groups[h.schemeCode]) {
+        groups[h.schemeCode] = {
+          schemeCode: h.schemeCode,
+          schemeName: h.schemeName,
+          totalInvested: 0,
+          totalUnits: 0,
+          currentNav: h.currentNav,
+          dailyChange: 0,
+          transactions: [],
+        };
+      }
+      const g = groups[h.schemeCode];
+      g.totalInvested += h.amount;
+      g.totalUnits += h.units;
+      g.dailyChange += h.dailyChange;
+      g.transactions.push(h);
+    });
+
+    return Object.values(groups).map((g) => {
+      // Sort transactions by date descending so latest purchase is first
+      g.transactions.sort((a, b) => new Date(b.investedDate).getTime() - new Date(a.investedDate).getTime());
+      
+      const currentValue = g.totalUnits * g.currentNav;
+      const gainLoss = currentValue - g.totalInvested;
+      const gainLossPct = g.totalInvested > 0 ? (gainLoss / g.totalInvested) * 100 : 0;
+      const avgBuyNav = g.totalUnits > 0 ? g.totalInvested / g.totalUnits : 0;
+      const dailyChangePct = (currentValue - g.dailyChange) > 0
+        ? (g.dailyChange / (currentValue - g.dailyChange)) * 100
+        : 0;
+
+      return {
+        ...g,
+        currentValue,
+        gainLoss,
+        gainLossPct,
+        avgBuyNav,
+        dailyChangePct,
+      };
+    }).sort((a, b) => b.currentValue - a.currentValue);
+  }, [portfolioSummary.holdings]);
 
   // Update cached total portfolio value in localStorage for Navbar and Dashboard usage
   useEffect(() => {
@@ -926,7 +1021,15 @@ export default function Portfolio() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                {notifyConfig.enabled && (
+                  <button
+                    onClick={triggerTestNotification}
+                    className="px-4 py-2 text-xs font-bold rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/40 active:scale-95 transition-all"
+                  >
+                    🔔 Test Notification
+                  </button>
+                )}
                 <button
                   onClick={handleNotificationToggle}
                   className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
@@ -1052,112 +1155,314 @@ export default function Portfolio() {
               </div>
             )}
           </div>
-
           {/* Holdings List Section */}
           <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-base font-bold">Invested Holdings ({portfolioSummary.holdings.length})</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Invested Holdings ({consolidatedHoldings.length} Funds)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {portfolioSummary.holdings.length} total transactions
+                </p>
+              </div>
+
+              {/* View Toggle */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl w-fit">
+                <button
+                  onClick={() => setViewMode("fund")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === "fund"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  📁 Fund-wise View
+                </button>
+                <button
+                  onClick={() => setViewMode("transaction")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === "transaction"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  📝 Transaction View
+                </button>
+              </div>
             </div>
             
-            <div className="overflow-x-auto -mx-5">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    <th className="px-5 py-3">Fund Name</th>
-                    <th className="px-5 py-3">Investment Details</th>
-                    <th className="px-5 py-3 text-right">Units Held</th>
-                    <th className="px-5 py-3 text-right">Current NAV</th>
-                    <th className="px-5 py-3 text-right">Invested Amount</th>
-                    <th className="px-5 py-3 text-right">Current Value</th>
-                    <th className="px-5 py-3 text-right">Total Gain / Loss</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
-                  {portfolioSummary.holdings.map((h) => (
-                    <tr key={h.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors">
-                      <td className="px-5 py-4 font-bold max-w-[220px]">
-                        <div className="truncate text-slate-800 dark:text-slate-200" title={h.schemeName}>
-                          {h.schemeName}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
-                          <span className="font-mono">AMFI: {h.schemeCode}</span>
-                          <span>•</span>
-                          <button
-                            onClick={() => handleEditClick(h)}
-                            className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:underline active:scale-95 transition-all"
-                            title="Edit this holding"
-                          >
-                            Edit
-                          </button>
-                          <span>•</span>
-                          {confirmDeleteId === String(h.id) ? (
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setHoldings((prev) => prev.filter((item) => String(item.id) !== String(h.id)));
-                                addToast("Holding removed from portfolio.", "info");
-                                setConfirmDeleteId(null);
-                              }}
-                              className="text-amber-500 font-bold hover:text-amber-600 dark:hover:text-amber-400 hover:underline active:scale-95 transition-all animate-pulse"
-                              title="Click again to confirm removal"
-                            >
-                              Confirm?
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setConfirmDeleteId(String(h.id));
-                                setTimeout(() => {
-                                  setConfirmDeleteId((prev) => prev === String(h.id) ? null : prev);
-                                }, 3000);
-                              }}
-                              className="text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:underline active:scale-95 transition-all"
-                              title="Delete this holding"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {new Date(h.investedDate).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-right font-mono font-medium">{h.units.toFixed(4)}</td>
-                      <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
-                        ₹{h.currentNav.toFixed(4)}
-                      </td>
-                      <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                        {formatCurrency(h.amount)}
-                      </td>
-                      <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
-                        {formatCurrency(h.currentValue)}
-                      </td>
-                      <td className="px-5 py-4 text-right font-bold">
-                        <span className={h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                          {h.gainLoss >= 0 ? "+" : ""}
-                          {formatCurrency(h.gainLoss)}
-                        </span>
-                        <div className={`text-[10px] font-bold mt-1 ${h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {h.gainLoss >= 0 ? "▲" : "▼"} {h.gainLossPct.toFixed(2)}%
-                          {h.cagr !== null && (
-                            <span className="text-slate-400 font-normal"> ({h.cagr.toFixed(1)}% CAGR)</span>
-                          )}
-                        </div>
-                      </td>
+            {viewMode === "fund" ? (
+              <div className="overflow-x-auto -mx-5">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <th className="px-5 py-3 w-[35%]">Mutual Fund</th>
+                      <th className="px-5 py-3 text-right">Avg Buy NAV</th>
+                      <th className="px-5 py-3 text-right">Current NAV</th>
+                      <th className="px-5 py-3 text-right">Units Held</th>
+                      <th className="px-5 py-3 text-right">Invested Amount</th>
+                      <th className="px-5 py-3 text-right">Current Value</th>
+                      <th className="px-5 py-3 text-right">Total Profit / Loss</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
+                    {consolidatedHoldings.map((c) => {
+                      const isExpanded = !!expandedFunds[c.schemeCode];
+                      return (
+                        <Fragment key={c.schemeCode}>
+                          {/* Consolidated Main Row */}
+                          <tr 
+                            onClick={() => toggleFundExpand(c.schemeCode)}
+                            className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 cursor-pointer transition-colors group"
+                          >
+                            <td className="px-5 py-4 font-bold">
+                              <div className="flex items-start gap-2">
+                                <span className="text-slate-400 transition-transform mt-0.5 group-hover:text-slate-600 dark:group-hover:text-slate-300">
+                                  {isExpanded ? "▼" : "▶"}
+                                </span>
+                                <div className="truncate text-slate-800 dark:text-slate-200 max-w-[280px]" title={c.schemeName}>
+                                  {c.schemeName}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1 ml-5 text-[10px] font-semibold text-slate-400">
+                                <span className="font-mono">Code: {c.schemeCode}</span>
+                                <span>•</span>
+                                <span className="text-blue-500">{c.transactions.length} purchase{c.transactions.length > 1 ? "s" : ""}</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
+                              ₹{c.avgBuyNav.toFixed(4)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
+                              ₹{c.currentNav.toFixed(4)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
+                              {c.totalUnits.toFixed(4)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
+                              {formatCurrency(c.totalInvested)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
+                              {formatCurrency(c.currentValue)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-bold">
+                              <span className={c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                                {c.gainLoss >= 0 ? "+" : ""}
+                                {formatCurrency(c.gainLoss)}
+                              </span>
+                              <div className={`text-[10px] font-bold mt-1 ${c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                {c.gainLoss >= 0 ? "▲" : "▼"} {c.gainLossPct.toFixed(2)}%
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Expanded Transactions Subtable */}
+                          {isExpanded && (
+                            <tr className="bg-slate-50/40 dark:bg-slate-900/10">
+                              <td colSpan="7" className="px-6 py-4">
+                                <div className="border-l-2 border-slate-200 dark:border-slate-800 pl-4 py-1 space-y-2.5">
+                                  <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                    Detailed Transactions
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                      <thead>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800/60 text-slate-400 font-bold uppercase tracking-wider">
+                                          <th className="py-2 pr-4">Date</th>
+                                          <th className="py-2 text-right pr-4">Buy NAV</th>
+                                          <th className="py-2 text-right pr-4">Units</th>
+                                          <th className="py-2 text-right pr-4">Invested Amount</th>
+                                          <th className="py-2 text-right pr-4">Current Value</th>
+                                          <th className="py-2 text-right pr-4">Gain / Loss</th>
+                                          <th className="py-2 text-right">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100/50 dark:divide-slate-800/20">
+                                        {c.transactions.map((t) => (
+                                          <tr key={t.id} className="hover:bg-slate-100/40 dark:hover:bg-slate-800/10 transition-colors">
+                                            <td className="py-2.5 font-semibold text-slate-700 dark:text-slate-300">
+                                              {new Date(t.investedDate).toLocaleDateString("en-IN", {
+                                                day: "2-digit",
+                                                month: "short",
+                                                year: "numeric",
+                                              })}
+                                            </td>
+                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
+                                              ₹{t.buyNav.toFixed(4)}
+                                            </td>
+                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
+                                              {t.units.toFixed(4)}
+                                            </td>
+                                            <td className="py-2.5 text-right font-bold text-slate-800 dark:text-slate-200 pr-4">
+                                              {formatCurrency(t.amount)}
+                                            </td>
+                                            <td className="py-2.5 text-right font-bold text-slate-800 dark:text-slate-200 pr-4">
+                                              {formatCurrency(t.currentValue)}
+                                            </td>
+                                            <td className="py-2.5 text-right font-bold pr-4">
+                                              <span className={t.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                                                {t.gainLoss >= 0 ? "+" : ""}
+                                                {formatCurrency(t.gainLoss)}
+                                              </span>
+                                              <span className={`text-[10px] font-bold block ${t.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                                {t.gainLossPct.toFixed(2)}%
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 text-right text-[10px] font-bold space-x-2">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleEditClick(t);
+                                                }}
+                                                className="text-blue-500 hover:text-blue-600 hover:underline active:scale-95 transition-all"
+                                              >
+                                                Edit
+                                              </button>
+                                              <span className="text-slate-300">|</span>
+                                              {confirmDeleteId === String(t.id) ? (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setHoldings((prev) => prev.filter((item) => String(item.id) !== String(t.id)));
+                                                    addToast("Holding removed.", "info");
+                                                    setConfirmDeleteId(null);
+                                                  }}
+                                                  className="text-amber-500 hover:underline active:scale-95 transition-all animate-pulse"
+                                                >
+                                                  Confirm?
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setConfirmDeleteId(String(t.id));
+                                                    setTimeout(() => {
+                                                      setConfirmDeleteId((prev) => prev === String(t.id) ? null : prev);
+                                                    }, 3000);
+                                                  }}
+                                                  className="text-rose-500 hover:text-rose-600 hover:underline active:scale-95 transition-all"
+                                                >
+                                                  Delete
+                                                </button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-5">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <th className="px-5 py-3">Fund Name</th>
+                      <th className="px-5 py-3">Investment Details</th>
+                      <th className="px-5 py-3 text-right">Units Held</th>
+                      <th className="px-5 py-3 text-right">Current NAV</th>
+                      <th className="px-5 py-3 text-right">Invested Amount</th>
+                      <th className="px-5 py-3 text-right">Current Value</th>
+                      <th className="px-5 py-3 text-right">Total Gain / Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
+                    {portfolioSummary.holdings.map((h) => (
+                      <tr key={h.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors">
+                        <td className="px-5 py-4 font-bold max-w-[220px]">
+                          <div className="truncate text-slate-800 dark:text-slate-200" title={h.schemeName}>
+                            {h.schemeName}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
+                            <span className="font-mono">AMFI: {h.schemeCode}</span>
+                            <span>•</span>
+                            <button
+                              onClick={() => handleEditClick(h)}
+                              className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:underline active:scale-95 transition-all"
+                              title="Edit this holding"
+                            >
+                              Edit
+                            </button>
+                            <span>•</span>
+                            {confirmDeleteId === String(h.id) ? (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setHoldings((prev) => prev.filter((item) => String(item.id) !== String(h.id)));
+                                  addToast("Holding removed from portfolio.", "info");
+                                  setConfirmDeleteId(null);
+                                }}
+                                className="text-amber-500 font-bold hover:text-amber-600 dark:hover:text-amber-400 hover:underline active:scale-95 transition-all animate-pulse"
+                                title="Click again to confirm removal"
+                              >
+                                Confirm?
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfirmDeleteId(String(h.id));
+                                  setTimeout(() => {
+                                    setConfirmDeleteId((prev) => prev === String(h.id) ? null : prev);
+                                  }, 3000);
+                                }}
+                                className="text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:underline active:scale-95 transition-all"
+                                title="Delete this holding"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {new Date(h.investedDate).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right font-mono font-medium">{h.units.toFixed(4)}</td>
+                        <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
+                          ₹{h.currentNav.toFixed(4)}
+                        </td>
+                        <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
+                          {formatCurrency(h.amount)}
+                        </td>
+                        <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
+                          {formatCurrency(h.currentValue)}
+                        </td>
+                        <td className="px-5 py-4 text-right font-bold">
+                          <span className={h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                            {h.gainLoss >= 0 ? "+" : ""}
+                            {formatCurrency(h.gainLoss)}
+                          </span>
+                          <div className={`text-[10px] font-bold mt-1 ${h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                            {h.gainLoss >= 0 ? "▲" : "▼"} {h.gainLossPct.toFixed(2)}%
+                            {h.cagr !== null && (
+                              <span className="text-slate-400 font-normal"> ({h.cagr.toFixed(1)}% CAGR)</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1267,6 +1572,7 @@ export default function Portfolio() {
                       type="number"
                       required
                       min="1"
+                      step="any"
                       placeholder="e.g. 10000"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
@@ -1413,6 +1719,7 @@ export default function Portfolio() {
                       type="number"
                       required
                       min="1"
+                      step="any"
                       placeholder="e.g. 10000"
                       value={editAmount}
                       onChange={(e) => setEditAmount(e.target.value)}
