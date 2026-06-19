@@ -157,20 +157,40 @@ export function usePortfolioNotifications() {
         });
         const consolidatedList = Object.values(consolidatedMap);
 
+        const showNotification = async (title, options) => {
+          if ("serviceWorker" in navigator) {
+            try {
+              const reg = await navigator.serviceWorker.ready;
+              if (reg && "showNotification" in reg) {
+                await reg.showNotification(title, options);
+                return;
+              }
+            } catch (e) {
+              console.warn("SW showNotification failed:", e);
+            }
+          }
+          try {
+            new Notification(title, options);
+          } catch (e) {
+            console.error("Notification constructor failed:", e);
+          }
+        };
+
         // 4. Trigger corresponding Notification
         if (notifyConfig.type === "total") {
-          new Notification(`Portfolio: ${formatCurrency(totalCurrent)}`, {
+          await showNotification(`Portfolio: ${formatCurrency(totalCurrent)}`, {
             icon: "/favicon.svg",
             tag: "fundlens-portfolio-daily-total",
           });
         } else {
           // Detail mode: trigger a separate browser notification for each unique fund
-          consolidatedList.forEach((item, index) => {
-            new Notification(`${item.name}: ${formatCurrency(item.currentValue)}`, {
+          for (let index = 0; index < consolidatedList.length; index++) {
+            const item = consolidatedList[index];
+            await showNotification(`${item.name}: ${formatCurrency(item.currentValue)}`, {
               icon: "/favicon.svg",
               tag: `fundlens-fund-detail-${index}-${Date.now()}`,
             });
-          });
+          }
         }
 
         // 5. Persist notification status for today
