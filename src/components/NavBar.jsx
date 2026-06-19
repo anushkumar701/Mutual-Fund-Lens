@@ -6,7 +6,7 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 
 const links = [
   {
-    to: "/",
+    to: "/dashboard",
     label: "Dashboard",
     icon: (
       <svg
@@ -90,7 +90,7 @@ const links = [
     ),
   },
   {
-    to: "/portfolio",
+    to: "/",
     label: "Portfolio",
     icon: (
       <svg
