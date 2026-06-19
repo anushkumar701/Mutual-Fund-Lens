@@ -1,9 +1,5 @@
 {
   "appId": "com.anushkumar.mflens",
   "appName": "Mutual Fund Lens",
-  "webDir": "dist",
-  "server": {
-    "url": "https://fundlens.netlify.app",
-    "cleartext": true
-  }
+  "webDir": "dist"
 }
