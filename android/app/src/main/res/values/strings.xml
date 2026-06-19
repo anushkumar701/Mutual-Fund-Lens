@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mutual Fund Lens</string>
+    <string name="title_activity_main">Mutual Fund Lens</string>
+    <string name="package_name">com.anushkumar.mflens</string>
+    <string name="custom_url_scheme">com.anushkumar.mflens</string>
+</resources>
