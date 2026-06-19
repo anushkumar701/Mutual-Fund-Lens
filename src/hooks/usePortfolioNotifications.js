@@ -210,7 +210,8 @@ export function usePortfolioNotifications() {
           // Detail mode: trigger a separate browser notification for each unique fund
           for (let index = 0; index < consolidatedList.length; index++) {
             const item = consolidatedList[index];
-            await showNotification(`${item.name}: ${formatCurrency(item.currentValue)}`, {
+            await showNotification(item.name, {
+              body: `Current Value: ${formatCurrency(item.currentValue)}`,
               icon: "/favicon.svg",
               tag: `fundlens-fund-detail-${index}-${Date.now()}`,
             });
