@@ -112,7 +112,8 @@ export default function Portfolio() {
     return (
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone ||
-      localStorage.getItem("fundlens_pwa_installed") === "1"
+      localStorage.getItem("fundlens_pwa_installed") === "1" ||
+      !!window.Capacitor
     );
   });
 
