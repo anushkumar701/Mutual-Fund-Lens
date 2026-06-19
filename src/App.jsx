@@ -25,6 +25,11 @@ import { usePortfolioNotifications } from "./hooks/usePortfolioNotifications";
 // Per-route SEO — updates document.title, meta description, and canonical URL
 const ROUTE_SEO = {
   "/": {
+    title: "Portfolio Tracker — Live Mutual Fund Valuation | FundLens",
+    description:
+      "Track your mutual fund holdings, view real-time valuation gains/losses, analyze historical performance curves, and get daily updates.",
+  },
+  "/dashboard": {
     title: "FundLens — Mutual Fund Research & Analysis",
     description:
       "FundLens — India's beginner-friendly mutual fund analysis platform. Search 37,000+ funds, compare performance, and plan investments.",
@@ -43,11 +48,6 @@ const ROUTE_SEO = {
     title: "SIP & FIRE Calculator | FundLens",
     description:
       "Calculate SIP returns, plan FIRE retirement, estimate ELSS tax savings, and simulate SWP withdrawals — all free.",
-  },
-  "/portfolio": {
-    title: "Portfolio Tracker — Live Mutual Fund Valuation | FundLens",
-    description:
-      "Track your mutual fund holdings, view real-time valuation gains/losses, analyze historical performance curves, and get daily updates.",
   },
 };
 
@@ -130,11 +130,12 @@ export default function App() {
                   }
                 >
                   <Routes>
-                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/" element={<Portfolio />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/screener" element={<Screener />} />
                     <Route path="/compare" element={<Compare />} />
                     <Route path="/sip" element={<SIPCalculator />} />
-                    <Route path="/portfolio" element={<Portfolio />} />
+                    <Route path="/portfolio" element={<Navigate to="/" replace />} />
                     {/* Catch-all: redirect any unknown URL to home */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
