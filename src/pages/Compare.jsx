@@ -1662,207 +1662,288 @@ export default function Compare() {
               </div>
 
               {/* ── Annual Returns Table ── */}
-              {annualReturns.years.length > 0 && (
-                <div className="card p-5">
-                  <div className="mb-4">
-                    <h2 className="font-bold text-slate-900 dark:text-white text-lg">
-                      📅 Annual Returns (Calendar Year)
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Jan–Dec returns for each fund.{" "}
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Green = gain
-                      </span>
-                      ,{" "}
-                      <span className="text-red-500 font-semibold">
-                        Red = loss
-                      </span>
-                      . Helps identify consistency over market cycles.
-                    </p>
-                  </div>
-                  <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60 sticky top-0">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold whitespace-nowrap">
-                            Year
-                          </th>
-                          {fundData.map((fund, i) => (
-                            <th
-                              key={fund.schemeCode}
-                              className="px-4 py-3 font-semibold"
-                              style={{
-                                color: CHART_COLORS[i % CHART_COLORS.length],
-                              }}
-                            >
-                              <div
-                                className="line-clamp-1 max-w-[160px]"
-                                title={fund.meta?.scheme_name}
-                              >
-                                {fund.meta?.scheme_name
-                                  ?.split(" ")
-                                  .slice(0, 4)
-                                  .join(" ") || fund.schemeCode}
-                              </div>
-                            </th>
-                          ))}
-                          {fundData.length >= 2 && (
-                            <th className="px-4 py-3 font-semibold text-slate-400">
-                              Difference
-                            </th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                        {annualReturns.years.map((year) => {
-                          const row = annualReturns.data[year] || {};
-                          const vals = fundData.map(
-                            (f) =>
-                              row[f.meta?.scheme_name || String(f.schemeCode)],
-                          );
-                          const defined = vals.filter((v) => v !== undefined);
-                          const bestVal =
-                            defined.length > 0 ? Math.max(...defined) : null;
-                          let event = MARKET_EVENTS[year];
+              {annualReturns.years.length > 0 && (() => {
+                const overallPerformances = fundData.map((fund) => {
+                  const name = fund.meta?.scheme_name || String(fund.schemeCode);
+                  const yearReturns = annualReturns.years
+                    .map((year) => annualReturns.data[year]?.[name])
+                    .filter((v) => v !== undefined);
+                  
+                  const avgReturn = yearReturns.length > 0
+                    ? yearReturns.reduce((sum, v) => sum + v, 0) / yearReturns.length
+                    : null;
 
-                          // Future-proof: If no historical reason is mapped, generate an exact, unique proper reason based on the math
-                          if (!event && defined.length > 0) {
-                            const avgReturn =
-                              defined.reduce((sum, v) => sum + v, 0) /
-                              defined.length;
-                            if (avgReturn >= 0) {
-                              event = {
-                                label: `🟢 Average market growth of +${avgReturn.toFixed(1)}% lifted overall performance`,
-                                color:
-                                  "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-                              };
-                            } else {
-                              event = {
-                                label: `🔴 Average market drop of ${avgReturn.toFixed(1)}% dragged down overall performance`,
-                                color:
-                                  "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-                              };
-                            }
-                          }
-                          return (
-                            <tr
-                              key={year}
-                              className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
-                            >
-                              <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
-                                <div className="flex flex-col gap-1.5">
-                                  <span className="flex items-center gap-2 text-base">
-                                    {year}
-                                    {year === new Date().getFullYear() && (
-                                      <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded font-bold tracking-wide">
-                                        YTD
+                  return {
+                    schemeCode: fund.schemeCode,
+                    avgReturn,
+                  };
+                });
+
+                const sortedPerformances = [...overallPerformances]
+                  .filter((p) => p.avgReturn !== null)
+                  .sort((a, b) => b.avgReturn - a.avgReturn);
+
+                return (
+                  <div className="card p-5">
+                    <div className="mb-4">
+                      <h2 className="font-bold text-slate-900 dark:text-white text-lg">
+                        📅 Annual Returns (Calendar Year)
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Jan–Dec returns for each fund.{" "}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                          Green = gain
+                        </span>
+                        ,{" "}
+                        <span className="text-red-500 font-semibold">
+                          Red = loss
+                        </span>
+                        . Helps identify consistency over market cycles.
+                      </p>
+                    </div>
+                    <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold whitespace-nowrap">
+                              Year
+                            </th>
+                            {fundData.map((fund, i) => {
+                              const perf = overallPerformances.find((p) => p.schemeCode === fund.schemeCode);
+                              const rankIndex = perf && perf.avgReturn !== null
+                                ? sortedPerformances.findIndex((p) => p.schemeCode === fund.schemeCode)
+                                : -1;
+                              const overallRank = rankIndex !== -1 ? rankIndex + 1 : null;
+
+                              return (
+                                <th
+                                  key={fund.schemeCode}
+                                  className="px-4 py-3 font-semibold"
+                                  style={{
+                                    color: CHART_COLORS[i % CHART_COLORS.length],
+                                  }}
+                                >
+                                  <div className="flex flex-col gap-1.5">
+                                    <div
+                                      className="line-clamp-1 max-w-[160px]"
+                                      title={fund.meta?.scheme_name}
+                                    >
+                                      {fund.meta?.scheme_name
+                                        ?.split(" ")
+                                        .slice(0, 4)
+                                        .join(" ") || fund.schemeCode}
+                                    </div>
+                                    {overallRank && fundData.length > 1 && (
+                                      <span className={`text-[10px] w-fit font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                                        overallRank === 1
+                                          ? "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 shadow-sm"
+                                          : overallRank === 2
+                                            ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 border border-slate-200 dark:border-slate-700/60"
+                                            : overallRank === 3
+                                              ? "bg-orange-100 dark:bg-orange-950/50 text-orange-850 dark:text-orange-355 border border-orange-200 dark:border-orange-900/50"
+                                              : "bg-slate-50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/60"
+                                      }`}>
+                                        {overallRank === 1 ? "🏆 1st" : overallRank === 2 ? "🥈 2nd" : overallRank === 3 ? "🥉 3rd" : `${overallRank}th`}
                                       </span>
                                     )}
-                                  </span>
-                                  {event && (
-                                    <span
-                                      className={`text-xs font-semibold px-2.5 py-1 rounded-md w-fit ${event.color}`}
-                                    >
-                                      {event.label}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              {fundData.map((fund) => {
-                                const name =
-                                  fund.meta?.scheme_name ||
-                                  String(fund.schemeCode);
-                                const val = row[name];
-                                const isGain = val !== undefined && val >= 0;
-                                
-                                // Calculate rank for this cell among defined values for this year
-                                let rank = null;
-                                if (val !== undefined && defined.length > 1) {
-                                  const sortedUniqueVals = Array.from(new Set(defined)).sort((a, b) => b - a);
-                                  rank = sortedUniqueVals.indexOf(val) + 1;
-                                }
+                                  </div>
+                                </th>
+                              );
+                            })}
+                            {fundData.length >= 2 && (
+                              <th className="px-4 py-3 font-semibold text-slate-400">
+                                Difference
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                          {annualReturns.years.map((year) => {
+                            const row = annualReturns.data[year] || {};
+                            const vals = fundData.map(
+                              (f) =>
+                                row[f.meta?.scheme_name || String(f.schemeCode)],
+                            );
+                            const defined = vals.filter((v) => v !== undefined);
+                            const bestVal =
+                              defined.length > 0 ? Math.max(...defined) : null;
+                            let event = MARKET_EVENTS[year];
 
-                                return (
-                                  <td
-                                    key={fund.schemeCode}
-                                    className={`px-4 py-3 font-semibold text-sm tabular-nums ${
-                                      val === undefined
-                                        ? "text-slate-300 dark:text-slate-600"
-                                        : isGain
-                                          ? "text-emerald-600 dark:text-emerald-400"
-                                          : "text-red-600 dark:text-red-400"
-                                    }`}
-                                  >
-                                    <div className="flex flex-col gap-1">
-                                      <span>
+                            if (!event && defined.length > 0) {
+                              const avgReturn =
+                                defined.reduce((sum, v) => sum + v, 0) /
+                                defined.length;
+                              if (avgReturn >= 0) {
+                                event = {
+                                  label: `🟢 Average market growth of +${avgReturn.toFixed(1)}% lifted overall performance`,
+                                  color:
+                                    "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
+                                };
+                              } else {
+                                event = {
+                                  label: `🔴 Average market drop of ${avgReturn.toFixed(1)}% dragged down overall performance`,
+                                  color:
+                                    "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+                                };
+                              }
+                            }
+                            return (
+                              <tr
+                                key={year}
+                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                              >
+                                <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className="flex items-center gap-2 text-base">
+                                      {year}
+                                      {year === new Date().getFullYear() && (
+                                        <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded font-bold tracking-wide">
+                                          YTD
+                                        </span>
+                                      )}
+                                    </span>
+                                    {event && (
+                                      <span
+                                        className={`text-xs font-semibold px-2.5 py-1 rounded-md w-fit ${event.color}`}
+                                      >
+                                        {event.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                {fundData.map((fund) => {
+                                  const name =
+                                    fund.meta?.scheme_name ||
+                                    String(fund.schemeCode);
+                                  const val = row[name];
+                                  const isGain = val !== undefined && val >= 0;
+                                  const isBest =
+                                    val !== undefined &&
+                                    val === bestVal &&
+                                    defined.length > 1;
+                                  return (
+                                    <td
+                                      key={fund.schemeCode}
+                                      className={`px-4 py-3 font-semibold text-sm tabular-nums ${
+                                        val === undefined
+                                          ? "text-slate-300 dark:text-slate-600"
+                                          : isGain
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : "text-red-600 dark:text-red-400"
+                                      }`}
+                                    >
+                                      <span
+                                        className={
+                                          isBest
+                                            ? "bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded"
+                                            : ""
+                                        }
+                                      >
                                         {val === undefined
                                           ? "—"
                                           : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
                                       </span>
-                                      {rank && (
-                                        <span className={`text-[10px] w-fit font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
-                                          rank === 1
-                                            ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40 shadow-sm"
-                                            : rank === 2
-                                              ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                                              : rank === 3
-                                                ? "bg-orange-100 dark:bg-orange-950/40 text-orange-850 dark:text-orange-300 border border-orange-200 dark:border-orange-900/40"
-                                                : "bg-slate-50 dark:bg-slate-800/25 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/50"
-                                        }`}>
-                                          {rank === 1 ? "🥇 1st" : rank === 2 ? "🥈 2nd" : rank === 3 ? "🥉 3rd" : `${rank}th`}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                              {fundData.length >= 2 && (
-                                <td className="px-4 py-3 text-xs">
-                                  {(() => {
-                                    if (defined.length < 2)
+                                    </td>
+                                  );
+                                })}
+                                {fundData.length >= 2 && (
+                                  <td className="px-4 py-3 text-xs">
+                                    {(() => {
+                                      if (defined.length < 2)
+                                        return (
+                                          <span className="text-slate-300">
+                                            —
+                                          </span>
+                                        );
+                                      const diff =
+                                        Math.max(...defined) -
+                                        Math.min(...defined);
+                                      const winnerIdx = vals.indexOf(bestVal);
                                       return (
-                                        <span className="text-slate-300">
-                                          —
-                                        </span>
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+                                            {diff.toFixed(2)}% spread
+                                          </span>
+                                          {winnerIdx >= 0 &&
+                                            defined.length > 1 && (
+                                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
+                                                🏆{" "}
+                                                {fundData[
+                                                  winnerIdx
+                                                ]?.meta?.scheme_name?.split(
+                                                  " ",
+                                                )[0] || `F${winnerIdx + 1}`}
+                                              </span>
+                                            )}
+                                        </div>
                                       );
-                                    const diff =
-                                      Math.max(...defined) -
-                                      Math.min(...defined);
-                                    const winnerIdx = vals.indexOf(bestVal);
-                                    return (
-                                      <div className="flex flex-col gap-0.5">
-                                        <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
-                                          {diff.toFixed(2)}% spread
-                                        </span>
-                                        {winnerIdx >= 0 &&
-                                          defined.length > 1 && (
-                                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
-                                              🏆{" "}
-                                              {fundData[
-                                                winnerIdx
-                                              ]?.meta?.scheme_name?.split(
-                                                " ",
-                                              )[0] || `F${winnerIdx + 1}`}
-                                            </span>
-                                          )}
-                                      </div>
-                                    );
-                                  })()}
+                                    })()}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+                          <tr className="font-bold">
+                            <td className="px-4 py-3 text-slate-900 dark:text-white">
+                              Overall Avg Return
+                            </td>
+                            {fundData.map((fund) => {
+                              const perf = overallPerformances.find((p) => p.schemeCode === fund.schemeCode);
+                              return (
+                                <td key={fund.schemeCode} className="px-4 py-3 text-slate-900 dark:text-white tabular-nums">
+                                  {perf && perf.avgReturn !== null
+                                    ? `${perf.avgReturn >= 0 ? "+" : ""}${perf.avgReturn.toFixed(2)}%`
+                                    : "—"}
                                 </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                              );
+                            })}
+                            {fundData.length >= 2 && <td className="px-4 py-3 text-slate-400">—</td>}
+                          </tr>
+
+                          <tr className="font-bold">
+                            <td className="px-4 py-3 text-slate-900 dark:text-white">
+                              Overall Rank
+                            </td>
+                            {fundData.map((fund) => {
+                              const perf = overallPerformances.find((p) => p.schemeCode === fund.schemeCode);
+                              const rankIndex = perf && perf.avgReturn !== null
+                                ? sortedPerformances.findIndex((p) => p.schemeCode === fund.schemeCode)
+                                : -1;
+                              const overallRank = rankIndex !== -1 ? rankIndex + 1 : null;
+
+                              return (
+                                <td key={fund.schemeCode} className="px-4 py-3">
+                                  {overallRank && fundData.length > 1 ? (
+                                    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-black ${
+                                      overallRank === 1
+                                        ? "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 shadow-sm"
+                                        : overallRank === 2
+                                          ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-355 border border-slate-200 dark:border-slate-700/60"
+                                          : overallRank === 3
+                                            ? "bg-orange-100 dark:bg-orange-950/50 text-orange-850 dark:text-orange-355 border border-orange-200 dark:border-orange-900/50"
+                                            : "bg-slate-50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/60"
+                                    }`}>
+                                      {overallRank === 1 ? "🥇 1st Overall" : overallRank === 2 ? "🥈 2nd Overall" : overallRank === 3 ? "🥉 3rd Overall" : `${overallRank}th Overall`}
+                                    </span>
+                                  ) : "—"}
+                                </td>
+                              );
+                            })}
+                            {fundData.length >= 2 && <td className="px-4 py-3 text-slate-400">—</td>}
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
+                      💡 Look for funds that limit losses in bad years (2020,
+                      2022). Consistent compounders beat volatile outperformers
+                      long-term.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
-                    💡 Look for funds that limit losses in bad years (2020,
-                    2022). Consistent compounders beat volatile outperformers
-                    long-term.
-                  </p>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ── Advanced Risk & Drawdown Matrix ── */}
               {fundData.length > 0 && (
@@ -2200,6 +2281,7 @@ export default function Compare() {
                                 className="input-base w-14 py-0.5 text-xs text-center border-slate-300"
                                 min={0}
                                 max={20}
+                                step="any"
                               />
                               <span className="text-xs text-slate-500 font-medium">
                                 %

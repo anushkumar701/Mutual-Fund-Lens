@@ -1,6 +1,6 @@
 // components/NavBar.jsx
 import { NavLink } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import ThemeToggle from "./ThemeToggle";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
@@ -123,6 +123,50 @@ export default function NavBar() {
   const [portfolioList] = useLocalStorage("fundlens_portfolio", []);
   const [totalValRaw] = useLocalStorage("fundlens_portfolio_total_value", 0);
 
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  useEffect(() => {
+    const isInstalled = 
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone ||
+      localStorage.getItem("fundlens_pwa_installed") === "1";
+
+    if (isInstalled) {
+      setShowInstallBtn(false);
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+
+    const handleAppInstalled = () => {
+      localStorage.setItem("fundlens_pwa_installed", "1");
+      setDeferredPrompt(null);
+      setShowInstallBtn(false);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.debug(`PWA install prompt outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBtn(false);
+  };
+
   const formatCurrency = (val) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -218,6 +262,15 @@ export default function NavBar() {
           )}
         </div>
 
+        {showInstallBtn && (
+          <button
+            onClick={handleInstallClick}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-sm hover:shadow transition-all mr-2"
+            aria-label="Install FundLens App"
+          >
+            📥 Install App
+          </button>
+        )}
         <ThemeToggle />
       </nav>
 
@@ -249,6 +302,15 @@ export default function NavBar() {
         </NavLink>
 
         <div className="flex items-center gap-3">
+          {showInstallBtn && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm"
+              aria-label="Install FundLens App"
+            >
+              📥 Install
+            </button>
+          )}
           <ThemeToggle />
         </div>
       </div>

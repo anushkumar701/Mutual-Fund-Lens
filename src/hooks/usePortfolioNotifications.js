@@ -45,7 +45,9 @@ export function usePortfolioNotifications() {
             totalInvested += h.amount;
             detailsList.push({
               name: h.schemeName,
+              code: h.schemeCode,
               changePct: 0,
+              changeValue: 0,
               currentValue,
             });
             continue;
@@ -67,7 +69,9 @@ export function usePortfolioNotifications() {
 
               detailsList.push({
                 name: h.schemeName,
+                code: h.schemeCode,
                 changePct: dailyChangePct,
+                changeValue: dailyChange,
                 currentValue,
               });
             }
@@ -78,7 +82,9 @@ export function usePortfolioNotifications() {
             totalInvested += h.amount;
             detailsList.push({
               name: h.schemeName,
+              code: h.schemeCode,
               changePct: 0,
+              changeValue: 0,
               currentValue,
             });
           }
@@ -137,23 +143,30 @@ export function usePortfolioNotifications() {
         const prevTotalValue = totalCurrent - totalDailyChange;
         const totalDailyChangePct = prevTotalValue > 0 ? (totalDailyChange / prevTotalValue) * 100 : 0;
 
+        // Group individual transactions by fund to prevent duplicate notifications
+        const consolidatedMap = {};
+        detailsList.forEach((item) => {
+          if (!consolidatedMap[item.code]) {
+            consolidatedMap[item.code] = {
+              name: item.name,
+              code: item.code,
+              currentValue: 0,
+            };
+          }
+          consolidatedMap[item.code].currentValue += item.currentValue;
+        });
+        const consolidatedList = Object.values(consolidatedMap);
+
         // 4. Trigger corresponding Notification
         if (notifyConfig.type === "total") {
-          const changeSign = totalDailyChange >= 0 ? "+" : "";
-          const direction = totalDailyChange >= 0 ? "▲" : "▼";
-
-          new Notification("Portfolio Daily Update", {
-            body: `Value: ${formatCurrency(totalCurrent)} (${changeSign}${formatCurrency(totalDailyChange)} / ${direction}${totalDailyChangePct.toFixed(2)}% today)`,
+          new Notification(`Portfolio: ${formatCurrency(totalCurrent)}`, {
             icon: "/favicon.svg",
             tag: "fundlens-portfolio-daily-total",
           });
         } else {
-          // Detail mode: trigger a separate browser notification for each individual fund
-          detailsList.forEach((item, index) => {
-            const nameAbbr = item.name.length > 25 ? item.name.slice(0, 25) + "..." : item.name;
-            const sign = item.changePct >= 0 ? "+" : "";
-            new Notification(`${nameAbbr}`, {
-              body: `Current Value: ${formatCurrency(item.currentValue)}\nToday's Returns: ${sign}${item.changePct.toFixed(2)}%`,
+          // Detail mode: trigger a separate browser notification for each unique fund
+          consolidatedList.forEach((item, index) => {
+            new Notification(`${item.name}: ${formatCurrency(item.currentValue)}`, {
               icon: "/favicon.svg",
               tag: `fundlens-fund-detail-${index}-${Date.now()}`,
             });
