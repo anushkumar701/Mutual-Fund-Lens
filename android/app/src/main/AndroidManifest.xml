@@ -51,9 +51,21 @@
                 android:resource="@xml/portfolio_widget_info" />
         </receiver>
 
+        <!-- Receiver to handle Widget alarms & auto-refresh scheduled times -->
+        <receiver
+            android:name=".WidgetAlarmReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.anushkumar.mflens.WIDGET_SYNC" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>
