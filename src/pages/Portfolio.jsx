@@ -87,6 +87,20 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+// Calculate stamp duty (0.005% for investments on or after July 1, 2020 in India)
+const calculateStampDuty = (amount, dateStr) => {
+  if (!amount || isNaN(amount)) return 0;
+  if (!dateStr) return 0;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const investTime = Date.UTC(year, month - 1, day);
+  const stampDutyStartTime = Date.UTC(2020, 6, 1); // July 1, 2020
+  
+  if (investTime >= stampDutyStartTime) {
+    return parseFloat(amount) * 0.00005; // 0.005%
+  }
+  return 0;
+};
+
 export default function Portfolio() {
   const addToast = useToast();
   const { funds, loading: listLoading } = useFunds();
@@ -377,16 +391,19 @@ export default function Portfolio() {
 
   // Auto-calculate units when amount or NAV changes
   useEffect(() => {
+    if (manualOverride) return;
     if (amount && customNav && !isNaN(amount) && !isNaN(customNav)) {
       const parsedAmount = parseFloat(amount);
       const parsedNav = parseFloat(customNav);
       if (parsedNav > 0) {
-        setCustomUnits((parsedAmount / parsedNav).toFixed(4));
+        const sDuty = calculateStampDuty(parsedAmount, investDate);
+        const netAmt = parsedAmount - sDuty;
+        setCustomUnits((netAmt / parsedNav).toFixed(4));
       }
     } else {
       setCustomUnits("");
     }
-  }, [amount, customNav]);
+  }, [amount, customNav, investDate, manualOverride]);
 
   // Fetch and update Purchase NAV when editing holding date changes
   useEffect(() => {
@@ -414,16 +431,19 @@ export default function Portfolio() {
 
   // Auto-calculate edit units when amount or NAV changes
   useEffect(() => {
+    if (editManualOverride) return;
     if (editAmount && editCustomNav && !isNaN(editAmount) && !isNaN(editCustomNav)) {
       const parsedAmount = parseFloat(editAmount);
       const parsedNav = parseFloat(editCustomNav);
       if (parsedNav > 0) {
-        setEditCustomUnits((parsedAmount / parsedNav).toFixed(4));
+        const sDuty = calculateStampDuty(parsedAmount, editInvestDate);
+        const netAmt = parsedAmount - sDuty;
+        setEditCustomUnits((netAmt / parsedNav).toFixed(4));
       }
     } else {
       setEditCustomUnits("");
     }
-  }, [editAmount, editCustomNav]);
+  }, [editAmount, editCustomNav, editInvestDate, editManualOverride]);
 
   const handleEditClick = (holding) => {
     setEditingHolding(holding);
@@ -791,6 +811,7 @@ export default function Portfolio() {
           totalCurrent:   portfolioSummary.totalCurrent,
           dailyChange:    portfolioSummary.totalDailyChange,
           dailyChangePct: portfolioSummary.totalDailyChangePct,
+          holdings:       holdings,
         });
       }
     }
@@ -1770,6 +1791,30 @@ export default function Portfolio() {
                   </div>
                 </div>
 
+                {/* Stamp Duty Summary */}
+                {amount && parseFloat(amount) > 0 && (
+                  <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-xs space-y-1">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Gross Amount:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatCurrencyINR(parseFloat(amount))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Stamp Duty {calculateStampDuty(amount, investDate) > 0 ? "(0.005%)" : "(0% - N/A before July 2020)"}:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatCurrencyINR(calculateStampDuty(amount, investDate))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-blue-600 dark:text-blue-400 font-bold border-t border-slate-100 dark:border-slate-800/40 pt-1 mt-1">
+                      <span>Net Investment Amount:</span>
+                      <span>
+                        {formatCurrencyINR(parseFloat(amount) - calculateStampDuty(amount, investDate))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Manual Override Checkbox */}
                 <div className="flex items-center gap-2 pt-1">
                   <input
@@ -1916,6 +1961,30 @@ export default function Portfolio() {
                     />
                   </div>
                 </div>
+
+                {/* Stamp Duty Summary */}
+                {editAmount && parseFloat(editAmount) > 0 && (
+                  <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-xs space-y-1">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Gross Amount:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatCurrencyINR(parseFloat(editAmount))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Stamp Duty {calculateStampDuty(editAmount, editInvestDate) > 0 ? "(0.005%)" : "(0% - N/A before July 2020)"}:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatCurrencyINR(calculateStampDuty(editAmount, editInvestDate))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-blue-600 dark:text-blue-400 font-bold border-t border-slate-100 dark:border-slate-800/40 pt-1 mt-1">
+                      <span>Net Investment Amount:</span>
+                      <span>
+                        {formatCurrencyINR(parseFloat(editAmount) - calculateStampDuty(editAmount, editInvestDate))}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Manual Override checkbox */}
                 <div className="flex items-center gap-2 px-1">

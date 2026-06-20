@@ -41,6 +41,7 @@ public class PortfolioWidgetPlugin extends Plugin {
         String dailyChange    = call.getString("dailyChange", "₹0.00");
         String dailyChangePct = call.getString("dailyChangePct", "0.00%");
         boolean isProfit      = Boolean.TRUE.equals(call.getBoolean("isProfit", true));
+        String holdingsJson   = call.getString("holdingsJson", "[]");
 
         Context context = getContext();
 
@@ -52,6 +53,7 @@ public class PortfolioWidgetPlugin extends Plugin {
         editor.putString("dailyChange",    dailyChange);
         editor.putString("dailyChangePct", dailyChangePct);
         editor.putBoolean("isProfit",      isProfit);
+        editor.putString("holdingsJson",   holdingsJson);
         editor.apply();
 
         // 2. Broadcast update intent to force all active widget instances to redraw
