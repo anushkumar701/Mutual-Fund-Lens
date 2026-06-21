@@ -34,11 +34,10 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- ══════════════════════════════════════════════
-             Portfolio Home Screen Widget
-             Receiver is registered here so Android lists it
-             in the widget picker on the home screen.
-             ══════════════════════════════════════════════ -->
+        <!-- ══════════════════════════════════════════════════════
+             WIDGET 1: Portfolio Summary
+             Shows total current value, invested amount, daily change
+             ══════════════════════════════════════════════════════ -->
         <receiver
             android:name=".PortfolioWidgetProvider"
             android:exported="true"
@@ -51,7 +50,29 @@
                 android:resource="@xml/portfolio_widget_info" />
         </receiver>
 
-        <!-- Receiver to handle Widget alarms & auto-refresh scheduled times -->
+        <!-- ══════════════════════════════════════════════════════
+             WIDGET 2: Per-Fund Tracker
+             Scrollable list of each fund's invested vs current value
+             ══════════════════════════════════════════════════════ -->
+        <receiver
+            android:name=".FundListWidgetProvider"
+            android:exported="true"
+            android:label="Fund Tracker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fund_list_widget_info" />
+        </receiver>
+
+        <!-- RemoteViewsService for Widget 2 ListView data -->
+        <service
+            android:name=".FundListRemoteViewsService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- Widget alarm receiver (triggers WidgetSyncWorker for widget refresh) -->
         <receiver
             android:name=".WidgetAlarmReceiver"
             android:enabled="true"
@@ -62,10 +83,28 @@
             </intent-filter>
         </receiver>
 
+        <!-- Notification alarm receiver (posts background notifications independently) -->
+        <receiver
+            android:name=".NotificationAlarmReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.anushkumar.mflens.NOTIFY_SYNC" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
-    <!-- Permissions -->
-
+    <!-- ════════════════════════════════
+         Permissions
+         ════════════════════════════════ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Required on Android 13+ (API 33+) for posting notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for setExactAndAllowWhileIdle alarms on Android 12+ -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
 </manifest>
