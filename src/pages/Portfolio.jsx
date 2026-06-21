@@ -384,6 +384,7 @@ export default function Portfolio() {
     if (!selectedFund) return;
 
     const getNAV = async () => {
+      setCustomNav(""); // Clear stale NAV before fetch
       try {
         const details = await fetchFundDetail(selectedFund.schemeCode);
         if (details?.data) {
@@ -426,6 +427,7 @@ export default function Portfolio() {
     }
 
     const getNAV = async () => {
+      setEditCustomNav(""); // Clear stale NAV before fetch
       try {
         const details = await fetchFundDetail(editingHolding.schemeCode);
         if (details?.data) {
