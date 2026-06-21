@@ -809,9 +809,11 @@ export default function Portfolio() {
         // Sync data to the Android home screen widget (safe no-op on web/PWA)
         syncPortfolioWidget({
           totalCurrent:   portfolioSummary.totalCurrent,
+          totalInvested:  portfolioSummary.totalInvested,
           dailyChange:    portfolioSummary.totalDailyChange,
           dailyChangePct: portfolioSummary.totalDailyChangePct,
           holdings:       holdings,
+          notifyEnabled:  notifyConfig?.enabled === true,
         });
       }
     }
