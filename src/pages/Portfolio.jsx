@@ -35,21 +35,34 @@ const processNavData = (rawDetails) => {
     .filter((d) => !isNaN(d.ts) && d.nav > 0);
 };
 
-// Binary search helper to find NAV on or closest after a target timestamp
+/**
+ * getNavOnDate — returns the NAV applicable on the given date.
+ *
+ * Indian mutual fund convention: the applicable NAV is the one last declared
+ * ON OR BEFORE the investment date (floor).
+ * e.g. investing on a Saturday → Friday's NAV is used (not Monday's).
+ *
+ * sortedNavs: array sorted ascending by `ts` (oldest → newest)
+ * targetTs:   UTC midnight timestamp for the investment date
+ */
 const getNavOnDate = (sortedNavs, targetTs) => {
   if (!sortedNavs || sortedNavs.length === 0) return 0;
-  const oldestTs = sortedNavs[0].ts;
+
+  const oldest = sortedNavs[0];
   const latest = sortedNavs[sortedNavs.length - 1];
 
-  if (targetTs < oldestTs) return sortedNavs[0].nav;
-  if (targetTs > latest.ts) return latest.nav;
+  // Before fund inception — use oldest available NAV
+  if (targetTs <= oldest.ts) return oldest.nav;
+  // After latest data — use latest NAV
+  if (targetTs >= latest.ts) return latest.nav;
 
+  // Binary search for the last entry whose ts <= targetTs (floor)
   let lo = 0;
   let hi = sortedNavs.length - 1;
   while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (sortedNavs[mid].ts < targetTs) lo = mid + 1;
-    else hi = mid;
+    const mid = (lo + hi + 1) >> 1; // upper-mid to bias toward right (floor)
+    if (sortedNavs[mid].ts <= targetTs) lo = mid;
+    else hi = mid - 1;
   }
   return sortedNavs[lo].nav;
 };
