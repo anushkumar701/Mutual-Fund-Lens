@@ -25,7 +25,6 @@ export function usePortfolioNotifications() {
 
       // 2. Fetch NAV updates for all holdings and compute total current value
       let totalCurrent = 0;
-      let totalDailyChange = 0;
       const detailsList = [];
 
       try {
@@ -83,7 +82,6 @@ export function usePortfolioNotifications() {
 
         results.forEach((res) => {
           totalCurrent += res.currentValue;
-          totalDailyChange += res.changeValue;
           detailsList.push(res);
         });
 

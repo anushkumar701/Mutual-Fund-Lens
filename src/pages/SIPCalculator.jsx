@@ -23,7 +23,6 @@ import { formatINR } from "../utils/formatCurrency";
 import { fetchFundDetail } from "../hooks/useFunds";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFunds } from "../hooks/useFunds";
-import { calculateHistoricalSIP } from "../utils/metrics";
 
 function ResultCard({ label, value, accent, sub }) {
   return (
@@ -169,6 +168,7 @@ function renderStepIcon(name, cls) {
 
 function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
   const sellFY = getSellFY(sellDate);
+  // eslint-disable-next-line no-unused-vars
   const { rules, fyKey, fyLabel } = resolveRules(sellFY);
   const isEquity = fundType === "equity";
   const fmt = (v) => `₹${Math.round(v).toLocaleString("en-IN")}`;
@@ -422,7 +422,7 @@ export default function SIPCalculator() {
     try {
       const data = await fetchFundDetail(String(fund.schemeCode));
       setDateFundData(data);
-    } catch {}
+    } catch { /* loading failure is silent — UI stays as-is */ }
     setDateFundLoading(false);
   };
 
@@ -2373,7 +2373,7 @@ export default function SIPCalculator() {
                       Search for a fund to get started
                     </p>
                     <p className="text-xs text-slate-400">
-                      We'll simulate your SIP on each date 1–28 using actual NAV
+                      We&apos;ll simulate your SIP on each date 1–28 using actual NAV
                       history.
                     </p>
                   </div>

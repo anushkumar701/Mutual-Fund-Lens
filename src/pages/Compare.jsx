@@ -888,6 +888,7 @@ export default function Compare() {
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableRanges.length, range, minFundAge]);
 
   // Max SIP years = minimum fund age across all compared funds (floor)
