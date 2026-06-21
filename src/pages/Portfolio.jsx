@@ -391,7 +391,7 @@ export default function Portfolio() {
           const targetTs = new Date(investDate).getTime();
           const buyNav = getNavOnDate(sorted, targetTs);
           if (!manualOverride) {
-            setCustomNav(buyNav.toFixed(4));
+            setCustomNav(buyNav.toFixed(5));
           }
         }
       } catch (err) {
@@ -411,7 +411,7 @@ export default function Portfolio() {
       if (parsedNav > 0) {
         const sDuty = calculateStampDuty(parsedAmount, investDate);
         const netAmt = parsedAmount - sDuty;
-        setCustomUnits((netAmt / parsedNav).toFixed(4));
+        setCustomUnits((netAmt / parsedNav).toFixed(6));
       }
     } else {
       setCustomUnits("");
@@ -432,7 +432,7 @@ export default function Portfolio() {
           const sorted = processNavData(details);
           const targetTs = new Date(editInvestDate).getTime();
           const buyNav = getNavOnDate(sorted, targetTs);
-          setEditCustomNav(buyNav.toFixed(4));
+          setEditCustomNav(buyNav.toFixed(5));
         }
       } catch (err) {
         console.warn("Failed to lookup historical NAV for edit:", err);
@@ -451,7 +451,7 @@ export default function Portfolio() {
       if (parsedNav > 0) {
         const sDuty = calculateStampDuty(parsedAmount, editInvestDate);
         const netAmt = parsedAmount - sDuty;
-        setEditCustomUnits((netAmt / parsedNav).toFixed(4));
+        setEditCustomUnits((netAmt / parsedNav).toFixed(6));
       }
     } else {
       setEditCustomUnits("");
