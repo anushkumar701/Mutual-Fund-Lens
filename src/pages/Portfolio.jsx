@@ -381,7 +381,7 @@ export default function Portfolio() {
 
   // Fetch and update Purchase NAV when selected fund or date changes
   useEffect(() => {
-    if (!selectedFund) return;
+    if (!selectedFund || manualOverride) return;
 
     const getNAV = async () => {
       setCustomNav(""); // Clear stale NAV before fetch
