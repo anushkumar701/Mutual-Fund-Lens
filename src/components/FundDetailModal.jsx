@@ -12,7 +12,6 @@ import {
 import {
   getAllPlatformUrls,
   getUserPlatform,
-  setUserPlatform,
 } from "../utils/platformLinks";
 
 function parseNavDate(s) {
@@ -497,7 +496,7 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                     return (
                       <p className="text-[10px] text-slate-400 mt-2">
                         💡 Tip: Set your default platform in Settings to see a
-                        quick "Invest Now" button.
+                        quick &ldquo;Invest Now&rdquo; button.
                       </p>
                     );
                   return null;

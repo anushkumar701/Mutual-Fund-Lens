@@ -3,6 +3,7 @@ import { inferCategory } from "./goalFilters";
 // Lazy-loaded: getER pulls in the 91KB expense ratio JSON, so we only load
 // it when filterFunds actually filters by expense ratio band.
 let _getER = null;
+// eslint-disable-next-line no-unused-vars
 async function loadGetER() {
   if (!_getER) {
     const mod = await import("./expenseRatio");
