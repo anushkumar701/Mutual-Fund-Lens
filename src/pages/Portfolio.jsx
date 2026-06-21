@@ -1830,9 +1830,9 @@ export default function Portfolio() {
                 </div>
 
                 {/* NAV and Units Display / Edit */}
-                <div className="grid grid-cols-2 gap-4 pt-1">
+                <div className="grid grid-cols-3 gap-3 pt-1">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Purchase NAV (₹)
                     </label>
                     <input
@@ -1843,7 +1843,7 @@ export default function Portfolio() {
                       placeholder={selectedFund ? "Loading..." : "NAV"}
                       value={customNav}
                       onChange={(e) => setCustomNav(e.target.value)}
-                      className={`w-full px-4 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                         manualOverride
                           ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                           : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
@@ -1852,7 +1852,20 @@ export default function Portfolio() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
+                      Stamp Duty (₹)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      placeholder="0.00"
+                      value={amount ? calculateStampDuty(amount, investDate).toFixed(2) : "0.00"}
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-transparent bg-slate-100 dark:bg-slate-800/40 text-slate-400 cursor-not-allowed focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Units Allocated
                     </label>
                     <input
@@ -1860,10 +1873,10 @@ export default function Portfolio() {
                       required
                       step="0.0001"
                       readOnly={!manualOverride}
-                      placeholder={selectedFund ? "Auto-calculating..." : "Units"}
+                      placeholder={selectedFund ? "Auto..." : "Units"}
                       value={customUnits}
                       onChange={(e) => setCustomUnits(e.target.value)}
-                      className={`w-full px-4 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                         manualOverride
                           ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                           : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
@@ -2001,9 +2014,9 @@ export default function Portfolio() {
                 </div>
 
                 {/* Buy NAV and Units */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Purchase NAV (₹)
                     </label>
                     <input
@@ -2014,7 +2027,7 @@ export default function Portfolio() {
                       placeholder="NAV price"
                       value={editCustomNav}
                       onChange={(e) => setEditCustomNav(e.target.value)}
-                      className={`w-full px-4 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                         editManualOverride
                           ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                           : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
@@ -2023,7 +2036,20 @@ export default function Portfolio() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
+                      Stamp Duty (₹)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      placeholder="0.00"
+                      value={editAmount ? calculateStampDuty(editAmount, editInvestDate).toFixed(2) : "0.00"}
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-transparent bg-slate-100 dark:bg-slate-800/40 text-slate-400 cursor-not-allowed focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Units Allocated
                     </label>
                     <input
@@ -2034,7 +2060,7 @@ export default function Portfolio() {
                       placeholder="Units"
                       value={editCustomUnits}
                       onChange={(e) => setEditCustomUnits(e.target.value)}
-                      className={`w-full px-4 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                         editManualOverride
                           ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                           : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
