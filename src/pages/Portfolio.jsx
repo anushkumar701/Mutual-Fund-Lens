@@ -1411,12 +1411,12 @@ export default function Portfolio() {
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       <th className="px-5 py-3 w-[35%]">Mutual Fund</th>
-                      <th className="px-5 py-3 text-right">Avg Buy NAV</th>
-                      <th className="px-5 py-3 text-right">Current NAV</th>
-                      <th className="px-5 py-3 text-right">Units Held</th>
                       <th className="px-5 py-3 text-right">Invested Amount</th>
                       <th className="px-5 py-3 text-right">Current Value</th>
                       <th className="px-5 py-3 text-right">Total Profit / Loss</th>
+                      <th className="px-5 py-3 text-right">Units Held</th>
+                      <th className="px-5 py-3 text-right">Avg Buy NAV</th>
+                      <th className="px-5 py-3 text-right">Current NAV</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
@@ -1444,15 +1444,6 @@ export default function Portfolio() {
                                 <span className="text-blue-500">{c.transactions.length} purchase{c.transactions.length > 1 ? "s" : ""}</span>
                               </div>
                             </td>
-                            <td className="px-5 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
-                              ₹{c.avgBuyNav.toFixed(4)}
-                            </td>
-                            <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
-                              ₹{c.currentNav.toFixed(4)}
-                            </td>
-                            <td className="px-5 py-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
-                              {c.totalUnits.toFixed(4)}
-                            </td>
                             <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
                               {formatCurrencyINR(c.totalInvested)}
                             </td>
@@ -1467,6 +1458,15 @@ export default function Portfolio() {
                               <div className={`text-[10px] font-bold mt-1 ${c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                 {c.gainLoss >= 0 ? "▲" : "▼"} {c.gainLossPct.toFixed(2)}%
                               </div>
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
+                              {c.totalUnits.toFixed(4)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
+                              ₹{c.avgBuyNav.toFixed(4)}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
+                              ₹{c.currentNav.toFixed(4)}
                             </td>
                           </tr>
 
@@ -1483,11 +1483,11 @@ export default function Portfolio() {
                                       <thead>
                                         <tr className="border-b border-slate-100 dark:border-slate-800/60 text-slate-400 font-bold uppercase tracking-wider">
                                           <th className="py-2 pr-4">Date</th>
-                                          <th className="py-2 text-right pr-4">Buy NAV</th>
-                                          <th className="py-2 text-right pr-4">Units</th>
                                           <th className="py-2 text-right pr-4">Invested Amount</th>
                                           <th className="py-2 text-right pr-4">Current Value</th>
                                           <th className="py-2 text-right pr-4">Gain / Loss</th>
+                                          <th className="py-2 text-right pr-4">Units</th>
+                                          <th className="py-2 text-right pr-4">Buy NAV</th>
                                           <th className="py-2 text-right">Actions</th>
                                         </tr>
                                       </thead>
@@ -1500,12 +1500,6 @@ export default function Portfolio() {
                                                 month: "short",
                                                 year: "numeric",
                                               })}
-                                            </td>
-                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
-                                              ₹{t.buyNav.toFixed(4)}
-                                            </td>
-                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
-                                              {t.units.toFixed(4)}
                                             </td>
                                             <td className="py-2.5 text-right font-bold text-slate-800 dark:text-slate-200 pr-4">
                                               {formatCurrencyINR(t.amount)}
@@ -1521,6 +1515,12 @@ export default function Portfolio() {
                                               <span className={`text-[10px] font-bold block ${t.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                                 {t.gainLossPct.toFixed(2)}%
                                               </span>
+                                            </td>
+                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
+                                              {t.units.toFixed(4)}
+                                            </td>
+                                            <td className="py-2.5 text-right font-mono text-slate-600 dark:text-slate-400 pr-4">
+                                              ₹{t.buyNav.toFixed(4)}
                                             </td>
                                             <td className="py-2.5 text-right text-[10px] font-bold space-x-2">
                                               <button
@@ -1582,11 +1582,11 @@ export default function Portfolio() {
                     <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       <th className="px-5 py-3">Fund Name</th>
                       <th className="px-5 py-3">Investment Details</th>
-                      <th className="px-5 py-3 text-right">Units Held</th>
-                      <th className="px-5 py-3 text-right">Current NAV</th>
                       <th className="px-5 py-3 text-right">Invested Amount</th>
                       <th className="px-5 py-3 text-right">Current Value</th>
                       <th className="px-5 py-3 text-right">Total Gain / Loss</th>
+                      <th className="px-5 py-3 text-right">Units Held</th>
+                      <th className="px-5 py-3 text-right">Current NAV</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
@@ -1648,10 +1648,6 @@ export default function Portfolio() {
                             })}
                           </div>
                         </td>
-                        <td className="px-5 py-4 text-right font-mono font-medium">{h.units.toFixed(4)}</td>
-                        <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
-                          ₹{h.currentNav.toFixed(4)}
-                        </td>
                         <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
                           {formatCurrencyINR(h.amount)}
                         </td>
@@ -1669,6 +1665,10 @@ export default function Portfolio() {
                               <span className="text-slate-400 font-normal"> ({h.cagr.toFixed(1)}% CAGR)</span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-5 py-4 text-right font-mono font-medium">{h.units.toFixed(4)}</td>
+                        <td className="px-5 py-4 text-right font-mono text-slate-700 dark:text-slate-300">
+                          ₹{h.currentNav.toFixed(4)}
                         </td>
                       </tr>
                     ))}
