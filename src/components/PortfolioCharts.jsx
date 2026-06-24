@@ -1,0 +1,224 @@
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+import { formatCurrencyINR } from "../utils/formatCurrency";
+
+const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#84cc16"];
+
+const RANGE_LABELS = {
+  "30d": "1M",
+  "90d": "3M",
+  "180d": "6M",
+  "365d": "1Y",
+  all: "ALL",
+};
+
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    const portfolioVal = payload[0]?.value || 0;
+    const investedVal = payload[1]?.value || 0;
+    const gain = portfolioVal - investedVal;
+    const gainPct = investedVal > 0 ? (gain / investedVal) * 100 : 0;
+    const isProfit = gain >= 0;
+
+    return (
+      <div className="bg-[#0f172a]/95 border border-slate-800 backdrop-blur-md p-3 rounded-xl shadow-xl text-xs space-y-1.5 min-w-[180px]">
+        <p className="text-slate-400 font-semibold mb-1">{label}</p>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-300">Portfolio Value:</span>
+          <span className="font-bold text-blue-400">{formatCurrencyINR(portfolioVal)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-300">Invested Capital:</span>
+          <span className="font-bold text-slate-400">{formatCurrencyINR(investedVal)}</span>
+        </div>
+        <div className="border-t border-slate-800/80 pt-1.5 mt-1.5 flex items-center justify-between gap-4">
+          <span className="text-slate-400">Total Profit:</span>
+          <span className={`font-bold ${isProfit ? "text-emerald-500" : "text-rose-500"}`}>
+            {isProfit ? "+" : ""}
+            {formatCurrencyINR(gain)} ({gainPct.toFixed(2)}%)
+          </span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+export default function PortfolioCharts({
+  chartRange,
+  setChartRange,
+  detailsLoading,
+  filteredChartData,
+  pieChartData,
+  totalCurrent,
+}) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div>
+            <h3 className="text-base font-bold">Historical Valuation Growth</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+              Portfolio current value vs step-line of invested capital over time.
+            </p>
+          </div>
+          <div className="flex self-start sm:self-center bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
+            {["30d", "90d", "180d", "365d", "all"].map((r) => (
+              <button
+                key={r}
+                onClick={() => setChartRange(r)}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  chartRange === r
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                }`}
+              >
+                {RANGE_LABELS[r]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-h-[260px]">
+          {detailsLoading ? (
+            <div className="h-full flex items-center justify-center text-xs text-slate-500">
+              Loading historical valuation curves...
+            </div>
+          ) : filteredChartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-xs text-slate-400 text-center px-4">
+              No historical valuation data within the selected range.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={filteredChartData}>
+                <defs>
+                  <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={45}
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[(min) => Math.max(0, Math.floor(min * 0.95)), (max) => Math.ceil(max * 1.05)]}
+                  tickFormatter={(v) =>
+                    v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`
+                  }
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  iconType="circle"
+                  formatter={(value) => (
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{value}</span>
+                  )}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="Portfolio Value"
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6, strokeWidth: 0, fill: "#3b82f6" }}
+                  fillOpacity={1}
+                  fill="url(#valGrad)"
+                />
+                <Area
+                  type="step"
+                  dataKey="Invested Capital"
+                  stroke="#10b981"
+                  strokeWidth={1.8}
+                  strokeDasharray="4 4"
+                  activeDot={{ r: 4, strokeWidth: 0, fill: "#10b981" }}
+                  fill="none"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
+        <div className="mb-4">
+          <h3 className="text-base font-bold">Fund Allocation Split</h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Holdings value concentration breakdown.</p>
+        </div>
+        <div className="flex-1 flex items-center justify-center min-h-[220px]">
+          {pieChartData.length === 0 ? (
+            <div className="text-xs text-slate-400">No holdings to allocate</div>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center">
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={65}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#0f172a",
+                        border: "none",
+                        borderRadius: "12px",
+                        color: "#fff",
+                        fontSize: "12px",
+                      }}
+                      formatter={(value) => [formatCurrencyINR(value), ""]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-[85px] w-full mt-2 text-left space-y-1.5 px-2">
+                {pieChartData.map((entry, index) => {
+                  const pct = (entry.value / totalCurrent) * 100;
+                  return (
+                    <div key={entry.name} className="flex items-center justify-between text-[11px] font-medium">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span className="truncate text-slate-600 dark:text-slate-300">{entry.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-100">{pct.toFixed(1)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 // pages/Portfolio.jsx
-import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment, lazy, Suspense } from "react";
 import { useFunds, fetchFundDetail } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
@@ -7,18 +7,14 @@ import { useToast } from "../components/Toast";
 import { formatCurrencyINR } from "../utils/formatCurrency";
 import { syncPortfolioWidget } from "../utils/portfolioWidget";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
+  calcStampDuty,
+  UNIT_PRECISION,
+  CAGR_MIN_YEARS,
+  STORAGE_KEYS,
+  loadAndMigrateHoldings,
+} from "../config/financial";
+
+const PortfolioCharts = lazy(() => import("../components/PortfolioCharts"));
 
 // Process NAV list from newest to oldest into sorted oldest to newest array
 const processNavData = (rawDetails) => {
@@ -67,65 +63,39 @@ const getNavOnDate = (sortedNavs, targetTs) => {
   return sortedNavs[lo].nav;
 };
 
-
-
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const portfolioVal = payload[0]?.value || 0;
-    const investedVal = payload[1]?.value || 0;
-    const gain = portfolioVal - investedVal;
-    const gainPct = investedVal > 0 ? (gain / investedVal) * 100 : 0;
-    const isProfit = gain >= 0;
-
-    return (
-      <div className="bg-[#0f172a]/95 border border-slate-800 backdrop-blur-md p-3 rounded-xl shadow-xl text-xs space-y-1.5 min-w-[180px]">
-        <p className="text-slate-400 font-semibold mb-1">{label}</p>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-slate-300">Portfolio Value:</span>
-          <span className="font-bold text-blue-400">{formatCurrencyINR(portfolioVal)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-slate-300">Invested Capital:</span>
-          <span className="font-bold text-slate-400">{formatCurrencyINR(investedVal)}</span>
-        </div>
-        <div className="border-t border-slate-800/80 pt-1.5 mt-1.5 flex items-center justify-between gap-4">
-          <span className="text-slate-400">Total Profit:</span>
-          <span className={`font-bold ${isProfit ? "text-emerald-500" : "text-rose-500"}`}>
-            {isProfit ? "+" : ""}{formatCurrencyINR(gain)} ({gainPct.toFixed(2)}%)
-          </span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
-// Calculate stamp duty (0.005% for investments on or after July 1, 2020 in India)
-const calculateStampDuty = (amount, dateStr) => {
-  if (!amount || isNaN(amount)) return 0;
-  if (!dateStr) return 0;
+// Calculate NAV for purchases using a floor search (units-allocated-date convention).
+// The allocated date always corresponds to a real trading day, so we simply find
+// the exact NAV on that date (or the closest prior date if unavailable).
+const getPurchaseNavOnDate = (sortedNavs, dateStr) => {
+  if (!sortedNavs || sortedNavs.length === 0) return 0;
   const [year, month, day] = dateStr.split("-").map(Number);
-  const investTime = Date.UTC(year, month - 1, day);
-  const stampDutyStartTime = Date.UTC(2020, 6, 1); // July 1, 2020
-  
-  if (investTime >= stampDutyStartTime) {
-    return parseFloat(amount) * 0.00005; // 0.005%
-  }
-  return 0;
+  const targetTs = Date.UTC(year, month - 1, day);
+  // Delegate to the standard floor search
+  return getNavOnDate(sortedNavs, targetTs);
 };
+
+// Stamp duty is now sourced from the centralized financial config.
+// To update the rate when SEBI changes it, edit src/config/financial.js only.
+const calculateStampDuty = calcStampDuty;
 
 export default function Portfolio() {
   const addToast = useToast();
   const { funds, loading: listLoading } = useFunds();
 
-  // Portfolio items in LocalStorage
-  const [holdings, setHoldings] = useLocalStorage("fundlens_portfolio", []);
+  // Portfolio items in LocalStorage — run schema migration on every load
+  // so old saved data is automatically upgraded to the current shape.
+  const [holdings, setHoldingsRaw] = useLocalStorage(STORAGE_KEYS.HOLDINGS, []);
+  const holdings_migrated = useMemo(() => loadAndMigrateHoldings(holdings), [holdings]);
+  // Expose migrated version downstream; writes still go through setHoldingsRaw
+  const setHoldings = setHoldingsRaw;
+  // Use migrated holdings throughout the component
+  const holdingsSafe = holdings_migrated;
   
   // Notification Preferences
-  const [notifyConfig, setNotifyConfig] = useLocalStorage("fundlens_portfolio_notify", {
+  const [notifyConfig, setNotifyConfig] = useLocalStorage(STORAGE_KEYS.NOTIFY_CONFIG, {
     enabled: false,
-    type: "total", // total or detail
-    time: "evening", // morning or evening
+    type: "total",
+    time: "evening",
   });
 
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -176,6 +146,9 @@ export default function Portfolio() {
 
   // Cached fund details (NAV list, current price)
   const [detailsCache, setDetailsCache] = useState({});
+  // Mirror detailsCache in a ref so effects can read the current value
+  // without needing it in their dependency arrays (avoids stale-closure bugs).
+  const detailsCacheRef = useRef({});
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   // Form states
@@ -191,11 +164,11 @@ export default function Portfolio() {
   const [customUnits, setCustomUnits] = useState("");
 
   const [filterDirectOnly, setFilterDirectOnly] = useLocalStorage(
-    "fundlens_portfolio_filter_direct",
+    STORAGE_KEYS.FILTER_DIRECT,
     true
   );
   const [filterGrowthOnly, setFilterGrowthOnly] = useLocalStorage(
-    "fundlens_portfolio_filter_growth",
+    STORAGE_KEYS.FILTER_GROWTH,
     true
   );
 
@@ -222,61 +195,28 @@ export default function Portfolio() {
     }));
   };
 
-  // Helper to convert 24h format (HH:MM) to 12h parts
-  const get12HourParts = (timeStr) => {
-    if (!timeStr || !timeStr.includes(":")) {
-      return { hour: "10", minute: "00", ampm: "AM" };
-    }
-    const [hStr, mStr] = timeStr.split(":");
-    let h = parseInt(hStr, 10);
-    const m = mStr;
-    if (isNaN(h)) return { hour: "10", minute: "00", ampm: "AM" };
 
-    let ampm = "AM";
-    if (h >= 12) {
-      ampm = "PM";
-      if (h > 12) h -= 12;
-    }
-    if (h === 0) h = 12;
 
-    return {
-      hour: h.toString(),
-      minute: m,
-      ampm,
-    };
-  };
-
-  const handleTimePartChange = (part, value) => {
-    const parts = get12HourParts(notifyConfig.time);
-    parts[part] = value;
-
-    let hr = parseInt(parts.hour, 10);
-    if (parts.ampm === "PM" && hr < 12) hr += 12;
-    if (parts.ampm === "AM" && hr === 12) hr = 0;
-    const hh = hr.toString().padStart(2, "0");
-    const mm = parts.minute.padStart(2, "0");
-    
-    setNotifyConfig((prev) => ({ ...prev, time: `${hh}:${mm}` }));
-  };
-
-  // Load details for all holdings when they mount or change
+  // Load details for all holdings when they mount or change.
+  // Uses holdingsSafe (schema-migrated) so stale/corrupt entries never hit the API.
   useEffect(() => {
-    if (holdings.length === 0) return;
+    if (holdingsSafe.length === 0) return;
     
     let isMounted = true;
     const fetchAllDetails = async () => {
       setDetailsLoading(true);
-      
-      // Determine which holdings actually need to be fetched (not manual and not in cache)
-      let currentCache;
-      setDetailsCache(prev => {
-        currentCache = prev;
-        return prev;
-      });
 
-      const neededHoldings = holdings.filter(h => {
+      // Read current cache from ref — avoids the setState read anti-pattern
+      const currentCache = detailsCacheRef.current;
+
+      // Deduplicate: only fetch scheme codes we haven't loaded yet
+      const seenCodes = new Set();
+      const neededHoldings = holdingsSafe.filter(h => {
         const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
-        return !isManual && (!currentCache || !currentCache[h.schemeCode]);
+        if (isManual) return false;
+        if (seenCodes.has(h.schemeCode)) return false;
+        seenCodes.add(h.schemeCode);
+        return !currentCache[h.schemeCode];
       });
 
       if (neededHoldings.length === 0) {
@@ -288,13 +228,7 @@ export default function Portfolio() {
         try {
           const data = await fetchFundDetail(h.schemeCode);
           if (data) {
-            return {
-              code: h.schemeCode,
-              data: {
-                ...data,
-                sortedNavs: processNavData(data),
-              }
-            };
+            return { code: h.schemeCode, data: { ...data, sortedNavs: processNavData(data) } };
           }
         } catch (err) {
           console.error(`Failed to load details for ${h.schemeCode}:`, err);
@@ -303,21 +237,20 @@ export default function Portfolio() {
       });
 
       const results = await Promise.all(fetchPromises);
-      
       if (!isMounted) return;
 
       setDetailsCache(prev => {
         const next = { ...prev };
         let updated = false;
         results.forEach(res => {
-          if (res) {
-            next[res.code] = res.data;
-            updated = true;
-          }
+          if (res) { next[res.code] = res.data; updated = true; }
         });
-        return updated ? next : prev;
+        const resolved = updated ? next : prev;
+        // Keep ref in sync with state
+        detailsCacheRef.current = resolved;
+        return resolved;
       });
-      
+
       setDetailsLoading(false);
     };
 
@@ -379,29 +312,31 @@ export default function Portfolio() {
     return () => document.removeEventListener("mousedown", clickHandler);
   }, []);
 
-  // Fetch and update Purchase NAV when selected fund or date changes
+  // Fetch and update Purchase NAV when selected fund or date changes.
+  // Skips when manualOverride is ON — user manages their own NAV.
   useEffect(() => {
     if (!selectedFund || manualOverride) return;
 
+    let cancelled = false;
+    setCustomNav("");
     const getNAV = async () => {
-      setCustomNav(""); // Clear stale NAV before fetch
       try {
         const details = await fetchFundDetail(selectedFund.schemeCode);
+        if (cancelled) return;
         if (details?.data) {
           const sorted = processNavData(details);
-          const targetTs = new Date(investDate).getTime();
-          const buyNav = getNavOnDate(sorted, targetTs);
-          if (!manualOverride) {
-            setCustomNav(buyNav.toFixed(5));
-          }
+          const buyNav = getPurchaseNavOnDate(sorted, investDate);
+          setCustomNav(buyNav.toFixed(5));
         }
       } catch (err) {
         console.warn("Failed to lookup historical NAV:", err);
       }
     };
-
     getNAV();
-  }, [selectedFund, investDate, manualOverride]);
+    return () => { cancelled = true; };
+  // manualOverride change alone should NOT re-trigger this fetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFund, investDate]);
 
   // Auto-calculate units when amount or NAV changes
   useEffect(() => {
@@ -412,37 +347,38 @@ export default function Portfolio() {
       if (parsedNav > 0) {
         const sDuty = calculateStampDuty(parsedAmount, investDate);
         const netAmt = parsedAmount - sDuty;
-        setCustomUnits((netAmt / parsedNav).toFixed(6));
+        setCustomUnits((netAmt / parsedNav).toFixed(UNIT_PRECISION));
       }
     } else {
       setCustomUnits("");
     }
   }, [amount, customNav, investDate, manualOverride]);
 
-  // Fetch and update Purchase NAV when editing holding date changes
+  // Fetch and update Purchase NAV when editing holding date changes.
+  // Skips manual-entry holdings and when user is in manual override mode.
   useEffect(() => {
     if (!editingHolding || editManualOverride) return;
-    if (typeof editingHolding.schemeCode === "string" && editingHolding.schemeCode.startsWith("manual-")) {
-      return;
-    }
+    if (typeof editingHolding.schemeCode === "string" && editingHolding.schemeCode.startsWith("manual-")) return;
 
+    let cancelled = false;
+    setEditCustomNav("");
     const getNAV = async () => {
-      setEditCustomNav(""); // Clear stale NAV before fetch
       try {
         const details = await fetchFundDetail(editingHolding.schemeCode);
+        if (cancelled) return;
         if (details?.data) {
           const sorted = processNavData(details);
-          const targetTs = new Date(editInvestDate).getTime();
-          const buyNav = getNavOnDate(sorted, targetTs);
+          const buyNav = getPurchaseNavOnDate(sorted, editInvestDate);
           setEditCustomNav(buyNav.toFixed(5));
         }
       } catch (err) {
         console.warn("Failed to lookup historical NAV for edit:", err);
       }
     };
-
     getNAV();
-  }, [editingHolding, editInvestDate, editManualOverride]);
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingHolding, editInvestDate]);
 
   // Auto-calculate edit units when amount or NAV changes
   useEffect(() => {
@@ -453,7 +389,7 @@ export default function Portfolio() {
       if (parsedNav > 0) {
         const sDuty = calculateStampDuty(parsedAmount, editInvestDate);
         const netAmt = parsedAmount - sDuty;
-        setEditCustomUnits((netAmt / parsedNav).toFixed(6));
+        setEditCustomUnits((netAmt / parsedNav).toFixed(UNIT_PRECISION));
       }
     } else {
       setEditCustomUnits("");
@@ -526,14 +462,14 @@ export default function Portfolio() {
     setHoldings((prev) => [...prev, newHolding]);
     addToast(`Added investment in ${finalFundName}`, "success");
     
-    // Reset form
-    setSelectedFund(null);
-    setSearchQuery("");
+    // Reset only amount/nav/units — keep fund and date so the user
+    // can quickly add another transaction for the same fund
     setAmount("");
     setCustomNav("");
     setCustomUnits("");
     setManualOverride(false);
-    setShowAddForm(false);
+    // Do NOT close the form — let the user add more transactions
+    // setShowAddForm(false);  ← intentionally removed
 
     // Show notification permission prompt if enabled is off and permission is default
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
@@ -700,13 +636,13 @@ export default function Portfolio() {
     }
   };
 
-  // Compute live portfolio metrics
+  // Compute live portfolio metrics from schema-migrated holdings
   const portfolioSummary = useMemo(() => {
     let totalInvested = 0;
     let totalCurrent = 0;
     let totalDailyChange = 0;
 
-    const holdingRows = holdings.map((h) => {
+    const holdingRows = holdingsSafe.map((h) => {
       const details = detailsCache[h.schemeCode];
       const currentNav = details?.data?.[0]?.nav ? parseFloat(details.data[0].nav) : h.buyNav;
       const prevNav = details?.data?.[1]?.nav ? parseFloat(details.data[1].nav) : currentNav;
@@ -723,11 +659,13 @@ export default function Portfolio() {
       totalCurrent += currentValue;
       totalDailyChange += dailyChange;
 
-      // Calculate CAGR
+      // Calculate CAGR — only meaningful after CAGR_MIN_YEARS holding period
       const buyTime = new Date(h.investedDate).getTime();
-      const todayTime = new Date().getTime();
+      const todayTime = Date.now();
       const years = (todayTime - buyTime) / (1000 * 60 * 60 * 24 * 365.25);
-      const cagr = years >= 0.5 ? (Math.pow(currentValue / investedValue, 1 / years) - 1) * 100 : null;
+      const cagr = years >= CAGR_MIN_YEARS
+        ? (Math.pow(currentValue / investedValue, 1 / years) - 1) * 100
+        : null;
 
       return {
         ...h,
@@ -756,7 +694,7 @@ export default function Portfolio() {
       totalDailyChangePct,
       holdings: holdingRows,
     };
-  }, [holdings, detailsCache]);
+  }, [holdingsSafe, detailsCache]);
 
   const consolidatedHoldings = useMemo(() => {
     const groups = {};
@@ -804,22 +742,22 @@ export default function Portfolio() {
 
   // Update cached total portfolio value in localStorage for Navbar and Dashboard usage
   useEffect(() => {
-    if (holdings.length === 0) {
-      localStorage.setItem("fundlens_portfolio_total_value", "0");
+    if (holdingsSafe.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.TOTAL_VALUE, "0");
       return;
     }
 
-    const hasAnyApiHolding = holdings.some(
+    const hasAnyApiHolding = holdingsSafe.some(
       (h) => !(typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-"))
     );
-    const hasLoadedAllApiHoldings = holdings.every((h) => {
+    const hasLoadedAllApiHoldings = holdingsSafe.every((h) => {
       const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
       return isManual || detailsCache[h.schemeCode]?.data?.[0]?.nav;
     });
 
     if (!hasAnyApiHolding || hasLoadedAllApiHoldings) {
       if (portfolioSummary.totalCurrent > 0) {
-        localStorage.setItem("fundlens_portfolio_total_value", String(portfolioSummary.totalCurrent));
+        localStorage.setItem(STORAGE_KEYS.TOTAL_VALUE, String(portfolioSummary.totalCurrent));
 
         // Sync data to the Android home screen widget (safe no-op on web/PWA)
         syncPortfolioWidget({
@@ -832,21 +770,18 @@ export default function Portfolio() {
         });
       }
     }
-  }, [portfolioSummary.totalCurrent, portfolioSummary.totalDailyChange, portfolioSummary.totalDailyChangePct, holdings, detailsCache]);
+  }, [portfolioSummary.totalCurrent, portfolioSummary.totalInvested, portfolioSummary.totalDailyChange, portfolioSummary.totalDailyChangePct, holdingsSafe, detailsCache, notifyConfig?.enabled]);
 
   // Reconstruct portfolio valuation chart data over time
   const historicalChartData = useMemo(() => {
-    if (holdings.length === 0) return [];
-    
-    // Check if details are loaded for all holdings (manual ones don't need fetching)
-    const allLoaded = holdings.every((h) => {
+    if (holdingsSafe.length === 0) return [];
+    const allLoaded = holdingsSafe.every((h) => {
       const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
       return isManual || detailsCache[h.schemeCode]?.sortedNavs;
     });
     if (!allLoaded) return [];
-
-    return generateHistoricalData(holdings, detailsCache);
-  }, [holdings, detailsCache]);
+    return generateHistoricalData(holdingsSafe, detailsCache);
+  }, [holdingsSafe, detailsCache]);
 
   // Filter historical growth data by time range
   const filteredChartData = useMemo(() => {
@@ -862,26 +797,20 @@ export default function Portfolio() {
     return historicalChartData.filter((item) => item.timestamp >= cutoffTs);
   }, [historicalChartData, chartRange]);
 
-  // Pie chart data for fund weight allocation (grouped by scheme name)
+  // Pie chart data for fund weight allocation (grouped by scheme name).
+  // Depends on portfolioSummary.holdings, not the whole object, to avoid
+  // spurious re-renders when unrelated summary fields change.
   const pieChartData = useMemo(() => {
     if (portfolioSummary.totalCurrent === 0) return [];
-    
     const groups = {};
     portfolioSummary.holdings.forEach((h) => {
       const displayName = h.schemeName.length > 25 ? h.schemeName.slice(0, 25) + "..." : h.schemeName;
-      if (!groups[displayName]) {
-        groups[displayName] = 0;
-      }
-      groups[displayName] += h.currentValue;
+      groups[displayName] = (groups[displayName] || 0) + h.currentValue;
     });
+    return Object.entries(groups).map(([name, value]) => ({ name, value }));
+  }, [portfolioSummary.holdings, portfolioSummary.totalCurrent]);
 
-    return Object.entries(groups).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }, [portfolioSummary]);
-
-  // Export holdings as a JSON file
+  // Export holdings as a JSON file — revoke URL after click to prevent memory leak
   const handleExport = () => {
     const dataStr = JSON.stringify(holdings, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -892,6 +821,7 @@ export default function Portfolio() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     addToast("Portfolio backup exported successfully!", "success");
   };
 
@@ -912,9 +842,17 @@ export default function Portfolio() {
         );
         if (!isValid) throw new Error("Holdings schema mismatch");
 
-        // Merge or replace options. Here we replace for safety.
-        setHoldings(imported);
-        addToast(`Successfully imported ${imported.length} holdings!`, "success");
+        // Run schema migration on imported data — handles old backup formats automatically.
+        // Corrupt/missing records are silently dropped by migrateHolding.
+        const migrated = loadAndMigrateHoldings(imported);
+        if (migrated.length === 0) throw new Error("No valid holdings found after migration");
+
+        setHoldings(migrated);
+        const dropped = imported.length - migrated.length;
+        const msg = dropped > 0
+          ? `Imported ${migrated.length} holdings (${dropped} skipped — corrupt format).`
+          : `Successfully imported ${migrated.length} holdings!`;
+        addToast(msg, "success");
       } catch (err) {
         addToast(`Failed to parse backup: ${err.message}`, "error");
       }
@@ -922,8 +860,6 @@ export default function Portfolio() {
     reader.readAsText(file);
     e.target.value = ""; // reset input
   };
-
-  const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#84cc16"];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-slate-900 dark:text-slate-100">
@@ -1036,173 +972,24 @@ export default function Portfolio() {
             </div>
           </div>
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Historical Growth Chart */}
-            <div className="lg:col-span-2 bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                <div>
-                  <h3 className="text-base font-bold">Historical Valuation Growth</h3>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                    Portfolio current value vs step-line of invested capital over time.
-                  </p>
-                </div>
-                {/* Time Range Selector */}
-                {(() => {
-                  const RANGE_LABELS = {
-                    "30d": "1M",
-                    "90d": "3M",
-                    "180d": "6M",
-                    "365d": "1Y",
-                    "all": "ALL"
-                  };
-                  return (
-                    <div className="flex self-start sm:self-center bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
-                      {["30d", "90d", "180d", "365d", "all"].map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setChartRange(r)}
-                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                            chartRange === r
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-                          }`}
-                        >
-                          {RANGE_LABELS[r]}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
+          {/* Charts Row — lazy-loaded so empty portfolio avoids ~400KB recharts bundle */}
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 min-h-[350px] rounded-2xl skeleton" />
+                <div className="min-h-[350px] rounded-2xl skeleton" />
               </div>
-              <div className="flex-1 min-h-[260px]">
-                {detailsLoading ? (
-                  <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                    Loading historical valuation curves...
-                  </div>
-                ) : filteredChartData.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-xs text-slate-400 text-center px-4">
-                    No historical valuation data within the selected range.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={filteredChartData}>
-                      <defs>
-                        <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)"/>
-                      <XAxis
-                        dataKey="date"
-                        stroke="#94a3b8"
-                        fontSize={10}
-                        tickLine={false}
-                        axisLine={false}
-                        minTickGap={45}
-                      />
-                      <YAxis
-                        stroke="#94a3b8"
-                        fontSize={10}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[(min) => Math.max(0, Math.floor(min * 0.95)), (max) => Math.ceil(max * 1.05)]}
-                        tickFormatter={(v) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >= 1000 ? `₹${(v/1000).toFixed(0)}k` : `₹${v}`}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend
-                        verticalAlign="top"
-                        height={36}
-                        iconType="circle"
-                        formatter={(value) => <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{value}</span>}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="Portfolio Value"
-                        stroke="#3b82f6"
-                        strokeWidth={2.5}
-                        activeDot={{ r: 6, strokeWidth: 0, fill: "#3b82f6" }}
-                        fillOpacity={1}
-                        fill="url(#valGrad)"
-                      />
-                      <Area
-                        type="step"
-                        dataKey="Invested Capital"
-                        stroke="#10b981"
-                        strokeWidth={1.8}
-                        strokeDasharray="4 4"
-                        activeDot={{ r: 4, strokeWidth: 0, fill: "#10b981" }}
-                        fill="none"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-
-            {/* Allocation Split */}
-            <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
-              <div className="mb-4">
-                <h3 className="text-base font-bold">Fund Allocation Split</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  Holdings value concentration breakdown.
-                </p>
-              </div>
-              <div className="flex-1 flex items-center justify-center min-h-[220px]">
-                {pieChartData.length === 0 ? (
-                  <div className="text-xs text-slate-400">No holdings to allocate</div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center">
-                    <div className="h-[180px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={pieChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={45}
-                            outerRadius={65}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {pieChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#0f172a",
-                              border: "none",
-                              borderRadius: "12px",
-                              color: "#fff",
-                              fontSize: "12px",
-                            }}
-                            formatter={(value) => [formatCurrencyINR(value), ""]}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    {/* Compact Custom Legend */}
-                    <div className="flex-1 overflow-y-auto max-h-[85px] w-full mt-2 text-left space-y-1.5 px-2">
-                      {pieChartData.map((entry, index) => {
-                        const pct = (entry.value / portfolioSummary.totalCurrent) * 100;
-                        return (
-                          <div key={entry.name} className="flex items-center justify-between text-[11px] font-medium">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                              <span className="truncate text-slate-600 dark:text-slate-300">{entry.name}</span>
-                            </div>
-                            <span className="font-bold text-slate-800 dark:text-slate-100">{pct.toFixed(1)}%</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+            }
+          >
+            <PortfolioCharts
+              chartRange={chartRange}
+              setChartRange={setChartRange}
+              detailsLoading={detailsLoading}
+              filteredChartData={filteredChartData}
+              pieChartData={pieChartData}
+              totalCurrent={portfolioSummary.totalCurrent}
+            />
+          </Suspense>
 
           {/* Settings / Notifications Card */}
           <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
@@ -1883,16 +1670,24 @@ export default function Portfolio() {
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800/60">
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(false)}
+                    onClick={() => {
+                      setSelectedFund(null);
+                      setSearchQuery("");
+                      setAmount("");
+                      setCustomNav("");
+                      setCustomUnits("");
+                      setManualOverride(false);
+                      setShowAddForm(false);
+                    }}
                     className="px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors"
                   >
-                    Cancel
+                    Done
                   </button>
                   <button
                     type="submit"
                     className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg active:scale-95 transition-all"
                   >
-                    Save Investment
+                    + Add Transaction
                   </button>
                 </div>
 
@@ -1968,7 +1763,6 @@ export default function Portfolio() {
                     />
                   </div>
                 </div>
-
 
                 {/* Manual Override checkbox */}
                 <div className="flex items-center gap-2 px-1">
