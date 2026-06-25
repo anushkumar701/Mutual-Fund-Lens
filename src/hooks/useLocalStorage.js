@@ -14,17 +14,18 @@ export function useLocalStorage(key, initialValue) {
   // Sync across browser tabs (storage event only fires for OTHER tabs)
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === key && e.newValue !== null) {
-        try {
-          setStoredValue(JSON.parse(e.newValue));
-        } catch {
-          // Ignore invalid JSON from other tabs
-        }
+      if (e.key !== key) return;
+      try {
+        // newValue is null when the key was deleted by another tab
+        const parsed = e.newValue !== null ? JSON.parse(e.newValue) : initialValue;
+        setStoredValue(parsed);
+      } catch {
+        // Ignore invalid JSON from other tabs
       }
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
-  }, [key]);
+  }, [key, initialValue]);
 
   const setValue = useCallback(
     (value) => {
