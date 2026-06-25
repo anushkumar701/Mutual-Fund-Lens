@@ -90,8 +90,8 @@ const FundCard = memo(function FundCard({
 
   return (
     <div
-      className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden transition-all hover:shadow-lg ${closed ? "opacity-70" : ""}`}
-      style={{ borderTop: `3px solid ${borderColor}` }}
+      className={`bg-white dark:bg-[#161b27] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 border-t-4 hover-glow flex flex-col overflow-hidden transition-all ${closed ? "opacity-70" : ""}`}
+      style={{ borderTopColor: borderColor }}
     >
       {/* Closed banner */}
       {closed && (

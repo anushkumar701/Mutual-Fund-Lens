@@ -311,7 +311,7 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
     taxType:
       holdingMonths >= (rules.debt.ltcgMonths || 36)
         ? `LTCG @ ${(rules.debt.ltcgRate * 100).toFixed(0)}% (with indexation)`
-        : `STCG @ slab ${taxSlab}%`,
+        : `STCG @ slab yes${taxSlab}%`,
     taxAmount: tax,
     fyLabel,
     rulesNote: rules.note,
@@ -872,12 +872,30 @@ export default function SIPCalculator() {
                           <stop
                             offset="5%"
                             stopColor="#2563eb"
-                            stopOpacity={0.3}
+                            stopOpacity={0.4}
                           />
                           <stop
                             offset="95%"
                             stopColor="#2563eb"
-                            stopOpacity={0.05}
+                            stopOpacity={0.02}
+                          />
+                        </linearGradient>
+                        <linearGradient
+                          id="stepUpGrad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#8b5cf6"
+                            stopOpacity={0.4}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#8b5cf6"
+                            stopOpacity={0.02}
                           />
                         </linearGradient>
                         <linearGradient
@@ -890,18 +908,18 @@ export default function SIPCalculator() {
                           <stop
                             offset="5%"
                             stopColor="#10b981"
-                            stopOpacity={0.3}
+                            stopOpacity={0.4}
                           />
                           <stop
                             offset="95%"
                             stopColor="#10b981"
-                            stopOpacity={0.05}
+                            stopOpacity={0.02}
                           />
                         </linearGradient>
                       </defs>
                       <CartesianGrid
                         strokeDasharray="3 3"
-                        stroke="rgba(148,163,184,0.2)"
+                        stroke="rgba(148,163,184,0.12)"
                       />
                       <XAxis
                         dataKey="year"
@@ -933,9 +951,8 @@ export default function SIPCalculator() {
                         stackId="1"
                         name="Base SIP"
                         stroke="#2563eb"
-                        strokeWidth={2}
-                        fill="#3b82f6"
-                        fillOpacity={0.6}
+                        strokeWidth={2.5}
+                        fill="url(#investedGrad)"
                       />
                       {!isLumpsum && stepUp > 0 && (
                         <Area
@@ -944,9 +961,8 @@ export default function SIPCalculator() {
                           stackId="1"
                           name="Step-Up Extra"
                           stroke="#8b5cf6"
-                          strokeWidth={2}
-                          fill="#a78bfa"
-                          fillOpacity={0.6}
+                          strokeWidth={2.5}
+                          fill="url(#stepUpGrad)"
                         />
                       )}
                       <Area
@@ -955,16 +971,15 @@ export default function SIPCalculator() {
                         stackId="1"
                         name="Wealth Generated"
                         stroke="#10b981"
-                        strokeWidth={2}
-                        fill="#34d399"
-                        fillOpacity={0.6}
+                        strokeWidth={2.5}
+                        fill="url(#returnsGrad)"
                       />
                       <Area
                         type="monotone"
                         dataKey="ppfValue"
                         name="PPF (7.1%)"
                         stroke="#fca5a5"
-                        strokeWidth={2}
+                        strokeWidth={1.5}
                         strokeDasharray="5 5"
                         fill="transparent"
                         fillOpacity={0}
@@ -974,7 +989,7 @@ export default function SIPCalculator() {
                         dataKey="fdValue"
                         name="FD (6.5%)"
                         stroke="#94a3b8"
-                        strokeWidth={2}
+                        strokeWidth={1.5}
                         strokeDasharray="5 5"
                         fill="transparent"
                         fillOpacity={0}
@@ -1882,7 +1897,7 @@ export default function SIPCalculator() {
                       </div>
                       <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-500"
+                          className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -1892,62 +1907,72 @@ export default function SIPCalculator() {
                       </div>
                     </div>
 
-                    <div className="card p-5 border-slate-100 dark:border-slate-800">
-                      <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-4 flex items-center gap-1.5">
-                        <span>🗓️</span> Retirement Milestones
+                    {/* Interactive horizontal timeline tracker */}
+                    <div className="card p-6 border-slate-100 dark:border-slate-800 relative overflow-hidden">
+                      <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-6 flex items-center gap-1.5">
+                        <span>🚀</span> Interactive FIRE Journey Timeline
                       </h4>
-                      <div className="space-y-4">
-                        {[0.25, 0.5, 0.75, 1.0].map((pct) => {
-                          const milestoneTarget = fireCorpus * pct;
-                          const isCompleted =
-                            fireCurrentCorpus >= milestoneTarget;
-                          const est = calculateMilestoneAge(pct);
-                          return (
-                            <div
-                              key={pct}
-                              className="relative flex gap-4 items-start pb-4 last:pb-0"
-                            >
-                              {pct !== 1.0 && (
-                                <div className="absolute left-3 top-6 bottom-0 w-0.5 bg-slate-100 dark:bg-slate-800" />
-                              )}
+                      <div className="relative pt-6 pb-2 px-2">
+                        {/* Connecting Track Line */}
+                        <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full">
+                          <div
+                            className="h-full bg-gradient-to-r from-orange-400 via-amber-400 to-emerald-500 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+
+                        {/* Nodes along the track */}
+                        <div className="relative flex justify-between">
+                          {[
+                            { pct: 0.25, name: "¼ Coast FIRE", label: "25%" },
+                            { pct: 0.5, name: "½ Half FIRE", label: "50%" },
+                            { pct: 0.75, name: "¾ Lean FIRE", label: "75%" },
+                            { pct: 1.0, name: "Full FIRE", label: "100%" }
+                          ].map((node) => {
+                            const milestoneTarget = fireCorpus * node.pct;
+                            const isCompleted = fireCurrentCorpus >= milestoneTarget;
+                            const est = calculateMilestoneAge(node.pct);
+
+                            return (
                               <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black z-10 shadow-sm ${isCompleted ? "bg-emerald-500 text-white" : "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-2 border-orange-200 dark:border-orange-800"}`}
+                                key={node.pct}
+                                className="flex flex-col items-center group relative"
+                                style={{ transform: "translateY(-16px)" }}
                               >
-                                {isCompleted ? "✓" : `${pct * 100}%`}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center gap-4">
-                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    {pct === 0.25
-                                      ? "¼ Coast FIRE"
-                                      : pct === 0.5
-                                        ? "½ Half FIRE"
-                                        : pct === 0.75
-                                          ? "¾ Lean FIRE"
-                                          : "Full FIRE"}{" "}
-                                    ({fmt(milestoneTarget)})
-                                  </span>
-                                  <span
-                                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isCompleted ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400" : "bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400"}`}
-                                  >
-                                    {isCompleted
-                                      ? "Achieved!"
-                                      : est.age
-                                        ? `Est. Age ${est.age}`
-                                        : "—"}
-                                  </span>
+                                {/* Node Bullet */}
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-[10px] z-10 border-4 transition-all duration-300 cursor-help ${
+                                    isCompleted
+                                      ? "bg-emerald-500 text-white border-emerald-100 dark:border-emerald-950/80 hover:scale-110"
+                                      : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-orange-300 hover:scale-110"
+                                  }`}
+                                >
+                                  {isCompleted ? "✓" : node.label}
                                 </div>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                                  {isCompleted
-                                    ? "Milestone cleared!"
-                                    : est.years !== null
-                                      ? `Reachable in ${est.years} years of regular SIP investing`
-                                      : "Need active monthly investment plan"}
-                                </p>
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 mt-2 text-center">
+                                  {node.name}
+                                </span>
+                                <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 text-center">
+                                  {isCompleted ? "Cleared!" : est.age ? `Age ${est.age}` : "—"}
+                                </span>
+
+                                {/* Popover Tooltip */}
+                                <div className="absolute bottom-full mb-3 hidden group-hover:block z-40 bg-slate-950 text-white text-[10px] p-2.5 rounded-xl shadow-2xl w-44 text-center pointer-events-none border border-slate-800">
+                                  <p className="font-extrabold text-orange-400 mb-1">{node.name}</p>
+                                  <p className="text-slate-400 border-b border-slate-800 pb-1 mb-1 font-mono">Target: {fmt(milestoneTarget)}</p>
+                                  {isCompleted ? (
+                                    <p className="text-emerald-400 font-bold">✓ Already Achieved!</p>
+                                  ) : (
+                                    <>
+                                      <p className="text-slate-300">Est. Age: <strong className="text-white">{est.age ?? "N/A"}</strong></p>
+                                      <p className="text-slate-300">Time: <strong className="text-white">{est.years ?? "N/A"} yrs</strong></p>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -2209,6 +2234,73 @@ export default function SIPCalculator() {
                     </div>
                   </div>
 
+                  {/* 💡 Tax Harvesting Opportunity Planner */}
+                  {isEquity && (
+                    <div className="card p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-100 dark:border-blue-900/40 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">💡</span>
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-800 dark:text-white">
+                            Tax Harvesting Planner
+                          </h4>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                            Legally reduce your mutual fund tax liability to ₹0 using the annual ₹1.25L exemption.
+                          </p>
+                        </div>
+                      </div>
+
+                      {holdingMonths >= 12 ? (
+                        <div className="space-y-3 text-xs">
+                          <div className="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-xl border border-blue-200/40 dark:border-blue-900/40">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-1">Unused Annual LTCG Exemption</p>
+                            <p className="text-lg font-black text-indigo-600 dark:text-indigo-400">
+                              {formatINR(Math.max(0, 125000 - gain))}
+                            </p>
+                            <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                              Since your gain is {formatINR(gain)} (below the annual ₹1,25,000 tax-free limit), you pay **₹0 tax** on this transaction!
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <p className="font-bold text-slate-700 dark:text-slate-300">How to Harvest & Save:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] leading-relaxed">
+                              <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+                                <span className="font-bold text-indigo-600">Step 1: Sell</span>
+                                <p className="text-slate-500 mt-1">Redeem your units worth {formatINR(taxSellAmount)} to officially lock in the {formatINR(gain)} profit tax-free.</p>
+                              </div>
+                              <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+                                <span className="font-bold text-indigo-600">Step 2: Re-invest</span>
+                                <p className="text-slate-500 mt-1">Re-purchase the same fund immediately. Your new buy price resets to today's higher NAV.</p>
+                              </div>
+                              <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+                                <span className="font-bold text-emerald-600">Result: Save Tax</span>
+                                <p className="text-slate-500 mt-1">Future tax is only calculated on gains *above* today's price, saving you up to 12.5% in taxes!</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 text-xs">
+                          <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl text-amber-800 dark:text-amber-300">
+                            <p className="font-bold mb-1">⚠️ Currently in STCG (Held only {Math.round(holdingMonths)} months)</p>
+                            <p className="text-[10px] leading-relaxed">
+                              Short-Term Capital Gains are taxed at a flat **20%** with **no exemptions**. If you sell today, you will pay a tax of **{formatINR(taxAmount)}**!
+                            </p>
+                          </div>
+                          
+                          {holdingMonths < 12 && (
+                            <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-blue-200/20 dark:border-blue-900/20 text-[10px] leading-relaxed">
+                              <p className="font-bold text-indigo-600 dark:text-indigo-400">💡 Smart Advice:</p>
+                              <p className="text-slate-500 mt-0.5">
+                                Hold these units for another **{Math.ceil(12 - holdingMonths)} months** (until {new Date(new Date(taxBuyDate).setFullYear(new Date(taxBuyDate).getFullYear() + 1)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'})}). 
+                                Once they qualify for LTCG, your tax rate drops from 20% to 12.5% — and you can use the ₹1.25L annual tax-free harvesting limit!
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {/* Step-by-step plain English explanation */}
                   <div className="card p-4 space-y-3">
                     <p className="font-bold text-slate-900 dark:text-white text-sm">
@@ -2412,58 +2504,85 @@ export default function SIPCalculator() {
                           </p>
                         </div>
                       </div>
-                      <div className="card p-4">
-                        <p className="font-bold text-slate-900 dark:text-white text-sm mb-3">
-                          XIRR by SIP Date
+                      <div className="card p-5">
+                        <p className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-1.5">
+                          <span>📊</span> Interactive SIP Date Performance Heatmap
                         </p>
-                        <div className="grid grid-cols-7 gap-1.5">
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-4 leading-relaxed">
+                          Hover over any date to see the simulated investment value, total money invested, and exact annualized return (XIRR).
+                        </p>
+                        
+                        <div className="grid grid-cols-7 gap-2">
                           {dateOptimizerResults.map((r) => {
-                            const allXirr = dateOptimizerResults.map(
-                              (x) => x.xirr ?? 0,
-                            );
-                            const minX = Math.min(...allXirr),
-                              maxX = Math.max(...allXirr);
-                            const pct =
-                              maxX > minX
-                                ? ((r.xirr ?? minX) - minX) / (maxX - minX)
-                                : 0.5;
-                            const isB = r.date === bestDateResult?.date;
-                            const isW = r.date === worstDateResult?.date;
+                            const allXirr = dateOptimizerResults.map((x) => x.xirr ?? 0);
+                            const minX = Math.min(...allXirr);
+                            const maxX = Math.max(...allXirr);
+                            const val = r.xirr ?? 0;
+                            const range = maxX - minX;
+                            const weight = range > 0 ? (val - minX) / range : 0.5;
+                            
+                            let bgClass = "bg-slate-50 dark:bg-slate-800/40 text-slate-500";
+                            let borderClass = "border-slate-100 dark:border-slate-800/80";
+                            
+                            if (r.date === bestDateResult?.date) {
+                              bgClass = "bg-emerald-500 text-white shadow-md shadow-emerald-500/10";
+                              borderClass = "border-emerald-600";
+                            } else if (r.date === worstDateResult?.date) {
+                              bgClass = "bg-red-500 text-white shadow-md shadow-red-500/10";
+                              borderClass = "border-red-600";
+                            } else if (weight > 0.75) {
+                              bgClass = "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300";
+                              borderClass = "border-emerald-200/60 dark:border-emerald-900/40";
+                            } else if (weight > 0.45) {
+                              bgClass = "bg-blue-50/70 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300";
+                              borderClass = "border-blue-100 dark:border-blue-900/30";
+                            } else {
+                              bgClass = "bg-amber-50/60 dark:bg-amber-950/10 text-amber-800 dark:text-amber-400";
+                              borderClass = "border-amber-100 dark:border-amber-900/20";
+                            }
+
                             return (
                               <div
                                 key={r.date}
-                                className="flex flex-col items-center gap-1"
+                                className={`p-2 rounded-xl border flex flex-col items-center justify-between min-h-[60px] transition-all duration-150 hover:scale-105 hover:shadow-sm group relative cursor-help ${bgClass} ${borderClass}`}
                               >
-                                <div className="w-full flex flex-col items-center justify-end h-14">
-                                  <div
-                                    className={`w-full rounded-t transition-all ${isB ? "bg-emerald-500" : isW ? "bg-red-400" : "bg-blue-400"}`}
-                                    style={{
-                                      height: `${Math.max(15, pct * 100)}%`,
-                                    }}
-                                    title={`${r.date}th: ${r.xirr?.toFixed(2)}%`}
-                                  />
-                                </div>
-                                <span
-                                  className={`text-[9px] font-bold ${isB ? "text-emerald-600" : isW ? "text-red-500" : "text-slate-500"}`}
-                                >
-                                  {r.date}
+                                <span className="text-[11px] font-black">{r.date}</span>
+                                <span className="text-[9px] font-bold mt-1 tracking-tight">
+                                  {r.xirr != null ? `${r.xirr.toFixed(1)}%` : "N/A"}
                                 </span>
+                                
+                                {/* Popover Tooltip */}
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-40 bg-slate-900 dark:bg-slate-950 text-white text-[10px] p-2.5 rounded-xl shadow-2xl w-36 text-center pointer-events-none border border-slate-800">
+                                  <p className="font-extrabold text-blue-400 mb-1 border-b border-slate-800 pb-1">Day {r.date} Simulation</p>
+                                  <p className="text-slate-400">Invested: {formatINR(r.invested)}</p>
+                                  <p className="text-slate-400">Value: {formatINR(Math.round(r.currentValue))}</p>
+                                  <p className="text-emerald-400 font-black mt-1">XIRR: {r.xirr?.toFixed(2)}%</p>
+                                </div>
                               </div>
                             );
                           })}
                         </div>
-                        <div className="flex gap-3 mt-3 text-[10px] text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded bg-emerald-500 inline-block" />
-                            Best
+                        
+                        <div className="flex flex-wrap gap-3 mt-4 text-[10px] text-slate-500 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" />
+                            🏆 Best Date
                           </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded bg-red-400 inline-block" />
-                            Worst
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 inline-block" />
+                            High Yield
                           </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded bg-blue-400 inline-block" />
-                            Other dates
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-100 inline-block" />
+                            Average Yield
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded bg-amber-50 dark:bg-amber-950/20 border border-amber-100 inline-block" />
+                            Lower Yield
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded bg-red-500 inline-block" />
+                            📉 Worst Date
                           </span>
                         </div>
                       </div>
