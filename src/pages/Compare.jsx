@@ -29,6 +29,7 @@ import {
   toMonthlyData,
   CHART_COLORS,
   sanitizeDataKey,
+  getMonthlyWinRate,
 } from "../utils/chartUtils";
 import { getHistoricalRate } from "../utils/historicalRates";
 import ComparedFundCard from "../components/ComparedFundCard";
@@ -996,23 +997,29 @@ export default function Compare() {
     const map = {};
     fundData.forEach((f) => {
       if (f?.navData) {
-        map[f.schemeCode] = calculateFundMetrics(f.navData);
+        const metrics = calculateFundMetrics(f.navData) || {};
+        const winRate = getMonthlyWinRate(f.navData);
+        map[f.schemeCode] = {
+          ...metrics,
+          winRate,
+        };
       }
     });
     return map;
   }, [fundData]);
 
-  // Memoize multi-factor verdict analysis calculations
+  // Memoize multi-factor verdict analysis.
+  // Reuses fundMetricsMap to avoid redundant O(N) metric recalculations.
   const verdictData = useMemo(() => {
     if (fundData.length < 2) return null;
 
-    // Calculate stats for all funds
     const fundStats = fundData.map((f) => {
-      const m = calculateFundMetrics(f.navData);
+      // Pull pre-computed metrics from the shared map — no extra work
+      const m = fundMetricsMap[f.schemeCode] || null;
       const bw = calculateBestWorstMonth(f.navData);
-      const latest = parseFloat(f.navData[0].nav);
+      const latest = parseFloat(f.navData?.[0]?.nav ?? 0);
       let perf6m = -Infinity;
-      if (f.navData.length > 126) {
+      if (f.navData && f.navData.length > 126) {
         perf6m =
           ((latest - parseFloat(f.navData[125].nav)) /
             parseFloat(f.navData[125].nav)) *
@@ -1021,7 +1028,6 @@ export default function Compare() {
       return { f, m, bw, perf6m };
     });
 
-    // Find winners
     const momentumWinner = [...fundStats].sort(
       (a, b) => b.perf6m - a.perf6m,
     )[0];
@@ -1029,7 +1035,6 @@ export default function Compare() {
       .filter((x) => x.m)
       .sort((a, b) => a.m.maxDrawdown - b.m.maxDrawdown)[0];
 
-    // Verdict Logic
     let verdictFund = fundStats[0];
     let highestScore = -Infinity;
     fundStats.forEach((stat) => {
@@ -1038,7 +1043,7 @@ export default function Compare() {
       if (stat.m.return3Y) score += stat.m.return3Y * 2;
       if (stat.m.return5Y) score += stat.m.return5Y * 1.5;
       if (stat.m.sharpe) score += stat.m.sharpe * 10;
-      score -= stat.m.maxDrawdown; // penalize risk
+      score -= stat.m.maxDrawdown;
 
       if (score > highestScore) {
         highestScore = score;
@@ -1047,7 +1052,8 @@ export default function Compare() {
     });
 
     return { fundStats, momentumWinner, lowestRisk, verdictFund };
-  }, [fundData]);
+  // fundMetricsMap updates whenever fundData changes, so a single dep is enough
+  }, [fundMetricsMap, fundData]);
 
   return (
     <div className="min-h-screen pb-24 md:pb-8 md:pt-20 pt-16">
@@ -1974,15 +1980,15 @@ export default function Compare() {
                     <table className="w-full text-sm text-left">
                       <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/60 sticky top-0">
                         <tr>
-                          <th className="px-4 py-3 font-semibold whitespace-nowrap">
-                            Risk Metric
+                          <th className="px-4 py-3 font-semibold whitespace-nowrap w-48">
+                            Metric
                           </th>
                           {fundData.map((fund, i) => (
                             <th
                               key={fund.schemeCode}
                               className="px-4 py-3 font-semibold"
                               style={{
-                                color: CHART_COLORS[i % CHART_COLORS.length],
+                                color: activeColors[i % activeColors.length],
                               }}
                             >
                               <div
@@ -2000,36 +2006,104 @@ export default function Compare() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                         {[
+                          // ── Performance section ──
+                          {
+                            key: "return1Y",
+                            label: "1Y Return",
+                            desc: "Simple annual return over the last 1 year.",
+                            format: (val) => (val != null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
+                            key: "return3Y",
+                            label: "3Y CAGR",
+                            desc: "Compound Annual Growth Rate over 3 years.",
+                            format: (val) => (val != null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
+                            key: "return5Y",
+                            label: "5Y CAGR",
+                            desc: "Compound Annual Growth Rate over 5 years.",
+                            format: (val) => (val != null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
+                            key: "return10Y",
+                            label: "10Y CAGR",
+                            desc: "Compound Annual Growth Rate over 10 years.",
+                            format: (val) => (val != null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
+                            key: "winRate",
+                            label: "Monthly Win Rate",
+                            desc: "% of months with positive returns.",
+                            format: (val) => (val != null ? `${val}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: false,
+                          },
+                          // ── Risk section ──
                           {
                             key: "volatility",
                             label: "Volatility (Std Dev)",
-                            desc: "Daily price fluctuation. Lower is more stable.",
+                            desc: "Daily price fluctuation — lower is more stable.",
                             format: (val) => (val ? `${val.toFixed(2)}%` : "—"),
                             isBetter: "lower",
+                            section: "Risk",
+                            isReturn: false,
                           },
                           {
                             key: "maxDrawdown",
                             label: "Max Drawdown",
-                            desc: "Biggest historical drop from peak. Lower is safer.",
-                            format: (val) =>
-                              val ? `-${val.toFixed(2)}%` : "—",
+                            desc: "Biggest historical drop from peak — lower is safer.",
+                            format: (val) => val ? `-${val.toFixed(2)}%` : "—",
                             isBetter: "lower",
+                            section: "Risk",
+                            isReturn: false,
                           },
                           {
                             key: "sharpe",
                             label: "Sharpe Ratio",
-                            desc: "Return generated per unit of total risk. Higher is better.",
+                            desc: "Return per unit of total risk — higher is better.",
                             format: (val) => (val ? val.toFixed(2) : "—"),
                             isBetter: "higher",
+                            section: "Risk",
+                            isReturn: false,
                           },
                           {
                             key: "sortino",
                             label: "Sortino Ratio",
-                            desc: "Return generated per unit of DOWNSIDE risk. Higher is better.",
+                            desc: "Return per unit of downside risk — higher is better.",
                             format: (val) => (val ? val.toFixed(2) : "—"),
                             isBetter: "higher",
+                            section: "Risk",
+                            isReturn: false,
                           },
-                        ].map((metric) => {
+                        ].reduce((rows, metric, idx, arr) => {
+                          // Insert a section-divider row when the section name changes
+                          const prevSection = idx > 0 ? arr[idx - 1].section : null;
+                          if (metric.section !== prevSection) {
+                            rows.push(
+                              <tr key={`divider-${metric.section}`} className="bg-slate-50 dark:bg-slate-800/50">
+                                <td
+                                  colSpan={fundData.length + 1}
+                                  className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400"
+                                >
+                                  {metric.section === "Performance" ? "📈 Returns" : "⚖️ Risk Metrics"}
+                                </td>
+                              </tr>
+                            );
+                          }
                           const vals = fundData.map((f) => {
                             const m = fundMetricsMap[f.schemeCode];
                             return m ? m[metric.key] : null;
@@ -2044,15 +2118,15 @@ export default function Compare() {
                                 : Math.min(...validVals)
                               : null;
 
-                          return (
+                          rows.push(
                             <tr
                               key={metric.key}
                               className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                             >
-                              <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
+                              <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">
                                 <div className="flex flex-col gap-0.5">
-                                  <span>{metric.label}</span>
-                                  <span className="text-[10px] text-slate-400 font-normal">
+                                  <span className="font-bold text-sm">{metric.label}</span>
+                                  <span className="text-[10px] text-slate-400 font-normal leading-tight">
                                     {metric.desc}
                                   </span>
                                 </div>
@@ -2062,17 +2136,24 @@ export default function Compare() {
                                   val !== null &&
                                   val === bestVal &&
                                   validVals.length > 1;
+                                // Color-code return values: green positive, red negative
+                                const returnColor =
+                                  metric.isReturn && val != null
+                                    ? val >= 0
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-red-600 dark:text-red-400"
+                                    : "text-slate-700 dark:text-slate-300";
                                 return (
                                   <td
                                     key={idx}
-                                    className="px-4 py-3 font-semibold text-sm tabular-nums text-slate-700 dark:text-slate-300"
+                                    className="px-4 py-3 tabular-nums"
                                   >
                                     <span
-                                      className={
+                                      className={`inline-block font-semibold text-sm ${returnColor} ${
                                         isBest
-                                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded"
+                                          ? "bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded ring-1 ring-emerald-200 dark:ring-emerald-800"
                                           : ""
-                                      }
+                                      }`}
                                     >
                                       {metric.format(val)}
                                     </span>
@@ -2081,7 +2162,8 @@ export default function Compare() {
                               })}
                             </tr>
                           );
-                        })}
+                          return rows;
+                        }, [])}  {/* end .reduce */}
                       </tbody>
                     </table>
                   </div>

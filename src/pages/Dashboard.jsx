@@ -400,28 +400,29 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen pb-24 md:pb-8">
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden pt-20 pb-12 px-4 md:pt-28 md:pb-16">
+      <section className="relative overflow-hidden pt-20 pb-12 px-4 md:pt-28 md:pb-16 bg-gradient-to-b from-slate-50/50 via-transparent to-transparent dark:from-slate-900/20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-20 -left-40 w-96 h-96 bg-indigo-500/10 dark:bg-indigo-500/5 rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white/70 dark:bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-6 border border-slate-200/50 dark:border-white/20 shadow-sm">
+          <div className="inline-flex items-center gap-2 bg-white/80 dark:bg-white/5 backdrop-blur-md px-4 py-2 rounded-full text-sm mb-6 border border-slate-200/60 dark:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-slate-700 dark:text-slate-300 font-medium">
               Live data ·{" "}
-              {funds.length > 0 ? `${funds.length.toLocaleString("en-IN")}+` : "18,000+"}{" "}
+              {funds.length > 0 ? `${funds.length.toLocaleString("en-IN")}+` : "37,000+"}{" "}
               mutual funds
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-4 text-slate-900 dark:text-white leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-5 text-slate-900 dark:text-white leading-tight tracking-tight">
             Find & Analyse
             <br />
-            <span className="text-blue-600 dark:text-blue-500">
+            <span className="gradient-text">
               Any Mutual Fund
             </span>
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-base mb-8 max-w-xl mx-auto">
-            Search, view details, compare and plan your investments — all free.
+          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg mb-8 max-w-xl mx-auto leading-relaxed">
+            Search, view details, compare, and simulate your wealth growth in one click — completely free.
           </p>
 
           {/* ── Fund Search — Main Feature ── */}
@@ -441,21 +442,21 @@ export default function Dashboard() {
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-6 w-full max-w-md sm:max-w-none mx-auto">
             <Link
               to="/screener"
-              className="btn-primary px-5 py-3 shadow-md w-full sm:w-auto text-center flex items-center justify-center gap-2"
+              className="btn-primary px-6 py-3.5 shadow-lg shadow-blue-500/10 dark:shadow-blue-500/5 w-full sm:w-auto text-center flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/></svg>
               <span>Browse & Filter Funds</span>
             </Link>
             <Link
               to="/compare"
-              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center flex items-center justify-center gap-2"
+              className="btn-secondary px-6 py-3.5 w-full sm:w-auto text-center flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:scale-[1.02] active:scale-[0.98]"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
               <span>Compare Funds</span>
             </Link>
             <Link
               to="/sip"
-              className="btn-secondary px-5 py-3 w-full sm:w-auto text-center flex items-center justify-center gap-2"
+              className="btn-secondary px-6 py-3.5 w-full sm:w-auto text-center flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:scale-[1.02] active:scale-[0.98]"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               <span>Wealth Simulator</span>
@@ -590,17 +591,24 @@ export default function Dashboard() {
                   <Link
                     key={cat}
                     to={`/screener?cat=${cat}`}
-                    className="card p-4 text-center hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                    className="card p-4 text-center hover-glow transition-all group duration-300 flex flex-col justify-between"
                   >
-                    <div className="mb-2 flex justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-500 transition-colors">{cfg.icon("w-7 h-7")}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                      {cat}
-                    </div>
-                    <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug mb-2 hidden sm:block">
-                      {cfg.desc}
+                    <div>
+                      <div 
+                        className="w-12 h-12 mx-auto mb-3 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300"
+                        style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                      >
+                        {cfg.icon("w-6 h-6")}
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                        {cat}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug mb-3 hidden sm:block min-h-[32px]">
+                        {cfg.desc}
+                      </div>
                     </div>
                     <div
-                      className="text-[11px] font-bold"
+                      className="text-[11px] font-bold px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/80"
                       style={{ color: cfg.color }}
                     >
                       {count.toLocaleString("en-IN")} funds
@@ -642,31 +650,34 @@ export default function Dashboard() {
                 return (
                   <div
                     key={fund.schemeCode}
-                    className="card p-4 border-l-4"
-                    style={{ borderLeftColor: cfg.color }}
+                    className="card p-5 border-t-4 hover-glow transition-all duration-300 flex flex-col justify-between"
+                    style={{ borderTopColor: cfg.color }}
                   >
-                    <div
-                      className="text-xs font-bold mb-2"
-                      style={{ color: cfg.color }}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {cfg.icon("w-3.5 h-3.5")}
-                        <span>{cat}</span>
-                      </span>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span 
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                          style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                        >
+                          {cfg.icon("w-3 h-3")}
+                          <span>{cat}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">#{fund.schemeCode}</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-950 dark:text-slate-50 line-clamp-2 mb-4 leading-snug">
+                        {fund.schemeName}
+                      </h3>
                     </div>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 mb-3 leading-snug">
-                      {fund.schemeName}
-                    </h3>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setModalFund(fund)}
-                        className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all"
+                        className="flex-1 text-[11px] font-bold py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-150"
                       >
-                        View Details
+                        Details
                       </button>
                       <Link
                         to={`/compare?code=${fund.schemeCode}`}
-                        className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-center transition-all"
+                        className="flex-1 text-[11px] font-bold py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-center transition-all duration-150 shadow-sm shadow-blue-500/10"
                       >
                         Analyse →
                       </Link>

@@ -72,6 +72,7 @@ const links = [
   {
     to: "/sip",
     label: "Wealth Simulator",
+    mobileLabel: "Simulator",
     icon: (
       <svg
         className="w-5 h-5"
@@ -124,57 +125,16 @@ export default function NavBar() {
   const [portfolioList] = useLocalStorage("fundlens_portfolio", []);
   const [totalValRaw] = useLocalStorage("fundlens_portfolio_total_value", 0);
 
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
 
-  useEffect(() => {
-    const isInstalled = 
-      window.matchMedia("(display-mode: standalone)").matches ||
-      window.navigator.standalone ||
-      localStorage.getItem("fundlens_pwa_installed") === "1" ||
-      !!window.Capacitor;
-
-    if (isInstalled) {
-      setShowInstallBtn(false);
-      return;
-    }
-
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallBtn(true);
-    };
-
-    const handleAppInstalled = () => {
-      localStorage.setItem("fundlens_pwa_installed", "1");
-      setDeferredPrompt(null);
-      setShowInstallBtn(false);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.debug(`PWA install prompt outcome: ${outcome}`);
-    setDeferredPrompt(null);
-    setShowInstallBtn(false);
-  };
-
-
-
+  // Short-circuit when the pre-computed total value is already synced from Portfolio page
   const totalValue = useMemo(() => {
     const parsedVal = parseFloat(totalValRaw);
-    if (parsedVal > 0) return parsedVal;
-    return portfolioList.reduce((acc, h) => acc + (parseFloat(h.amount) || 0), 0);
+    if (Number.isFinite(parsedVal) && parsedVal > 0) return parsedVal;
+    // Fallback: sum raw invested amounts when live value not yet computed
+    return portfolioList.reduce(
+      (acc, h) => acc + (Number.isFinite(parseFloat(h.amount)) ? parseFloat(h.amount) : 0),
+      0,
+    );
   }, [portfolioList, totalValRaw]);
 
   return (
@@ -257,15 +217,6 @@ export default function NavBar() {
           )}
         </div>
 
-        {showInstallBtn && (
-          <button
-            onClick={handleInstallClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-sm hover:shadow transition-all mr-2"
-            aria-label="Install FundLens App"
-          >
-            📥 Install App
-          </button>
-        )}
         <ThemeToggle />
       </nav>
 
@@ -297,15 +248,6 @@ export default function NavBar() {
         </NavLink>
 
         <div className="flex items-center gap-3">
-          {showInstallBtn && (
-            <button
-              onClick={handleInstallClick}
-              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm"
-              aria-label="Install FundLens App"
-            >
-              📥 Install
-            </button>
-          )}
           <ThemeToggle />
         </div>
       </div>
@@ -339,7 +281,7 @@ export default function NavBar() {
                   <span className="relative">
                     {icon}
                   </span>
-                  <span className="leading-none">{label}</span>
+                  <span className="leading-none">{mobileLabel || label}</span>
                 </>
               )}
             </NavLink>

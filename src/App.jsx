@@ -71,6 +71,12 @@ function PageSEOUpdater() {
       metaDesc.setAttribute("content", seo.description);
     }
 
+    // Update Open Graph title
+    let ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      ogTitle.setAttribute("content", seo.title);
+    }
+
     // Update canonical URL
     let canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) {

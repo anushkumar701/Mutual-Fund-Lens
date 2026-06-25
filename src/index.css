@@ -122,11 +122,6 @@
     touch-action: manipulation;
   }
 
-  /* Smooth scrolling on iOS */
-  * {
-    -webkit-overflow-scrolling: touch;
-  }
-
   /* ── Scrollbar ── */
   ::-webkit-scrollbar {
     width: 5px;
@@ -225,6 +220,44 @@
 
   .section-title {
     @apply text-xl font-bold text-slate-900 dark:text-white tracking-tight;
+  }
+
+  /* ══ Premium Fintech Design Classes ══ */
+  .glass-panel {
+    @apply bg-white/75 dark:bg-[#161b27]/80
+           backdrop-blur-md
+           border border-white/20 dark:border-white/5
+           shadow-[0_8px_30px_rgb(0,0,0,0.04)]
+           dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)];
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400;
+  }
+
+  .gradient-text-emerald {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-400 dark:to-teal-500;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-300
+           hover:shadow-[0_0_20px_rgba(37,99,235,0.15)]
+           dark:hover:shadow-[0_0_25px_rgba(59,130,246,0.2)]
+           hover:border-blue-400/50 dark:hover:border-blue-500/30;
+  }
+
+  .premium-gradient-card {
+    @apply relative overflow-hidden;
+  }
+
+  .premium-gradient-card::after {
+    content: "";
+    @apply absolute inset-0 opacity-0 transition-opacity duration-500 pointer-events-none
+           bg-gradient-to-tr from-blue-500/5 via-indigo-500/5 to-purple-500/5;
+  }
+
+  .premium-gradient-card:hover::after {
+    @apply opacity-100;
   }
 }
 

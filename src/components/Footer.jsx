@@ -10,6 +10,7 @@ export default function Footer() {
           <div className="flex items-center gap-2">
             <svg
               className="w-5 h-5 text-blue-600"
+              aria-hidden="true"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -27,7 +28,7 @@ export default function Footer() {
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
             {[
-              { to: "/", label: "Dashboard" },
+              { to: "/", label: "Portfolio" },
               { to: "/screener", label: "Screener" },
               { to: "/compare", label: "Compare" },
               { to: "/sip", label: "Wealth Simulator" },
@@ -60,6 +61,7 @@ export default function Footer() {
               <div className="flex items-center gap-2 mb-3">
                 <svg
                   className="w-6 h-6 text-blue-600"
+                  aria-hidden="true"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -88,7 +90,7 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2">
                 {[
-                  { to: "/", label: "Dashboard" },
+                  { to: "/", label: "Portfolio" },
                   { to: "/screener", label: "Fund Screener" },
                   { to: "/compare", label: "Compare Funds" },
                   { to: "/sip", label: "Wealth Simulator" },
