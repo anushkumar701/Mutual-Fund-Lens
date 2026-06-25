@@ -410,10 +410,12 @@ export default function Compare() {
       } catch (err) {
         failedCodesRef.current.add(codeStr);
         if (isMountedRef.current) {
+          const globalFund = funds?.find((f) => String(f.schemeCode) === codeStr);
+          const fundName = globalFund?.schemeName || `Scheme #${codeStr}`;
           const msg =
             err?.response?.status === 404
-              ? `Scheme code "${codeStr}" not found. Enter numeric codes only (e.g. 122639).`
-              : "Network error. Please check your connection and try again.";
+              ? `Failed to load "${fundName}". This scheme code is inactive or invalid.`
+              : `Failed to load "${fundName}". Network timeout. Please check your connection and try again.`;
           showError(msg);
         }
       } finally {
@@ -1323,14 +1325,98 @@ export default function Compare() {
 
               {/* Fund cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {fundData.map((fund, i) => (
-                  <ComparedFundCard
-                    key={fund.schemeCode}
-                    fund={fund}
-                    color={activeColors[i % activeColors.length]}
-                    onRemove={() => removeFund(fund.schemeCode)}
-                  />
-                ))}
+                {compareList.map((code, i) => {
+                  const codeStr = String(code);
+                  const fund = fundData.find((f) => String(f.schemeCode) === codeStr);
+                  const color = activeColors[i % activeColors.length];
+
+                  if (fund) {
+                    return (
+                      <ComparedFundCard
+                        key={codeStr}
+                        fund={fund}
+                        color={color}
+                        onRemove={() => removeFund(codeStr)}
+                      />
+                    );
+                  }
+
+                  // Resolve human-readable name from global funds list if available
+                  const globalFund = funds?.find((f) => String(f.schemeCode) === codeStr);
+                  const fundName = globalFund?.schemeName || `Scheme #${codeStr}`;
+
+                  if (loadingCode === codeStr) {
+                    // Shimmering skeleton card
+                    return (
+                      <div
+                        key={codeStr}
+                        className="card p-5 relative border-t-4 border-slate-300 dark:border-slate-700 animate-pulse flex flex-col justify-between min-h-[280px]"
+                      >
+                        <div className="space-y-4">
+                          <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+                          <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+                          <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                          <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-850">
+                            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-full" />
+                            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-5/6" />
+                          </div>
+                        </div>
+                        <div className="text-center text-xs text-slate-400 font-medium mt-4">
+                          Loading live analytics...
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (failedCodesRef.current.has(codeStr)) {
+                    // Error card
+                    return (
+                      <div
+                        key={codeStr}
+                        className="card p-5 relative border-t-4 border-red-500 bg-red-50/10 dark:bg-red-950/10 flex flex-col justify-between min-h-[280px] hover:shadow-md transition-shadow"
+                      >
+                        <button
+                          onClick={() => removeFund(codeStr)}
+                          className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-100 dark:bg-red-950/40 text-red-500 hover:bg-red-200 dark:hover:bg-red-900/60 flex items-center justify-center text-sm transition-all"
+                          title="Remove from comparison"
+                          aria-label={`Remove ${fundName} from comparison`}
+                        >
+                          ✕
+                        </button>
+                        
+                        <div className="space-y-3 pr-6">
+                          <div>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/40">
+                              Load Error
+                            </span>
+                            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-snug mt-2 line-clamp-2" title={fundName}>
+                              {fundName}
+                            </h3>
+                            <p className="text-[10px] font-mono text-slate-400 mt-1">
+                              AMFI Code: <span className="text-red-500 font-bold">#{codeStr}</span>
+                            </p>
+                          </div>
+
+                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal bg-red-50/50 dark:bg-red-950/20 p-2.5 rounded-lg border border-red-100/45 dark:border-red-900/10">
+                            Unable to fetch fund details. This code may be inactive, or the AMFI servers are rate-limiting traffic.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => loadFund(codeStr)}
+                          className="w-full mt-4 py-2 px-3 rounded-xl text-xs font-bold bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors flex items-center justify-center gap-1.5 border border-red-200/50 dark:border-red-900/30"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                          </svg>
+                          Retry Loading
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })}
               </div>
 
               {/* NAV History Chart */}

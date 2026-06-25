@@ -150,6 +150,7 @@ export default function Portfolio() {
   // without needing it in their dependency arrays (avoids stale-closure bugs).
   const detailsCacheRef = useRef({});
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [failedPortfolioCodes, setFailedPortfolioCodes] = useState(new Set());
 
   // Form states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -228,10 +229,20 @@ export default function Portfolio() {
         try {
           const data = await fetchFundDetail(h.schemeCode);
           if (data) {
+            setFailedPortfolioCodes((prev) => {
+              const next = new Set(prev);
+              next.delete(h.schemeCode);
+              return next;
+            });
             return { code: h.schemeCode, data: { ...data, sortedNavs: processNavData(data) } };
           }
         } catch (err) {
           console.error(`Failed to load details for ${h.schemeCode}:`, err);
+          setFailedPortfolioCodes((prev) => {
+            const next = new Set(prev);
+            next.add(h.schemeCode);
+            return next;
+          });
         }
         return null;
       });
@@ -1385,6 +1396,11 @@ export default function Portfolio() {
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
                             <span className="font-mono">AMFI: {h.schemeCode}</span>
+                            {failedPortfolioCodes.has(h.schemeCode) && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[9px] font-extrabold tracking-wide animate-pulse" title="Failed to fetch live NAV. Using purchase NAV as fallback.">
+                                ⚠️ Live Price Offline
+                              </span>
+                            )}
                             <span>•</span>
                             <button
                               onClick={() => handleEditClick(h)}
