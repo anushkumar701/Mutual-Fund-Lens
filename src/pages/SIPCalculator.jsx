@@ -2043,6 +2043,16 @@ export default function SIPCalculator() {
               result;
             const netInHand = taxSellAmount - Math.round(taxAmount);
             const isEquity = taxFundType === "equity";
+            const getSafeThresholdDate = (dateStr) => {
+              const d = new Date(dateStr);
+              if (isNaN(d.getTime())) return "N/A";
+              d.setFullYear(d.getFullYear() + 1);
+              return d.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+            };
 
             return (
               <div className="grid lg:grid-cols-[380px,1fr] gap-6">
@@ -2292,7 +2302,7 @@ export default function SIPCalculator() {
                             <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-blue-200/20 dark:border-blue-900/20 text-[10px] leading-relaxed">
                               <p className="font-bold text-indigo-600 dark:text-indigo-400">💡 Smart Advice:</p>
                               <p className="text-slate-500 mt-0.5">
-                                Hold these units for another **{Math.ceil(12 - holdingMonths)} months** (until {new Date(new Date(taxBuyDate).setFullYear(new Date(taxBuyDate).getFullYear() + 1)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'})}). 
+                                Hold these units for another **{Math.ceil(12 - holdingMonths)} months** (until {getSafeThresholdDate(taxBuyDate)}). 
                                 Once they qualify for LTCG, your tax rate drops from 20% to 12.5% — and you can use the ₹1.25L annual tax-free harvesting limit!
                               </p>
                             </div>
