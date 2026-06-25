@@ -100,17 +100,42 @@ const deferredInit = () => {
     }
   }
 
-  // Service Worker registration
+  // Service Worker registration with update detection
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
         .register("/sw.js")
         .then((reg) => {
           console.debug("Service Worker registered successfully:", reg.scope);
+
+          // Detect service worker updates
+          reg.addEventListener("updatefound", () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener("statechange", () => {
+                if (
+                  newWorker.state === "installed" &&
+                  navigator.serviceWorker.controller
+                ) {
+                  // A new service worker is installed and waiting
+                  window.dispatchEvent(new CustomEvent("sw-update-available"));
+                }
+              });
+            }
+          });
         })
         .catch((err) => {
           console.error("Service Worker registration failed:", err);
         });
+    });
+
+    // Handle controller change (automatic reload on activate)
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
     });
   }
 };

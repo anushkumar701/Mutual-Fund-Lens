@@ -126,6 +126,25 @@ export default function NavBar() {
   const [totalValRaw] = useLocalStorage("fundlens_portfolio_total_value", 0);
 
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      window.location.reload(true);
+    } catch {
+      window.location.reload();
+    }
+  };
+
   // Short-circuit when the pre-computed total value is already synced from Portfolio page
   const totalValue = useMemo(() => {
     const parsedVal = parseFloat(totalValRaw);
@@ -217,6 +236,28 @@ export default function NavBar() {
           )}
         </div>
 
+        <button
+          onClick={handleManualSync}
+          disabled={isSyncing}
+          title="Force Refresh App & Clear Cache"
+          aria-label="Force Refresh App"
+          className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-800/80 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all"
+        >
+          <svg
+            className={`w-4.5 h-4.5 ${isSyncing ? "animate-spin text-indigo-500" : "hover:rotate-180 transition-transform duration-500"}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 4v5h.582m15.356 2a9 9 0 11-1.591-5.182L20 9m0 0H15M20 9V4"
+            />
+          </svg>
+        </button>
+
         <ThemeToggle />
       </nav>
 
@@ -247,7 +288,28 @@ export default function NavBar() {
           </span>
         </NavLink>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            title="Force Refresh App & Clear Cache"
+            aria-label="Force Refresh App"
+            className="w-8.5 h-8.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all"
+          >
+            <svg
+              className={`w-4 h-4 ${isSyncing ? "animate-spin text-indigo-500" : "active:rotate-180 transition-transform duration-500"}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2a9 9 0 11-1.591-5.182L20 9m0 0H15M20 9V4"
+              />
+            </svg>
+          </button>
           <ThemeToggle />
         </div>
       </div>
