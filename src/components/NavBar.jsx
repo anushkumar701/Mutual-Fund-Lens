@@ -258,7 +258,7 @@ export default function NavBar() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1117] border-t border-slate-200 dark:border-slate-800 bottom-nav-safe"
       >
         <div className="flex items-stretch">
-          {links.map(({ to, label, icon }) => (
+          {links.map(({ to, label, icon, mobileLabel }) => (
             <NavLink
               key={to}
               to={to}
