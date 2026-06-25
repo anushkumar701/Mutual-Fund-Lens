@@ -11,6 +11,7 @@ import NavBar from "./components/NavBar";
 import { ToastProvider } from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 
 import Footer from "./components/Footer";
 import BackToTop from "./components/BackToTop";
@@ -156,6 +157,7 @@ export default function App() {
             <BackToTop />
           </Suspense>
           <PWAInstallPrompt />
+          <PWAUpdatePrompt />
         </BrowserRouter>
       </ToastProvider>
     </>
