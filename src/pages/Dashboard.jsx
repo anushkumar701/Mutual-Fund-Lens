@@ -998,13 +998,13 @@ export default function Dashboard() {
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">
                           Overall Performance Analysis (2013 - 2025 Average)
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                        <div className="flex flex-col gap-5">
                           {/* Category Ranking List */}
-                          <div className="md:col-span-3 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
+                          <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
                             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3">
-                              📊 Category Rankings (Average Return)
+                              📊 Select Category (Ranked by Average Return)
                             </span>
-                            <div className="space-y-2">
+                            <div className="flex overflow-x-auto no-scrollbar gap-3 pb-2">
                               {overallAverages.map((item, idx) => {
                                 const catColor = CAT_CFG[item.category]?.color || "#64748b";
                                 const isActive = activeCategory === item.category;
@@ -1012,11 +1012,12 @@ export default function Dashboard() {
                                   <button
                                     key={item.category}
                                     onClick={() => setActiveCategory(item.category)}
-                                    className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all border text-left ${
+                                    className={`min-w-[180px] flex-shrink-0 flex items-center justify-between p-2.5 rounded-xl transition-all border text-left ${
                                       isActive
-                                        ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm font-black"
+                                        ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm font-black ring-1"
                                         : "bg-transparent border-transparent hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
                                     }`}
+                                    style={{ ringColor: isActive ? catColor : "transparent" }}
                                   >
                                     <div className="flex items-center gap-2 min-w-0 pr-1">
                                       <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 w-3 flex-shrink-0">
@@ -1054,7 +1055,7 @@ export default function Dashboard() {
                           </div>
 
                           {/* Interactive Subcategory Returns Heatmap */}
-                          <div className="md:col-span-9 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 flex flex-col justify-between overflow-hidden">
+                          <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 flex flex-col justify-between overflow-hidden">
                             <div>
                               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                                 <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
