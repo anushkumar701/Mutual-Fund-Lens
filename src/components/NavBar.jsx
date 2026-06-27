@@ -1,6 +1,6 @@
 // components/NavBar.jsx
 import { NavLink } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import ThemeToggle from "./ThemeToggle";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { formatCurrencyINR } from "../utils/formatCurrency";

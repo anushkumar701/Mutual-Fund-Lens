@@ -425,7 +425,7 @@ export default function Compare() {
         setLoadingCode(null);
       }
     },
-    [toast, setRecentList],
+    [toast, setRecentList, funds],
   );
 
   // Load from URL param
@@ -777,41 +777,7 @@ export default function Compare() {
     return { years: validYears, data };
   }, [fundData]);
 
-  // Overlap matrix for ALL fund pairs
-  const overlapMatrix = useMemo(() => {
-    const matrix = [];
-    if (fundData.length >= 2) {
-      for (let i = 0; i < fundData.length; i++) {
-        for (let j = i + 1; j < fundData.length; j++) {
-          const corr = calculateCorrelation(
-            fundData[i].navData,
-            fundData[j].navData,
-          );
-          if (corr !== null) {
-            const score = Math.max(0, corr * 100);
-            matrix.push({
-              a: fundData[i].meta?.scheme_name || `Fund ${i + 1}`,
-              b: fundData[j].meta?.scheme_name || `Fund ${j + 1}`,
-              score,
-              quality:
-                score > 80
-                  ? "High Overlap"
-                  : score > 50
-                    ? "Medium Overlap"
-                    : "Low Overlap ✓",
-              color:
-                score > 80
-                  ? "text-red-500"
-                  : score > 50
-                    ? "text-amber-500"
-                    : "text-emerald-500",
-            });
-          }
-        }
-      }
-    }
-    return matrix;
-  }, [fundData]);
+
 
   // Dynamic time ranges based on minimum fund age
   const minFundAge =
