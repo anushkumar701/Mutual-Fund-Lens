@@ -145,10 +145,25 @@ export default function Portfolio() {
   };
 
   // Cached fund details (NAV list, current price)
-  const [detailsCache, setDetailsCache] = useState({});
+  const [detailsCache, setDetailsCache] = useState(() => {
+    try {
+      const saved = localStorage.getItem("fundlens_portfolio_details_cache");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   // Mirror detailsCache in a ref so effects can read the current value
   // without needing it in their dependency arrays (avoids stale-closure bugs).
-  const detailsCacheRef = useRef({});
+  const detailsCacheRef = useRef(detailsCache);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("fundlens_portfolio_details_cache", JSON.stringify(detailsCache));
+    } catch (e) {
+      console.warn("Failed to save details cache to localStorage:", e);
+    }
+  }, [detailsCache]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [failedPortfolioCodes, setFailedPortfolioCodes] = useState(new Set());
 

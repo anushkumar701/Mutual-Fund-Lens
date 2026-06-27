@@ -100,14 +100,14 @@ export default function PortfolioCharts({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={filteredChartData}>
+              <AreaChart data={filteredChartData} margin={{ top: 15, right: 15, left: 5, bottom: 5 }}>
                 <defs>
                   <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.08)" />
                 <XAxis
                   dataKey="date"
                   stroke="#94a3b8"
@@ -121,10 +121,22 @@ export default function PortfolioCharts({
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
-                  domain={[(min) => Math.max(0, Math.floor(min * 0.95)), (max) => Math.ceil(max * 1.05)]}
-                  tickFormatter={(v) =>
-                    v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`
-                  }
+                  width={75}
+                  domain={["auto", "auto"]}
+                  padding={{ top: 20, bottom: 20 }}
+                  tickFormatter={(v) => {
+                    if (v === 0) return "₹0";
+                    if (v >= 10000000) {
+                      return `₹${(v / 10000000).toLocaleString("en-IN", { maximumFractionDigits: 2 })}Cr`;
+                    }
+                    if (v >= 100000) {
+                      return `₹${(v / 100000).toLocaleString("en-IN", { maximumFractionDigits: 2 })}L`;
+                    }
+                    if (v >= 1000) {
+                      return `₹${(v / 1000).toLocaleString("en-IN", { maximumFractionDigits: 1 })}k`;
+                    }
+                    return `₹${v.toLocaleString("en-IN")}`;
+                  }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend
