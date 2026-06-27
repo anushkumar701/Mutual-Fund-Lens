@@ -78,6 +78,117 @@ const CAT_CFG = {
   },
 };
 
+// ─── Heatmap returns performance color scale (Google Finance Style) ───
+function getReturnColor(val) {
+  if (val >= 20) {
+    return {
+      bg: "bg-emerald-50/90 dark:bg-emerald-950/30",
+      border: "border-emerald-200/60 dark:border-emerald-900/40",
+      text: "text-emerald-800 dark:text-emerald-300",
+      label: "text-emerald-600 dark:text-emerald-400",
+    };
+  } else if (val >= 8) {
+    return {
+      bg: "bg-blue-50/70 dark:bg-blue-950/30",
+      border: "border-blue-200/60 dark:border-blue-900/40",
+      text: "text-blue-800 dark:text-blue-300",
+      label: "text-blue-600 dark:text-blue-400",
+    };
+  } else if (val >= 0) {
+    return {
+      bg: "bg-slate-50 dark:bg-slate-800/40",
+      border: "border-slate-200/60 dark:border-slate-700/50",
+      text: "text-slate-800 dark:text-slate-300",
+      label: "text-slate-500 dark:text-slate-400",
+    };
+  } else if (val >= -10) {
+    return {
+      bg: "bg-amber-50/90 dark:bg-amber-950/30",
+      border: "border-amber-200/60 dark:border-amber-900/40",
+      text: "text-amber-800 dark:text-amber-300",
+      label: "text-amber-600 dark:text-amber-400",
+    };
+  } else {
+    return {
+      bg: "bg-rose-50 dark:bg-rose-950/30",
+      border: "border-rose-200/60 dark:border-rose-900/40",
+      text: "text-rose-800 dark:text-rose-300",
+      label: "text-rose-600 dark:text-rose-400",
+    };
+  }
+}
+
+
+// ─── Subcategory returns data and config ────────────────────────
+const SUBCAT_CFG = {
+  // Equity
+  "Small Cap": { color: "#1d4ed8" },
+  "Mid Cap": { color: "#2563eb" },
+  "Large Cap": { color: "#3b82f6" },
+  "Flexi Cap": { color: "#60a5fa" },
+  "Multi Cap": { color: "#93c5fd" },
+  // Index
+  "Nifty 50": { color: "#4338ca" },
+  "Nifty Next 50": { color: "#4f46e5" },
+  "Sensex": { color: "#6366f1" },
+  "Nifty Midcap 150": { color: "#818cf8" },
+  // Hybrid
+  "Aggressive Hybrid": { color: "#b45309" },
+  "Balanced Advantage (DAA)": { color: "#d97706" },
+  "Arbitrage": { color: "#f59e0b" },
+  "Multi Asset": { color: "#fbbf24" },
+  // Debt
+  "Gilt (Govt Bonds)": { color: "#047857" },
+  "Corporate Bond": { color: "#059669" },
+  "Short Duration": { color: "#10b981" },
+  "Credit Risk": { color: "#34d399" },
+  // Liquid
+  "Liquid Fund": { color: "#0f766e" },
+  "Overnight Fund": { color: "#14b8a6" },
+  "Money Market": { color: "#2dd4bf" },
+  // ELSS
+  "ELSS Tax Saver (Direct)": { color: "#6d28d9" },
+  "ELSS Tax Saver (Regular)": { color: "#7c3aed" },
+};
+
+const SUBCAT_DATA = {
+  Equity: {
+    "Small Cap": [8.5, 62.4, 5.2, 11.2, 48.9, -15.2, -4.1, 28.5, 54.1, -1.5, 38.6, 29.8, 16.5],
+    "Mid Cap": [6.1, 48.2, 2.5, 8.4, 39.1, -10.5, 0.2, 22.4, 40.2, 1.8, 30.4, 24.2, 14.1],
+    "Large Cap": [4.2, 29.5, -2.1, 5.2, 26.8, 2.5, 10.5, 15.6, 24.5, 4.2, 18.6, 15.1, 10.5],
+    "Flexi Cap": [5.3, 37.1, -0.5, 7.8, 31.2, -4.2, 6.8, 18.2, 31.4, 3.2, 22.5, 19.8, 12.1],
+    "Multi Cap": [5.8, 41.5, 0.2, 9.1, 33.6, -6.8, 5.1, 19.5, 34.8, 2.8, 24.6, 21.4, 13.0]
+  },
+  Index: {
+    "Nifty 50": [6.5, 31.4, -4.1, 3.0, 28.6, 3.2, 12.0, 14.9, 24.1, 4.3, 19.4, 14.2, 9.5],
+    "Nifty Next 50": [4.8, 44.2, 1.2, 7.5, 43.1, -8.5, 1.5, 18.6, 29.8, 2.1, 26.5, 22.1, 13.5],
+    "Sensex": [6.8, 29.9, -5.0, 2.0, 28.0, 5.9, 14.4, 15.7, 22.0, 4.4, 18.7, 13.8, 9.2],
+    "Nifty Midcap 150": [5.1, 52.6, 3.0, 9.2, 45.4, -12.4, -1.8, 23.0, 44.5, 1.5, 32.0, 26.8, 15.8]
+  },
+  Hybrid: {
+    "Aggressive Hybrid": [7.2, 25.4, 1.8, 6.5, 20.1, -2.5, 8.2, 12.4, 21.0, 5.2, 16.5, 13.5, 9.5],
+    "Balanced Advantage (DAA)": [6.8, 18.5, 2.2, 5.8, 14.5, 1.2, 9.1, 10.5, 16.2, 6.1, 13.2, 11.0, 8.2],
+    "Arbitrage": [8.1, 8.4, 7.5, 6.8, 6.2, 6.0, 5.8, 4.1, 3.8, 4.5, 6.5, 6.8, 6.2],
+    "Multi Asset": [6.5, 16.2, 2.8, 6.0, 12.1, 2.5, 8.5, 9.8, 14.0, 7.0, 12.8, 11.5, 8.5]
+  },
+  Debt: {
+    "Gilt (Govt Bonds)": [9.2, 12.5, 7.8, 11.5, 4.2, 6.5, 10.8, 9.2, 3.1, 0.8, 6.8, 7.2, 6.5],
+    "Corporate Bond": [8.8, 10.5, 8.2, 9.5, 6.5, 6.2, 9.0, 8.4, 4.2, 2.1, 6.5, 7.5, 7.0],
+    "Short Duration": [8.2, 9.2, 8.0, 8.5, 6.8, 6.5, 8.2, 7.8, 4.5, 3.0, 6.2, 7.0, 6.8],
+    "Credit Risk": [9.5, 11.0, 8.5, 9.8, 7.2, 5.1, 7.5, 6.2, 3.0, -1.5, 7.0, 8.2, 7.5]
+  },
+  Liquid: {
+    "Liquid Fund": [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
+    "Overnight Fund": [7.8, 7.9, 7.2, 6.5, 6.0, 6.1, 5.5, 3.5, 3.1, 4.0, 6.2, 6.4, 6.0],
+    "Money Market": [8.5, 8.8, 8.1, 7.4, 6.8, 7.0, 6.6, 4.5, 3.9, 5.2, 7.2, 7.5, 7.1]
+  },
+  ELSS: {
+    "ELSS Tax Saver (Direct)": [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
+    "ELSS Tax Saver (Regular)": [2.0, 32.8, -2.1, 7.8, 26.9, -4.8, 1.0, 11.8, 24.9, 1.1, 20.2, 18.2, 11.8]
+  }
+};
+
+
 // ─── Fund Search Box ───────────────────────────────────────────
 function FundSearchBox({
   funds,
@@ -378,6 +489,7 @@ export default function Dashboard() {
   const { funds, loading, loadingSlow, error, refetch, triggerFetch } = useFunds({ lazy: true });
   const [watchlist] = useLocalStorage("fundlens_watchlist", []);
   const [modalFund, setModalFund] = useState(null);
+  const [activeCategory, setActiveCategory] = useState("Equity");
 
   const catStats = useMemo(() => {
     const c = {};
@@ -820,15 +932,15 @@ export default function Dashboard() {
           </div>
           <div className="card p-4 overflow-x-auto">
             {(() => {
-              const YEARS = [2019, 2020, 2021, 2022, 2023, 2024];
+              const YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
               // Approximate median category returns (%) — industry averages
               const DATA = {
-                Equity: [4.2, 14.7, 27.3, 3.1, 22.4, 18.2],
-                Index: [12.1, 15.2, 27.1, 4.6, 21.4, 17.3],
-                ELSS: [2.3, 13.1, 26.4, 2.4, 21.6, 19.7],
-                Hybrid: [5.8, 10.7, 19.8, 6.5, 16.7, 13.2],
-                Debt: [9.4, 8.1, 3.7, 1.2, 6.3, 7.5],
-                Liquid: [6.3, 4.2, 3.6, 4.8, 7.0, 7.2],
+                Equity: [4.8, 32.9, -1.2, 8.5, 29.6, -2.1, 4.2, 14.7, 27.3, 3.1, 22.4, 18.2, 12.5],
+                Index: [8.1, 31.2, -3.0, 4.4, 30.3, 4.6, 12.1, 15.2, 27.1, 4.6, 21.4, 17.3, 11.2],
+                ELSS: [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
+                Hybrid: [6.2, 22.8, 1.5, 7.2, 18.9, 2.1, 5.8, 10.7, 19.8, 6.5, 16.7, 13.2, 9.8],
+                Debt: [8.5, 10.2, 8.2, 9.8, 6.1, 5.9, 9.4, 8.1, 3.7, 1.2, 6.3, 7.5, 7.1],
+                Liquid: [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
               };
 
               const ranks = [0, 1, 2, 3, 4, 5];
@@ -844,7 +956,7 @@ export default function Dashboard() {
               });
 
               return (
-                <div className="min-w-[640px]">
+                <div className="min-w-[1200px]">
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr>
@@ -854,7 +966,7 @@ export default function Dashboard() {
                         {YEARS.map((y) => (
                           <th
                             key={y}
-                            className="text-center py-2 px-2 text-slate-700 dark:text-slate-300 font-bold text-sm bg-slate-50/80 dark:bg-slate-800/40 first:rounded-l-xl last:rounded-r-xl"
+                            className="text-center py-2.5 px-2 text-slate-700 dark:text-slate-300 font-bold text-sm bg-slate-50/80 dark:bg-slate-800/40 first:rounded-l-xl last:rounded-r-xl"
                           >
                             {y}
                           </th>
@@ -871,23 +983,16 @@ export default function Dashboard() {
                             </td>
                             {sortedYearsData.map(({ year, list }) => {
                               const item = list[r];
-                              const catColor = CAT_CFG[item.category]?.color || "#64748b";
+                              const colorSet = getReturnColor(item.returnVal);
                               return (
                                 <td key={year} className="px-1 py-1.5 min-w-[105px]">
                                   <div
-                                    className="rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
-                                    style={{
-                                      backgroundColor: `${catColor}08`,
-                                      borderColor: `${catColor}20`,
-                                    }}
+                                    className={`rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border ${colorSet.bg} ${colorSet.border}`}
                                   >
-                                    <div
-                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-1"
-                                      style={{ color: catColor }}
-                                    >
+                                    <div className={`text-[10px] font-extrabold uppercase tracking-wider mb-1 ${colorSet.label}`}>
                                       {item.category}
                                     </div>
-                                    <div className="text-xs font-bold tabular-nums text-slate-900 dark:text-white">
+                                    <div className={`text-xs font-black tabular-nums ${colorSet.text}`}>
                                       {item.returnVal > 0 ? "+" : ""}
                                       {item.returnVal}%
                                     </div>
@@ -900,6 +1005,7 @@ export default function Dashboard() {
                       })}
                     </tbody>
                   </table>
+                  
                   <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
                     {Object.entries(CAT_CFG).map(([cat, cfg]) => (
                       <span
@@ -914,7 +1020,197 @@ export default function Dashboard() {
                       </span>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-700 dark:text-slate-400 mt-2">
+
+                  {/* Overall Performance Analysis (Average Returns 2013-2025) */}
+                  {(() => {
+                    const overallAverages = Object.entries(DATA).map(([category, returns]) => {
+                      const sum = returns.reduce((acc, curr) => acc + curr, 0);
+                      const avg = sum / returns.length;
+                      return { category, avg };
+                    });
+                    overallAverages.sort((a, b) => b.avg - a.avg);
+
+                    const subcatDataset = SUBCAT_DATA[activeCategory] || {};
+                    const subcatList = Object.keys(subcatDataset);
+                    const subcatRanks = subcatList.map((_, idx) => idx);
+
+                    // Rank subcategories for each year descending by returns
+                    const sortedSubcatYearsData = YEARS.map((year, yearIdx) => {
+                      const list = Object.entries(subcatDataset).map(([subcategory, returns]) => ({
+                        subcategory,
+                        returnVal: returns[yearIdx],
+                      }));
+                      list.sort((a, b) => b.returnVal - a.returnVal);
+                      return { year, list };
+                    });
+
+                    const subcatAverages = Object.entries(subcatDataset).map(([subcategory, returns]) => {
+                      const sum = returns.reduce((acc, curr) => acc + curr, 0);
+                      const avg = sum / returns.length;
+                      return { subcategory, avg };
+                    });
+                    subcatAverages.sort((a, b) => b.avg - a.avg);
+
+                    return (
+                      <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/60">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">
+                          Overall Performance Analysis (2013 - 2025 Average)
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                          {/* Category Ranking List */}
+                          <div className="md:col-span-3 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3">
+                              📊 Category Rankings (Average Return)
+                            </span>
+                            <div className="space-y-2">
+                              {overallAverages.map((item, idx) => {
+                                const catColor = CAT_CFG[item.category]?.color || "#64748b";
+                                const isActive = activeCategory === item.category;
+                                return (
+                                  <button
+                                    key={item.category}
+                                    onClick={() => setActiveCategory(item.category)}
+                                    className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all border text-left ${
+                                      isActive
+                                        ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm font-black"
+                                        : "bg-transparent border-transparent hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0 pr-1">
+                                      <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 w-3 flex-shrink-0">
+                                        {idx + 1}
+                                      </span>
+                                      <div
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                        style={{
+                                          backgroundColor: `${catColor}15`,
+                                          color: catColor,
+                                        }}
+                                      >
+                                        {CAT_CFG[item.category]?.icon("w-4 h-4")}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="text-[11px] font-extrabold text-slate-900 dark:text-white capitalize truncate">
+                                          {item.category}
+                                        </div>
+                                        <div className="text-[8px] text-slate-450 truncate">
+                                          {CAT_CFG[item.category]?.desc}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <span
+                                      className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                      style={{
+                                        backgroundColor: `${catColor}15`,
+                                        color: catColor,
+                                      }}
+                                    >
+                                      +{item.avg.toFixed(1)}%
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Interactive Subcategory Returns Heatmap */}
+                          <div className="md:col-span-9 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 flex flex-col justify-between overflow-hidden">
+                            <div>
+                              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full inline-block animate-pulse"
+                                    style={{ backgroundColor: CAT_CFG[activeCategory]?.color }}
+                                  />
+                                  Subcategory Periodic Returns: {activeCategory}
+                                </h4>
+                                <span className="text-[9px] text-slate-500 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
+                                  Yearly Ranked Descending
+                                </span>
+                              </div>
+
+                              <div className="overflow-x-auto no-scrollbar">
+                                <table className="w-full border-collapse">
+                                  <thead>
+                                    <tr>
+                                      <th className="text-left pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4">
+                                        Rank
+                                      </th>
+                                      {YEARS.map((year) => (
+                                        <th
+                                          key={year}
+                                          className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[110px]"
+                                        >
+                                          {year}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {subcatRanks.map((r) => {
+                                      const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                                      return (
+                                        <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
+                                          <td className="py-3 pr-4 font-extrabold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                                            {rankLabels[r] || `${r + 1}th`}
+                                          </td>
+                                          {sortedSubcatYearsData.map(({ year, list }) => {
+                                            const item = list[r];
+                                            if (!item) return <td key={year} className="px-1.5 py-1.5" />;
+                                            const colorSet = getReturnColor(item.returnVal);
+                                            return (
+                                              <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
+                                                <div
+                                                  className={`rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border ${colorSet.bg} ${colorSet.border}`}
+                                                >
+                                                  <div
+                                                    className={`text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto ${colorSet.textMuted}`}
+                                                    title={item.subcategory}
+                                                  >
+                                                    {item.subcategory}
+                                                  </div>
+                                                  <div className={`text-[11px] font-black tabular-nums ${colorSet.text}`}>
+                                                    {item.returnVal > 0 ? "+" : ""}
+                                                    {item.returnVal}%
+                                                  </div>
+                                                </div>
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Average Performance Bar */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3">
+                              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-450 dark:text-slate-500">
+                                13-Year Average Return:
+                              </span>
+                              {subcatAverages.map((item, idx) => {
+                                const subColor = SUBCAT_CFG[item.subcategory]?.color || "#64748b";
+                                return (
+                                  <span
+                                    key={item.subcategory}
+                                    className="inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full"
+                                    style={{ backgroundColor: `${subColor}15`, color: subColor }}
+                                  >
+                                    <span>{idx + 1}. {item.subcategory}</span>
+                                    <span className="opacity-80">({item.avg.toFixed(2)}%)</span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <p className="text-[10px] text-slate-700 dark:text-slate-400 mt-4">
                     * Approximate median category returns. Actual individual
                     fund returns vary. Source: industry estimates.
                   </p>
