@@ -1070,70 +1070,72 @@ export default function Dashboard() {
                               </div>
 
                               <div className="overflow-x-auto no-scrollbar">
-                                <table className="w-full border-collapse">
-                                  <thead>
-                                    <tr>
-                                      <th className="text-left pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4">
-                                        Rank
-                                      </th>
-                                      {YEARS.map((year) => (
-                                        <th
-                                          key={year}
-                                          className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[110px]"
-                                        >
-                                          {year}
+                                <div className="min-w-[1200px]">
+                                  <table className="w-full border-collapse">
+                                    <thead>
+                                      <tr>
+                                        <th className="text-left pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4 w-16">
+                                          Rank
                                         </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {subcatRanks.map((r) => {
-                                      const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
-                                      return (
-                                        <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
-                                          <td className="py-3 pr-4 font-extrabold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
-                                            {rankLabels[r] || `${r + 1}th`}
-                                          </td>
-                                          {sortedSubcatYearsData.map(({ year, list }) => {
-                                            const item = list[r];
-                                            if (!item) return <td key={year} className="px-1.5 py-1.5" />;
-                                            // Each subcategory gets its own stable color from the palette
-                                            const subcatIdx = subcatList.indexOf(item.subcategory);
-                                            const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
-                                            
-                                            // Dynamic opacity based on rank
-                                            const opacity = Math.max(0.60, 1.0 - r * 0.08);
-                                            const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
-                                            const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
+                                        {YEARS.map((year) => (
+                                          <th
+                                            key={year}
+                                            className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[110px]"
+                                          >
+                                            {year}
+                                          </th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {subcatRanks.map((r) => {
+                                        const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                                        return (
+                                          <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
+                                            <td className="py-3 pr-4 font-extrabold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                                              {rankLabels[r] || `${r + 1}th`}
+                                            </td>
+                                            {sortedSubcatYearsData.map(({ year, list }) => {
+                                              const item = list[r];
+                                              if (!item) return <td key={year} className="px-1.5 py-1.5" />;
+                                              // Each subcategory gets its own stable color from the palette
+                                              const subcatIdx = subcatList.indexOf(item.subcategory);
+                                              const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
+                                              
+                                              // Dynamic opacity based on rank
+                                              const opacity = Math.max(0.60, 1.0 - r * 0.08);
+                                              const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+                                              const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
 
-                                            return (
-                                              <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
-                                                <div
-                                                  className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
-                                                  style={{
-                                                    backgroundColor: `${subColor}${bgHex}`,
-                                                    borderColor: `${subColor}${borderHex}`,
-                                                  }}
-                                                >
+                                              return (
+                                                <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
                                                   <div
-                                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto text-white drop-shadow-sm"
-                                                    title={item.subcategory}
+                                                    className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
+                                                    style={{
+                                                      backgroundColor: `${subColor}${bgHex}`,
+                                                      borderColor: `${subColor}${borderHex}`,
+                                                    }}
                                                   >
-                                                    {item.subcategory}
+                                                    <div
+                                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto text-white drop-shadow-sm"
+                                                      title={item.subcategory}
+                                                    >
+                                                      {item.subcategory}
+                                                    </div>
+                                                    <div className="text-[11px] font-black tabular-nums text-white drop-shadow-sm">
+                                                      {item.returnVal > 0 ? "+" : ""}
+                                                      {item.returnVal}%
+                                                    </div>
                                                   </div>
-                                                  <div className="text-[11px] font-black tabular-nums text-white drop-shadow-sm">
-                                                    {item.returnVal > 0 ? "+" : ""}
-                                                    {item.returnVal}%
-                                                  </div>
-                                                </div>
-                                              </td>
-                                            );
-                                          })}
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
                               </div>
                             </div>
 
