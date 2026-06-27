@@ -2280,11 +2280,11 @@ export default function SIPCalculator() {
                               </div>
                               <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
                                 <span className="font-bold text-indigo-600">Step 2: Re-invest</span>
-                                <p className="text-slate-500 mt-1">Re-purchase the same fund immediately. Your new buy price resets to today's higher NAV.</p>
+                                <p className="text-slate-500 mt-1">Re-purchase the same fund immediately. Your new buy price resets to today&apos;s higher NAV.</p>
                               </div>
                               <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
                                 <span className="font-bold text-emerald-600">Result: Save Tax</span>
-                                <p className="text-slate-500 mt-1">Future tax is only calculated on gains *above* today's price, saving you up to 12.5% in taxes!</p>
+                                <p className="text-slate-500 mt-1">Future tax is only calculated on gains *above* today&apos;s price, saving you up to 12.5% in taxes!</p>
                               </div>
                             </div>
                           </div>

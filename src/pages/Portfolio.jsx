@@ -269,7 +269,7 @@ export default function Portfolio() {
     return () => {
       isMounted = false;
     };
-  }, [holdings]);
+  }, [holdingsSafe]);
 
   // Autocomplete fund matching
   const searchResults = useMemo(() => {
@@ -647,6 +647,30 @@ export default function Portfolio() {
     }
   };
 
+  const get12HourParts = (timeStr) => {
+    if (!timeStr || !timeStr.includes(":")) {
+      return { hour: 10, minute: "00", ampm: "AM" };
+    }
+    const [h24Str, mStr] = timeStr.split(":");
+    const h24 = parseInt(h24Str, 10) || 0;
+    const minute = mStr || "00";
+    let hour = h24 % 12;
+    if (hour === 0) hour = 12;
+    const ampm = h24 >= 12 ? "PM" : "AM";
+    return { hour, minute, ampm };
+  };
+
+  const handleTimePartChange = (part, value) => {
+    const { hour, minute, ampm } = get12HourParts(notifyConfig.time);
+    let newHour = part === "hour" ? parseInt(value, 10) : hour;
+    let newMinute = part === "minute" ? value : minute;
+    let newAmpm = part === "ampm" ? value : ampm;
+    let h24 = newHour % 12;
+    if (newAmpm === "PM") h24 += 12;
+    const h24Str = String(h24).padStart(2, "0");
+    setNotifyConfig((prev) => ({ ...prev, time: `${h24Str}:${newMinute}` }));
+  };
+
   // Compute live portfolio metrics from schema-migrated holdings
   const portfolioSummary = useMemo(() => {
     let totalInvested = 0;
@@ -776,7 +800,7 @@ export default function Portfolio() {
           totalInvested:  portfolioSummary.totalInvested,
           dailyChange:    portfolioSummary.totalDailyChange,
           dailyChangePct: portfolioSummary.totalDailyChangePct,
-          holdings:       holdings,
+          holdings:       holdingsSafe,
           notifyEnabled:  notifyConfig?.enabled === true,
         });
       }
