@@ -78,52 +78,6 @@ const CAT_CFG = {
   },
 };
 
-// ─── Heatmap returns performance color scale (Google Finance Style) ───
-function getReturnColor(val) {
-  if (val >= 20) {
-    // High Positive (Deep Green)
-    return {
-      bg: "bg-emerald-100/90 dark:bg-emerald-950/40",
-      border: "border-emerald-250 dark:border-emerald-900/50",
-      text: "text-emerald-800 dark:text-emerald-300",
-      label: "text-emerald-700 dark:text-emerald-400",
-    };
-  } else if (val > 0) {
-    // Moderate Positive (Light Green)
-    return {
-      bg: "bg-emerald-50/60 dark:bg-emerald-950/20",
-      border: "border-emerald-100 dark:border-emerald-950/30",
-      text: "text-emerald-700 dark:text-emerald-400",
-      label: "text-emerald-600 dark:text-emerald-500",
-    };
-  } else if (val === 0) {
-    // Neutral (Slate Gray)
-    return {
-      bg: "bg-slate-50 dark:bg-slate-800/40",
-      border: "border-slate-100 dark:border-slate-700/50",
-      text: "text-slate-700 dark:text-slate-300",
-      label: "text-slate-500 dark:text-slate-400",
-    };
-  } else if (val >= -10) {
-    // Mild Negative (Light Red)
-    return {
-      bg: "bg-rose-50/60 dark:bg-rose-950/20",
-      border: "border-rose-100 dark:border-rose-950/30",
-      text: "text-rose-700 dark:text-rose-400",
-      label: "text-rose-600 dark:text-rose-500",
-    };
-  } else {
-    // Strong Negative (Deep Red)
-    return {
-      bg: "bg-rose-100/90 dark:bg-rose-950/40",
-      border: "border-rose-250 dark:border-rose-900/50",
-      text: "text-rose-800 dark:text-rose-300",
-      label: "text-rose-700 dark:text-rose-400",
-    };
-  }
-}
-
-
 
 const SUBCAT_DATA = {
   Equity: {
@@ -957,16 +911,26 @@ export default function Dashboard() {
                             </td>
                             {sortedYearsData.map(({ year, list }) => {
                               const item = list[r];
-                              const colorSet = getReturnColor(item.returnVal);
+                              const catColor = CAT_CFG[item.category]?.color || "#64748b";
                               return (
                                 <td key={year} className="px-1 py-1.5 min-w-[105px]">
                                   <div
-                                    className={`rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border ${colorSet.bg} ${colorSet.border}`}
+                                    className="rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
+                                    style={{
+                                      backgroundColor: `${catColor}22`,
+                                      borderColor: `${catColor}55`,
+                                    }}
                                   >
-                                    <div className={`text-[10px] font-extrabold uppercase tracking-wider mb-1 ${colorSet.label}`}>
+                                    <div
+                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-1"
+                                      style={{ color: catColor }}
+                                    >
                                       {item.category}
                                     </div>
-                                    <div className={`text-xs font-black tabular-nums ${colorSet.text}`}>
+                                    <div
+                                      className="text-xs font-black tabular-nums"
+                                      style={{ color: catColor }}
+                                    >
                                       {item.returnVal > 0 ? "+" : ""}
                                       {item.returnVal}%
                                     </div>
@@ -1040,7 +1004,6 @@ export default function Dashboard() {
                               {overallAverages.map((item, idx) => {
                                 const catColor = CAT_CFG[item.category]?.color || "#64748b";
                                 const isActive = activeCategory === item.category;
-                                const colorSet = getReturnColor(item.avg);
                                 return (
                                   <button
                                     key={item.category}
@@ -1068,13 +1031,15 @@ export default function Dashboard() {
                                         <div className="text-[11px] font-extrabold text-slate-900 dark:text-white capitalize truncate">
                                           {item.category}
                                         </div>
-                                        <div className="text-[8px] text-slate-450 truncate">
-                                          {CAT_CFG[item.category]?.desc}
-                                        </div>
                                       </div>
                                     </div>
                                     <span
-                                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex-shrink-0 border ${colorSet.bg} ${colorSet.border} ${colorSet.text}`}
+                                      className="text-[9px] font-extrabold px-2 py-0.5 rounded-md flex-shrink-0 border"
+                                      style={{
+                                        backgroundColor: `${catColor}18`,
+                                        borderColor: `${catColor}55`,
+                                        color: catColor,
+                                      }}
                                     >
                                       +{item.avg.toFixed(1)}%
                                     </span>
@@ -1128,19 +1093,29 @@ export default function Dashboard() {
                                           {sortedSubcatYearsData.map(({ year, list }) => {
                                             const item = list[r];
                                             if (!item) return <td key={year} className="px-1.5 py-1.5" />;
-                                            const colorSet = getReturnColor(item.returnVal);
+                                            const activeCatColor = CAT_CFG[activeCategory]?.color || "#64748b";
+                                            // Rank 0 = most vivid, higher ranks get lighter
+                                            const opacity = Math.max(0.12, 0.55 - r * 0.07);
                                             return (
                                               <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
                                                 <div
-                                                  className={`rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border ${colorSet.bg} ${colorSet.border}`}
+                                                  className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
+                                                  style={{
+                                                    backgroundColor: `${activeCatColor}${Math.round(opacity * 255).toString(16).padStart(2, "0")}`,
+                                                    borderColor: `${activeCatColor}55`,
+                                                  }}
                                                 >
                                                   <div
-                                                    className={`text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto ${colorSet.textMuted}`}
+                                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto"
+                                                    style={{ color: activeCatColor }}
                                                     title={item.subcategory}
                                                   >
                                                     {item.subcategory}
                                                   </div>
-                                                  <div className={`text-[11px] font-black tabular-nums ${colorSet.text}`}>
+                                                  <div
+                                                    className="text-[11px] font-black tabular-nums"
+                                                    style={{ color: activeCatColor }}
+                                                  >
                                                     {item.returnVal > 0 ? "+" : ""}
                                                     {item.returnVal}%
                                                   </div>
@@ -1162,14 +1137,19 @@ export default function Dashboard() {
                                 13-Year Average Return:
                               </span>
                               {subcatAverages.map((item, idx) => {
-                                const colorSet = getReturnColor(item.avg);
+                                const avgCatColor = CAT_CFG[activeCategory]?.color || "#64748b";
                                 return (
                                   <span
                                     key={item.subcategory}
-                                    className={`inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full border ${colorSet.bg} ${colorSet.border} ${colorSet.text}`}
+                                    className="inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full border"
+                                    style={{
+                                      backgroundColor: `${avgCatColor}18`,
+                                      borderColor: `${avgCatColor}55`,
+                                      color: avgCatColor,
+                                    }}
                                   >
                                     <span>{idx + 1}. {item.subcategory}</span>
-                                    <span className="opacity-80">({item.avg.toFixed(2)}%)</span>
+                                    <span className="opacity-90">({item.avg.toFixed(2)}%)</span>
                                   </span>
                                 );
                               })}
