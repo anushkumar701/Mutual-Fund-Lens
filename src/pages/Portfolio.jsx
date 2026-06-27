@@ -165,6 +165,8 @@ export default function Portfolio() {
     }
   }, [detailsCache]);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [navLoading, setNavLoading] = useState(false);
+  const [editNavLoading, setEditNavLoading] = useState(false);
   const [failedPortfolioCodes, setFailedPortfolioCodes] = useState(new Set());
 
   // Form states
@@ -338,13 +340,15 @@ export default function Portfolio() {
     return () => document.removeEventListener("mousedown", clickHandler);
   }, []);
 
-  // Fetch and update Purchase NAV when selected fund or date changes.
-  // Skips when manualOverride is ON — user manages their own NAV.
   useEffect(() => {
-    if (!selectedFund || manualOverride) return;
+    if (!selectedFund || manualOverride) {
+      setNavLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setCustomNav("");
+    setNavLoading(true);
     const getNAV = async () => {
       try {
         const details = await fetchFundDetail(selectedFund.schemeCode);
@@ -356,6 +360,8 @@ export default function Portfolio() {
         }
       } catch (err) {
         console.warn("Failed to lookup historical NAV:", err);
+      } finally {
+        if (!cancelled) setNavLoading(false);
       }
     };
     getNAV();
@@ -380,14 +386,19 @@ export default function Portfolio() {
     }
   }, [amount, customNav, investDate, manualOverride]);
 
-  // Fetch and update Purchase NAV when editing holding date changes.
-  // Skips manual-entry holdings and when user is in manual override mode.
   useEffect(() => {
-    if (!editingHolding || editManualOverride) return;
-    if (typeof editingHolding.schemeCode === "string" && editingHolding.schemeCode.startsWith("manual-")) return;
+    if (!editingHolding || editManualOverride) {
+      setEditNavLoading(false);
+      return;
+    }
+    if (typeof editingHolding.schemeCode === "string" && editingHolding.schemeCode.startsWith("manual-")) {
+      setEditNavLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setEditCustomNav("");
+    setEditNavLoading(true);
     const getNAV = async () => {
       try {
         const details = await fetchFundDetail(editingHolding.schemeCode);
@@ -399,6 +410,8 @@ export default function Portfolio() {
         }
       } catch (err) {
         console.warn("Failed to lookup historical NAV for edit:", err);
+      } finally {
+        if (!cancelled) setEditNavLoading(false);
       }
     };
     getNAV();
@@ -1671,20 +1684,36 @@ export default function Portfolio() {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Purchase NAV (₹)
                     </label>
-                    <input
-                      type="number"
-                      required
-                      step="0.0001"
-                      readOnly={!manualOverride}
-                      placeholder={selectedFund ? "Loading..." : "NAV"}
-                      value={customNav}
-                      onChange={(e) => setCustomNav(e.target.value)}
-                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                        manualOverride
-                          ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-                          : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        step="0.0001"
+                        readOnly={!manualOverride}
+                        placeholder={
+                          selectedFund 
+                            ? (navLoading ? "Fetching..." : "NAV")
+                            : "NAV"
+                        }
+                        value={customNav}
+                        onChange={(e) => setCustomNav(e.target.value)}
+                        className={`w-full pl-3 pr-8 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          navLoading ? "animate-pulse" : ""
+                        } ${
+                          manualOverride
+                            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                            : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
+                        }`}
+                      />
+                      {navLoading && (
+                        <div className="absolute right-2.5 top-2.5 flex items-center justify-center">
+                          <svg className="animate-spin h-4.5 w-4.5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -1704,20 +1733,31 @@ export default function Portfolio() {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Units Allocated
                     </label>
-                    <input
-                      type="number"
-                      required
-                      step="0.0001"
-                      readOnly={!manualOverride}
-                      placeholder={selectedFund ? "Auto..." : "Units"}
-                      value={customUnits}
-                      onChange={(e) => setCustomUnits(e.target.value)}
-                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                        manualOverride
-                          ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-                          : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        step="0.0001"
+                        readOnly={!manualOverride}
+                        placeholder={
+                          manualOverride 
+                            ? "Units" 
+                            : (customNav ? "Auto" : "Auto")
+                        }
+                        value={customUnits}
+                        onChange={(e) => setCustomUnits(e.target.value)}
+                        className={`w-full pl-3 pr-7 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          manualOverride
+                            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                            : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
+                        }`}
+                      />
+                      {!manualOverride && (
+                        <div className="absolute right-2.5 top-3.5 text-[10px] text-slate-400/80 dark:text-slate-500/80" title="Auto-calculated from amount and NAV">
+                          🔒
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1839,20 +1879,32 @@ export default function Portfolio() {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Purchase NAV (₹)
                     </label>
-                    <input
-                      type="number"
-                      required
-                      step="0.0001"
-                      readOnly={!editManualOverride}
-                      placeholder="NAV price"
-                      value={editCustomNav}
-                      onChange={(e) => setEditCustomNav(e.target.value)}
-                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                        editManualOverride
-                          ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-                          : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        step="0.0001"
+                        readOnly={!editManualOverride}
+                        placeholder={editNavLoading ? "Fetching..." : "NAV"}
+                        value={editCustomNav}
+                        onChange={(e) => setEditCustomNav(e.target.value)}
+                        className={`w-full pl-3 pr-8 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          editNavLoading ? "animate-pulse" : ""
+                        } ${
+                          editManualOverride
+                            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                            : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
+                        }`}
+                      />
+                      {editNavLoading && (
+                        <div className="absolute right-2.5 top-2.5 flex items-center justify-center">
+                          <svg className="animate-spin h-4.5 w-4.5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -1872,20 +1924,31 @@ export default function Portfolio() {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 truncate">
                       Units Allocated
                     </label>
-                    <input
-                      type="number"
-                      required
-                      step="0.0001"
-                      readOnly={!editManualOverride}
-                      placeholder="Units"
-                      value={editCustomUnits}
-                      onChange={(e) => setEditCustomUnits(e.target.value)}
-                      className={`w-full px-3 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                        editManualOverride
-                          ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-                          : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        step="0.0001"
+                        readOnly={!editManualOverride}
+                        placeholder={
+                          editManualOverride 
+                            ? "Units" 
+                            : (editCustomNav ? "Auto" : "Auto")
+                        }
+                        value={editCustomUnits}
+                        onChange={(e) => setEditCustomUnits(e.target.value)}
+                        className={`w-full pl-3 pr-7 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          editManualOverride
+                            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                            : "bg-slate-100 dark:bg-slate-800/40 border-transparent text-slate-400 cursor-not-allowed"
+                        }`}
+                      />
+                      {!editManualOverride && (
+                        <div className="absolute right-2.5 top-3.5 text-[10px] text-slate-400/80 dark:text-slate-500/80" title="Auto-calculated from amount and NAV">
+                          🔒
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -830,69 +830,87 @@ export default function Dashboard() {
                 Debt: [9.4, 8.1, 3.7, 1.2, 6.3, 7.5],
                 Liquid: [6.3, 4.2, 3.6, 4.8, 7.0, 7.2],
               };
-              const getColor = (v) => {
-                if (v >= 20) return "bg-emerald-700 text-white";
-                if (v >= 12) return "bg-emerald-400 text-emerald-950 dark:text-emerald-950";
-                if (v >= 6)
-                  return "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300";
-                if (v >= 2)
-                  return "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300";
-                if (v >= 0)
-                  return "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300";
-                return "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300";
-              };
+
+              const ranks = [0, 1, 2, 3, 4, 5];
+
+              // Rank categories for each year descending by returns
+              const sortedYearsData = YEARS.map((year, i) => {
+                const list = Object.entries(DATA).map(([category, returns]) => ({
+                  category,
+                  returnVal: returns[i],
+                }));
+                list.sort((a, b) => b.returnVal - a.returnVal);
+                return { year, list };
+              });
+
               return (
-                <div className="min-w-[480px]">
-                  <table className="w-full text-xs">
+                <div className="min-w-[640px]">
+                  <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr>
-                        <th className="text-left py-2 pr-3 text-slate-600 dark:text-slate-300 font-semibold w-20">
-                          Category
+                        <th className="text-left py-2 pr-4 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider w-16">
+                          Rank
                         </th>
                         {YEARS.map((y) => (
                           <th
                             key={y}
-                            className="text-center py-2 px-1 text-slate-600 dark:text-slate-300 font-semibold"
+                            className="text-center py-2 px-2 text-slate-700 dark:text-slate-300 font-bold text-sm bg-slate-50/80 dark:bg-slate-800/40 first:rounded-l-xl last:rounded-r-xl"
                           >
                             {y}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="space-y-1">
-                      {Object.entries(DATA).map(([cat, vals]) => (
-                        <tr key={cat}>
-                          <td className="pr-3 py-1 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                            {cat}
-                          </td>
-                          {vals.map((v, i) => (
-                            <td key={i} className="px-1 py-1">
-                              <div
-                                className={`rounded-lg px-1 py-1.5 text-center font-bold tabular-nums ${getColor(v)}`}
-                              >
-                                {v > 0 ? "+" : ""}
-                                {v}%
-                              </div>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {ranks.map((r) => {
+                        const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                        return (
+                          <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
+                            <td className="py-3 pr-4 font-bold text-slate-500 dark:text-slate-400 text-xs">
+                              {rankLabels[r]}
                             </td>
-                          ))}
-                        </tr>
-                      ))}
+                            {sortedYearsData.map(({ year, list }) => {
+                              const item = list[r];
+                              const catColor = CAT_CFG[item.category]?.color || "#64748b";
+                              return (
+                                <td key={year} className="px-1 py-1.5 min-w-[105px]">
+                                  <div
+                                    className="rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
+                                    style={{
+                                      backgroundColor: `${catColor}08`,
+                                      borderColor: `${catColor}20`,
+                                    }}
+                                  >
+                                    <div
+                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-1"
+                                      style={{ color: catColor }}
+                                    >
+                                      {item.category}
+                                    </div>
+                                    <div className="text-xs font-bold tabular-nums text-slate-900 dark:text-white">
+                                      {item.returnVal > 0 ? "+" : ""}
+                                      {item.returnVal}%
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
-                  <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                    {[
-                      ["≥20%", "bg-emerald-700"],
-                      ["12–19%", "bg-emerald-400"],
-                      ["6–11%", "bg-emerald-100 dark:bg-emerald-900/40"],
-                      ["2–5%", "bg-amber-100"],
-                      ["<2%", "bg-orange-100"],
-                    ].map(([l, c]) => (
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    {Object.entries(CAT_CFG).map(([cat, cfg]) => (
                       <span
-                        key={l}
-                        className="flex items-center gap-1.5 text-[10px] text-slate-700 dark:text-slate-300"
+                        key={cat}
+                        className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400"
                       >
-                        <span className={`w-3 h-3 rounded ${c} inline-block`} />
-                        {l}
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block"
+                          style={{ backgroundColor: cfg.color }}
+                        />
+                        <span className="font-semibold">{cat}</span>
                       </span>
                     ))}
                   </div>
