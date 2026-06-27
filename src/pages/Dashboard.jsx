@@ -19,7 +19,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
       </svg>
     ),
-    color: "#1d4ed8",
+    color: "#2563eb", // Vivid Blue
     desc: "Long-term wealth. Best for 7+ years.",
   },
   Debt: {
@@ -28,7 +28,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     ),
-    color: "#047857",
+    color: "#16a34a", // Forest Green
     desc: "Stable returns. Good for 1–3 years.",
   },
   Hybrid: {
@@ -37,7 +37,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
-    color: "#b45309",
+    color: "#ea580c", // Burnt Orange
     desc: "Balanced equity & debt exposure.",
   },
   ELSS: {
@@ -46,7 +46,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
-    color: "#6d28d9",
+    color: "#7c3aed", // Deep Violet
     desc: "Tax saving under 80C. 3-yr lock-in.",
   },
   Index: {
@@ -55,7 +55,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
       </svg>
     ),
-    color: "#4338ca",
+    color: "#0891b2", // Cyan
     desc: "Low cost. Tracks Nifty/Sensex.",
   },
   Liquid: {
@@ -64,7 +64,7 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
     ),
-    color: "#0f766e",
+    color: "#db2777", // Hot Pink — clearly different from Debt green
     desc: "Like savings account. Emergency fund.",
   },
   Other: {
@@ -73,10 +73,25 @@ const CAT_CFG = {
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
     ),
-    color: "#64748b",
+    color: "#ca8a04", // Gold/Amber — distinct from all others
     desc: "Specialty & sector funds.",
   },
 };
+
+// ─── Per-subcategory distinct color palette ─────────────────────
+// 10 visually separated hues cycling through the color wheel
+const SUBCAT_PALETTE = [
+  "#2563eb", // blue
+  "#16a34a", // green
+  "#ea580c", // orange
+  "#7c3aed", // violet
+  "#0891b2", // cyan
+  "#db2777", // pink
+  "#ca8a04", // amber
+  "#dc2626", // red
+  "#0d9488", // teal
+  "#9333ea", // purple
+];
 
 
 const SUBCAT_DATA = {
@@ -1093,28 +1108,28 @@ export default function Dashboard() {
                                           {sortedSubcatYearsData.map(({ year, list }) => {
                                             const item = list[r];
                                             if (!item) return <td key={year} className="px-1.5 py-1.5" />;
-                                            const activeCatColor = CAT_CFG[activeCategory]?.color || "#64748b";
-                                            // Rank 0 = most vivid, higher ranks get lighter
-                                            const opacity = Math.max(0.12, 0.55 - r * 0.07);
+                                            // Each subcategory gets its own stable color from the palette
+                                            const subcatIdx = subcatList.indexOf(item.subcategory);
+                                            const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
                                             return (
                                               <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
                                                 <div
                                                   className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                                   style={{
-                                                    backgroundColor: `${activeCatColor}${Math.round(opacity * 255).toString(16).padStart(2, "0")}`,
-                                                    borderColor: `${activeCatColor}55`,
+                                                    backgroundColor: `${subColor}22`,
+                                                    borderColor: `${subColor}55`,
                                                   }}
                                                 >
                                                   <div
                                                     className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto"
-                                                    style={{ color: activeCatColor }}
+                                                    style={{ color: subColor }}
                                                     title={item.subcategory}
                                                   >
                                                     {item.subcategory}
                                                   </div>
                                                   <div
                                                     className="text-[11px] font-black tabular-nums"
-                                                    style={{ color: activeCatColor }}
+                                                    style={{ color: subColor }}
                                                   >
                                                     {item.returnVal > 0 ? "+" : ""}
                                                     {item.returnVal}%
@@ -1137,15 +1152,15 @@ export default function Dashboard() {
                                 13-Year Average Return:
                               </span>
                               {subcatAverages.map((item, idx) => {
-                                const avgCatColor = CAT_CFG[activeCategory]?.color || "#64748b";
+                                const avgSubColor = SUBCAT_PALETTE[idx % SUBCAT_PALETTE.length];
                                 return (
                                   <span
                                     key={item.subcategory}
                                     className="inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full border"
                                     style={{
-                                      backgroundColor: `${avgCatColor}18`,
-                                      borderColor: `${avgCatColor}55`,
-                                      color: avgCatColor,
+                                      backgroundColor: `${avgSubColor}18`,
+                                      borderColor: `${avgSubColor}55`,
+                                      color: avgSubColor,
                                     }}
                                   >
                                     <span>{idx + 1}. {item.subcategory}</span>
