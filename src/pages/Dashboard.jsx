@@ -1080,7 +1080,7 @@ export default function Dashboard() {
                                         {YEARS.map((year) => (
                                           <th
                                             key={year}
-                                            className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[110px]"
+                                            className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[105px]"
                                           >
                                             {year}
                                           </th>
@@ -1108,7 +1108,7 @@ export default function Dashboard() {
                                               const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
 
                                               return (
-                                                <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
+                                                <td key={year} className="px-1 py-1.5 min-w-[105px]">
                                                   <div
                                                     className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                                     style={{
