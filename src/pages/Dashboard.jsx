@@ -918,7 +918,7 @@ export default function Dashboard() {
                               const item = list[r];
                               const catColor = CAT_CFG[item.category]?.color || "#64748b";
                               // Dynamic opacity based on rank (r goes 0 to 5)
-                              const opacity = Math.max(0.12, 0.45 - r * 0.06);
+                              const opacity = Math.max(0.60, 1.0 - r * 0.08);
                               const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
                               const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
                               
@@ -931,16 +931,10 @@ export default function Dashboard() {
                                       borderColor: `${catColor}${borderHex}`,
                                     }}
                                   >
-                                    <div
-                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-1"
-                                      style={{ color: catColor }}
-                                    >
+                                    <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 text-white drop-shadow-sm">
                                       {item.category}
                                     </div>
-                                    <div
-                                      className="text-xs font-black tabular-nums"
-                                      style={{ color: catColor }}
-                                    >
+                                    <div className="text-xs font-black tabular-nums text-white drop-shadow-sm">
                                       {item.returnVal > 0 ? "+" : ""}
                                       {item.returnVal}%
                                     </div>
@@ -1108,7 +1102,7 @@ export default function Dashboard() {
                                             const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
                                             
                                             // Dynamic opacity based on rank
-                                            const opacity = Math.max(0.12, 0.45 - r * 0.06);
+                                            const opacity = Math.max(0.60, 1.0 - r * 0.08);
                                             const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
                                             const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
 
@@ -1122,16 +1116,12 @@ export default function Dashboard() {
                                                   }}
                                                 >
                                                   <div
-                                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto"
-                                                    style={{ color: subColor }}
+                                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto text-white drop-shadow-sm"
                                                     title={item.subcategory}
                                                   >
                                                     {item.subcategory}
                                                   </div>
-                                                  <div
-                                                    className="text-[11px] font-black tabular-nums"
-                                                    style={{ color: subColor }}
-                                                  >
+                                                  <div className="text-[11px] font-black tabular-nums text-white drop-shadow-sm">
                                                     {item.returnVal > 0 ? "+" : ""}
                                                     {item.returnVal}%
                                                   </div>
