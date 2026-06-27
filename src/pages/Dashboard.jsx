@@ -20,7 +20,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#2563eb", // Vivid Blue
-    desc: "Long-term wealth. Best for 7+ years.",
   },
   Debt: {
     icon: (cls) => (
@@ -29,7 +28,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#16a34a", // Forest Green
-    desc: "Stable returns. Good for 1–3 years.",
   },
   Hybrid: {
     icon: (cls) => (
@@ -38,7 +36,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#ea580c", // Burnt Orange
-    desc: "Balanced equity & debt exposure.",
   },
   ELSS: {
     icon: (cls) => (
@@ -47,7 +44,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#7c3aed", // Deep Violet
-    desc: "Tax saving under 80C. 3-yr lock-in.",
   },
   Index: {
     icon: (cls) => (
@@ -56,7 +52,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#0891b2", // Cyan
-    desc: "Low cost. Tracks Nifty/Sensex.",
   },
   Liquid: {
     icon: (cls) => (
@@ -65,7 +60,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#db2777", // Hot Pink — clearly different from Debt green
-    desc: "Like savings account. Emergency fund.",
   },
   Other: {
     icon: (cls) => (
@@ -74,7 +68,6 @@ const CAT_CFG = {
       </svg>
     ),
     color: "#ca8a04", // Gold/Amber — distinct from all others
-    desc: "Specialty & sector funds.",
   },
 };
 
@@ -655,11 +648,8 @@ export default function Dashboard() {
                       >
                         {cfg.icon("w-6 h-6")}
                       </div>
-                      <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                      <div className="text-sm font-bold text-slate-900 dark:text-white mb-3">
                         {cat}
-                      </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug mb-3 hidden sm:block min-h-[32px]">
-                        {cfg.desc}
                       </div>
                     </div>
                     <div
@@ -927,13 +917,18 @@ export default function Dashboard() {
                             {sortedYearsData.map(({ year, list }) => {
                               const item = list[r];
                               const catColor = CAT_CFG[item.category]?.color || "#64748b";
+                              // Dynamic opacity based on rank (r goes 0 to 5)
+                              const opacity = Math.max(0.12, 0.45 - r * 0.06);
+                              const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+                              const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
+                              
                               return (
                                 <td key={year} className="px-1 py-1.5 min-w-[105px]">
                                   <div
                                     className="rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                     style={{
-                                      backgroundColor: `${catColor}22`,
-                                      borderColor: `${catColor}55`,
+                                      backgroundColor: `${catColor}${bgHex}`,
+                                      borderColor: `${catColor}${borderHex}`,
                                     }}
                                   >
                                     <div
@@ -1111,13 +1106,19 @@ export default function Dashboard() {
                                             // Each subcategory gets its own stable color from the palette
                                             const subcatIdx = subcatList.indexOf(item.subcategory);
                                             const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
+                                            
+                                            // Dynamic opacity based on rank
+                                            const opacity = Math.max(0.12, 0.45 - r * 0.06);
+                                            const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+                                            const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
+
                                             return (
                                               <td key={year} className="px-1.5 py-1.5 min-w-[110px]">
                                                 <div
                                                   className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                                   style={{
-                                                    backgroundColor: `${subColor}22`,
-                                                    borderColor: `${subColor}55`,
+                                                    backgroundColor: `${subColor}${bgHex}`,
+                                                    borderColor: `${subColor}${borderHex}`,
                                                   }}
                                                 >
                                                   <div
