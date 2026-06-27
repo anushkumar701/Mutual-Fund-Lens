@@ -124,6 +124,27 @@ const SUBCAT_DATA = {
   }
 };
 
+const SUBCAT_ABBR = {
+  "Small Cap": "Small",
+  "Mid Cap": "Mid",
+  "Large Cap": "Large",
+  "Large & Mid Cap": "Large & Mid",
+  "Flexi Cap": "Flexi",
+  "Multi Cap": "Multi",
+  "Balanced Advantage (DAA)": "Balanced Adv",
+  "Aggressive Hybrid": "Aggr Hybrid",
+  "Gilt (Govt Bonds)": "Gilt",
+  "Corporate Bond": "Corp Bond",
+  "Short Duration": "Short Dur",
+  "Liquid Fund": "Liquid",
+  "Overnight Fund": "Overnight",
+  "Money Market": "Money Mkt",
+  "ELSS Tax Saver (Direct)": "ELSS Direct",
+  "ELSS Tax Saver (Regular)": "ELSS Regular",
+  "Nifty Midcap 150": "Midcap 150",
+  "Nifty Next 50": "Next 50"
+};
+
 
 // ─── Fund Search Box ───────────────────────────────────────────
 function FundSearchBox({
@@ -863,7 +884,7 @@ export default function Dashboard() {
               at a glance
             </p>
           </div>
-          <div className="card p-4 overflow-x-auto">
+          <div className="card p-4 overflow-x-auto custom-scrollbar pb-6">
             {(() => {
               const YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
               // Approximate median category returns (%) — industry averages
@@ -890,7 +911,7 @@ export default function Dashboard() {
 
               return (
                 <div className="min-w-[1200px]">
-                  <table className="w-full text-xs border-collapse">
+                  <table className="w-full text-xs border-collapse table-fixed">
                     <thead>
                       <tr>
                         <th className="text-left py-2 pr-4 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider w-16">
@@ -899,7 +920,7 @@ export default function Dashboard() {
                         {YEARS.map((y) => (
                           <th
                             key={y}
-                            className="text-center py-2.5 px-2 text-slate-700 dark:text-slate-300 font-bold text-sm bg-slate-50/80 dark:bg-slate-800/40 first:rounded-l-xl last:rounded-r-xl"
+                            className="text-center py-2.5 px-2 text-slate-700 dark:text-slate-300 font-bold text-sm bg-slate-50/80 dark:bg-slate-800/40 first:rounded-l-xl last:rounded-r-xl min-w-[125px]"
                           >
                             {y}
                           </th>
@@ -923,7 +944,7 @@ export default function Dashboard() {
                               const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
                               
                               return (
-                                <td key={year} className="px-1 py-1.5 min-w-[105px]">
+                                <td key={year} className="px-1 py-1.5 min-w-[125px]">
                                   <div
                                     className="rounded-2xl p-2.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                     style={{
@@ -931,10 +952,10 @@ export default function Dashboard() {
                                       borderColor: `${catColor}${borderHex}`,
                                     }}
                                   >
-                                    <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 text-white drop-shadow-sm">
+                                    <div className="text-[11px] font-extrabold uppercase tracking-wider mb-1 text-white drop-shadow-sm break-words leading-tight line-clamp-2 min-h-[26px] flex items-center justify-center">
                                       {item.category}
                                     </div>
-                                    <div className="text-xs font-black tabular-nums text-white drop-shadow-sm">
+                                    <div className="text-sm font-black tabular-nums text-white drop-shadow-sm">
                                       {item.returnVal > 0 ? "+" : ""}
                                       {item.returnVal}%
                                     </div>
@@ -1004,7 +1025,7 @@ export default function Dashboard() {
                             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3">
                               📊 Select Category (Ranked by Average Return)
                             </span>
-                            <div className="flex overflow-x-auto no-scrollbar gap-3 pb-2">
+                            <div className="flex overflow-x-auto gap-3 pb-2 custom-scrollbar">
                               {overallAverages.map((item, idx) => {
                                 const catColor = CAT_CFG[item.category]?.color || "#64748b";
                                 const isActive = activeCategory === item.category;
@@ -1070,9 +1091,9 @@ export default function Dashboard() {
                                 </span>
                               </div>
 
-                              <div className="overflow-x-auto no-scrollbar">
+                              <div className="overflow-x-auto custom-scrollbar pb-2">
                                 <div className="min-w-[1200px]">
-                                  <table className="w-full border-collapse">
+                                  <table className="w-full text-xs border-collapse table-fixed">
                                     <thead>
                                       <tr>
                                         <th className="text-left pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4 w-16">
@@ -1081,7 +1102,7 @@ export default function Dashboard() {
                                         {YEARS.map((year) => (
                                           <th
                                             key={year}
-                                            className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[105px]"
+                                            className="text-center pb-3 text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[125px]"
                                           >
                                             {year}
                                           </th>
@@ -1098,7 +1119,7 @@ export default function Dashboard() {
                                             </td>
                                             {sortedSubcatYearsData.map(({ year, list }) => {
                                               const item = list[r];
-                                              if (!item) return <td key={year} className="px-1.5 py-1.5" />;
+                                              if (!item) return <td key={year} className="px-1 py-1.5 min-w-[125px]" />;
                                               // Each subcategory gets its own stable color from the palette
                                               const subcatIdx = subcatList.indexOf(item.subcategory);
                                               const subColor = SUBCAT_PALETTE[subcatIdx % SUBCAT_PALETTE.length];
@@ -1109,7 +1130,7 @@ export default function Dashboard() {
                                               const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
 
                                               return (
-                                                <td key={year} className="px-1 py-1.5 min-w-[105px]">
+                                                <td key={year} className="px-1 py-1.5 min-w-[125px]">
                                                   <div
                                                     className="rounded-xl p-2.5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-default text-center border"
                                                     style={{
@@ -1118,12 +1139,12 @@ export default function Dashboard() {
                                                     }}
                                                   >
                                                     <div
-                                                      className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5 truncate max-w-[85px] mx-auto text-white drop-shadow-sm"
+                                                      className="text-[11px] font-extrabold uppercase tracking-wider mb-0.5 mx-auto text-white drop-shadow-sm break-words leading-tight line-clamp-2 min-h-[28px] flex items-center justify-center"
                                                       title={item.subcategory}
                                                     >
-                                                      {item.subcategory}
+                                                      {SUBCAT_ABBR[item.subcategory] || item.subcategory}
                                                     </div>
-                                                    <div className="text-[11px] font-black tabular-nums text-white drop-shadow-sm">
+                                                    <div className="text-sm font-black tabular-nums text-white drop-shadow-sm">
                                                       {item.returnVal > 0 ? "+" : ""}
                                                       {item.returnVal}%
                                                     </div>
