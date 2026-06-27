@@ -81,75 +81,49 @@ const CAT_CFG = {
 // ─── Heatmap returns performance color scale (Google Finance Style) ───
 function getReturnColor(val) {
   if (val >= 20) {
+    // High Positive (Deep Green)
     return {
-      bg: "bg-emerald-50/90 dark:bg-emerald-950/30",
-      border: "border-emerald-200/60 dark:border-emerald-900/40",
+      bg: "bg-emerald-100/90 dark:bg-emerald-950/40",
+      border: "border-emerald-250 dark:border-emerald-900/50",
       text: "text-emerald-800 dark:text-emerald-300",
-      label: "text-emerald-600 dark:text-emerald-400",
+      label: "text-emerald-700 dark:text-emerald-400",
     };
-  } else if (val >= 8) {
+  } else if (val > 0) {
+    // Moderate Positive (Light Green)
     return {
-      bg: "bg-blue-50/70 dark:bg-blue-950/30",
-      border: "border-blue-200/60 dark:border-blue-900/40",
-      text: "text-blue-800 dark:text-blue-300",
-      label: "text-blue-600 dark:text-blue-400",
+      bg: "bg-emerald-50/60 dark:bg-emerald-950/20",
+      border: "border-emerald-100 dark:border-emerald-950/30",
+      text: "text-emerald-700 dark:text-emerald-400",
+      label: "text-emerald-600 dark:text-emerald-500",
     };
-  } else if (val >= 0) {
+  } else if (val === 0) {
+    // Neutral (Slate Gray)
     return {
       bg: "bg-slate-50 dark:bg-slate-800/40",
-      border: "border-slate-200/60 dark:border-slate-700/50",
-      text: "text-slate-800 dark:text-slate-300",
+      border: "border-slate-100 dark:border-slate-700/50",
+      text: "text-slate-700 dark:text-slate-300",
       label: "text-slate-500 dark:text-slate-400",
     };
   } else if (val >= -10) {
+    // Mild Negative (Light Red)
     return {
-      bg: "bg-amber-50/90 dark:bg-amber-950/30",
-      border: "border-amber-200/60 dark:border-amber-900/40",
-      text: "text-amber-800 dark:text-amber-300",
-      label: "text-amber-600 dark:text-amber-400",
+      bg: "bg-rose-50/60 dark:bg-rose-950/20",
+      border: "border-rose-100 dark:border-rose-950/30",
+      text: "text-rose-700 dark:text-rose-400",
+      label: "text-rose-600 dark:text-rose-500",
     };
   } else {
+    // Strong Negative (Deep Red)
     return {
-      bg: "bg-rose-50 dark:bg-rose-950/30",
-      border: "border-rose-200/60 dark:border-rose-900/40",
+      bg: "bg-rose-100/90 dark:bg-rose-950/40",
+      border: "border-rose-250 dark:border-rose-900/50",
       text: "text-rose-800 dark:text-rose-300",
-      label: "text-rose-600 dark:text-rose-400",
+      label: "text-rose-700 dark:text-rose-400",
     };
   }
 }
 
 
-// ─── Subcategory returns data and config ────────────────────────
-const SUBCAT_CFG = {
-  // Equity
-  "Small Cap": { color: "#1d4ed8" },
-  "Mid Cap": { color: "#2563eb" },
-  "Large Cap": { color: "#3b82f6" },
-  "Flexi Cap": { color: "#60a5fa" },
-  "Multi Cap": { color: "#93c5fd" },
-  // Index
-  "Nifty 50": { color: "#4338ca" },
-  "Nifty Next 50": { color: "#4f46e5" },
-  "Sensex": { color: "#6366f1" },
-  "Nifty Midcap 150": { color: "#818cf8" },
-  // Hybrid
-  "Aggressive Hybrid": { color: "#b45309" },
-  "Balanced Advantage (DAA)": { color: "#d97706" },
-  "Arbitrage": { color: "#f59e0b" },
-  "Multi Asset": { color: "#fbbf24" },
-  // Debt
-  "Gilt (Govt Bonds)": { color: "#047857" },
-  "Corporate Bond": { color: "#059669" },
-  "Short Duration": { color: "#10b981" },
-  "Credit Risk": { color: "#34d399" },
-  // Liquid
-  "Liquid Fund": { color: "#0f766e" },
-  "Overnight Fund": { color: "#14b8a6" },
-  "Money Market": { color: "#2dd4bf" },
-  // ELSS
-  "ELSS Tax Saver (Direct)": { color: "#6d28d9" },
-  "ELSS Tax Saver (Regular)": { color: "#7c3aed" },
-};
 
 const SUBCAT_DATA = {
   Equity: {
@@ -1066,6 +1040,7 @@ export default function Dashboard() {
                               {overallAverages.map((item, idx) => {
                                 const catColor = CAT_CFG[item.category]?.color || "#64748b";
                                 const isActive = activeCategory === item.category;
+                                const colorSet = getReturnColor(item.avg);
                                 return (
                                   <button
                                     key={item.category}
@@ -1099,11 +1074,7 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                     <span
-                                      className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex-shrink-0"
-                                      style={{
-                                        backgroundColor: `${catColor}15`,
-                                        color: catColor,
-                                      }}
+                                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex-shrink-0 border ${colorSet.bg} ${colorSet.border} ${colorSet.text}`}
                                     >
                                       +{item.avg.toFixed(1)}%
                                     </span>
@@ -1191,12 +1162,11 @@ export default function Dashboard() {
                                 13-Year Average Return:
                               </span>
                               {subcatAverages.map((item, idx) => {
-                                const subColor = SUBCAT_CFG[item.subcategory]?.color || "#64748b";
+                                const colorSet = getReturnColor(item.avg);
                                 return (
                                   <span
                                     key={item.subcategory}
-                                    className="inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full"
-                                    style={{ backgroundColor: `${subColor}15`, color: subColor }}
+                                    className={`inline-flex items-center gap-1.5 text-[9px] font-extrabold px-2.5 py-1 rounded-full border ${colorSet.bg} ${colorSet.border} ${colorSet.text}`}
                                   >
                                     <span>{idx + 1}. {item.subcategory}</span>
                                     <span className="opacity-80">({item.avg.toFixed(2)}%)</span>
