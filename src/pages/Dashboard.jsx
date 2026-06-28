@@ -541,6 +541,7 @@ export default function Dashboard() {
   const [modalFund, setModalFund] = useState(null);
   const [activeCategory, setActiveCategory] = useState("Equity");
   const [dynamicSubcatReturns, setDynamicSubcatReturns] = useState({});
+  const [isWorstFirst, setIsWorstFirst] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1018,18 +1019,42 @@ export default function Dashboard() {
             containIntrinsicSize: "auto 260px",
           }}
         >
-          <div className="mb-4">
-            <h2
-              id="heatmap-heading"
-              className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2"
-            >
-              <svg className="w-5 h-5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              <span>Category Returns Heatmap</span>
-            </h2>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Approximate annual returns by fund category — spot market cycles
-              at a glance
-            </p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2
+                id="heatmap-heading"
+                className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2"
+              >
+                <svg className="w-5 h-5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span>Category Returns Heatmap</span>
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Approximate annual returns by fund category — spot market cycles
+                at a glance
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm flex-shrink-0">
+              <button
+                onClick={() => setIsWorstFirst(false)}
+                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  !isWorstFirst
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/40 dark:border-slate-800"
+                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                }`}
+              >
+                Best First 🏆
+              </button>
+              <button
+                onClick={() => setIsWorstFirst(true)}
+                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  isWorstFirst
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/40 dark:border-slate-800"
+                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                }`}
+              >
+                Worst First ⚠️
+              </button>
+            </div>
           </div>
           <div className="card p-4 overflow-x-auto custom-scrollbar pb-6">
             {(() => {
@@ -1095,7 +1120,7 @@ export default function Dashboard() {
                   category,
                   returnVal: returns[i],
                 }));
-                list.sort((a, b) => b.returnVal - a.returnVal);
+                list.sort((a, b) => isWorstFirst ? a.returnVal - b.returnVal : b.returnVal - a.returnVal);
                 return { year, list };
               });
 
@@ -1120,7 +1145,9 @@ export default function Dashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {ranks.map((r) => {
-                        const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                        const rankLabels = isWorstFirst
+                          ? ["1st (Worst) ⚠️", "2nd", "3rd", "4th", "5th", "6th (Best) 🏆"]
+                          : ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
                         return (
                           <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
                             <td className="py-3 pr-4 font-bold text-slate-500 dark:text-slate-400 text-xs">
@@ -1182,7 +1209,7 @@ export default function Dashboard() {
                       const avg = sum / returns.length;
                       return { category, avg };
                     });
-                    overallAverages.sort((a, b) => b.avg - a.avg);
+                    overallAverages.sort((a, b) => isWorstFirst ? a.avg - b.avg : b.avg - a.avg);
 
                     const subcatDataset = activeSubcatDataMap[activeCategory] || {};
                     const subcatList = Object.keys(subcatDataset);
@@ -1194,7 +1221,7 @@ export default function Dashboard() {
                         subcategory,
                         returnVal: returns[yearIdx],
                       }));
-                      list.sort((a, b) => b.returnVal - a.returnVal);
+                      list.sort((a, b) => isWorstFirst ? a.returnVal - b.returnVal : b.returnVal - a.returnVal);
                       return { year, list };
                     });
 
@@ -1203,7 +1230,7 @@ export default function Dashboard() {
                       const avg = sum / returns.length;
                       return { subcategory, avg };
                     });
-                    subcatAverages.sort((a, b) => b.avg - a.avg);
+                    subcatAverages.sort((a, b) => isWorstFirst ? a.avg - b.avg : b.avg - a.avg);
 
                     return (
                       <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/60">
@@ -1302,7 +1329,9 @@ export default function Dashboard() {
                                     </thead>
                                     <tbody>
                                       {subcatRanks.map((r) => {
-                                        const rankLabels = ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                                        const rankLabels = isWorstFirst
+                                          ? ["1st (Worst) ⚠️", "2nd", "3rd", "4th", "5th", "6th (Best) 🏆"]
+                                          : ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
                                         return (
                                           <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
                                             <td className="py-3 pr-4 font-extrabold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
