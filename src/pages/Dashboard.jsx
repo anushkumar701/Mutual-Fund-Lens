@@ -10,6 +10,7 @@ import { calculateSIP } from "../utils/sipCalculations";
 const FundDetailModal = lazy(() => import("../components/FundDetailModal"));
 import { inferCategory } from "../utils/goalFilters";
 import { isFundClosed } from "../utils/fundFilters";
+import marketReasons from "../data/marketReasons.json";
 
 // ─── Category config ───────────────────────────────────────────
 const CAT_CFG = {
@@ -1373,6 +1374,80 @@ export default function Dashboard() {
                                   </span>
                                 );
                               })}
+                            </div>
+                          </div>
+
+                          {/* Historical Downside Risk (Worst Performing Years) */}
+                          <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 flex flex-col justify-between overflow-hidden">
+                            <div>
+                              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2.5 h-2.5 rounded-full inline-block bg-red-500 animate-pulse" />
+                                  Historical Downside Risk (Worst Years): {activeCategory}
+                                </h4>
+                                <span className="text-[9px] text-red-600 dark:text-red-400 font-extrabold bg-red-50 dark:bg-red-950/40 px-2.5 py-1 rounded-full border border-red-100 dark:border-red-900/30 shadow-sm">
+                                  Maximum Annual Drawdown
+                                </span>
+                              </div>
+
+                              <div className="overflow-x-auto custom-scrollbar pb-2">
+                                <table className="w-full text-xs border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-slate-200/60 dark:border-slate-800/60 text-slate-400 dark:text-slate-500">
+                                      <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider w-1/4">
+                                        Subcategory
+                                      </th>
+                                      <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider w-1/6">
+                                        Worst Year
+                                      </th>
+                                      <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider w-1/6">
+                                        Worst Return
+                                      </th>
+                                      <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider w-5/12 pl-4">
+                                        Market Context & Reason
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                    {Object.entries(subcatDataset).map(([subcategory, returns]) => {
+                                      // Find index of the worst return (minimum value)
+                                      let worstIdx = 0;
+                                      let worstVal = returns[0];
+                                      for (let i = 1; i < returns.length; i++) {
+                                        if (returns[i] < worstVal) {
+                                          worstVal = returns[i];
+                                          worstIdx = i;
+                                        }
+                                      }
+                                      const worstYear = YEARS[worstIdx];
+                                      const reasonObj = marketReasons[String(worstYear)] || { label: "Market correction", color: "text-slate-500" };
+                                      const cleanReason = reasonObj.label.replace(/^[🔴🟢🟡]\s*/u, ""); // strip the emoji prefix if any
+
+                                      return (
+                                        <tr key={subcategory} className="hover:bg-slate-100/10 dark:hover:bg-slate-800/5 transition-colors">
+                                          <td className="py-3.5 font-bold text-slate-700 dark:text-slate-300 pr-4">
+                                            {subcategory}
+                                          </td>
+                                          <td className="py-3.5 text-center font-bold text-slate-600 dark:text-slate-400">
+                                            {worstYear}
+                                          </td>
+                                          <td className="py-3.5 text-center">
+                                            <span className="inline-flex items-center justify-center font-black text-xs px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-950/40 text-red-650 dark:text-red-400 border border-red-100 dark:border-red-900/30">
+                                              {worstVal > 0 ? "+" : ""}{worstVal}%
+                                            </span>
+                                          </td>
+                                          <td className="py-3.5 pl-4 text-slate-500 dark:text-slate-400 text-xs">
+                                            <div className="flex items-center gap-2">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                                              <span className="leading-relaxed">{cleanReason}</span>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </div>
                         </div>
