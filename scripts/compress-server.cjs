@@ -4,7 +4,7 @@ const path = require('path');
 const zlib = require('zlib');
 
 const PORT = 3000;
-const DIST_DIR = path.join(__dirname, 'dist');
+const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',

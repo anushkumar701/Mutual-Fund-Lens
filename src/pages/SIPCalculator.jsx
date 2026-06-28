@@ -361,6 +361,8 @@ export default function SIPCalculator() {
   const [stepUp, setStepUp] = useState(0);
   const [inflation, setInflation] = useState(6);
   const [expenseRatio, setExpenseRatio] = useState(0.5);
+  const [fdRate, setFdRate] = useState(6.5);
+  const [ppfRate, setPpfRate] = useState(7.1);
   // Goal Calculator state
   const [goalTarget, setGoalTarget] = useState(5000000);
   const [goalYears, setGoalYears] = useState(10);
@@ -546,12 +548,12 @@ export default function SIPCalculator() {
     
     if (isLumpsum) {
       baseRes = calculateLumpsum(amount, years, effectiveReturn);
-      fdRes = calculateLumpsum(amount, years, 6.5);
-      ppfRes = calculateLumpsum(amount, years, 7.1);
+      fdRes = calculateLumpsum(amount, years, fdRate);
+      ppfRes = calculateLumpsum(amount, years, ppfRate);
     } else {
       baseRes = calculateSIP(amount, years, effectiveReturn, stepUp);
-      fdRes = calculateSIP(amount, years, 6.5, stepUp);
-      ppfRes = calculateSIP(amount, years, 7.1, stepUp);
+      fdRes = calculateSIP(amount, years, fdRate, stepUp);
+      ppfRes = calculateSIP(amount, years, ppfRate, stepUp);
     }
 
     // Merge FD and PPF projection data into the main yearlyData array for the chart
@@ -562,7 +564,7 @@ export default function SIPCalculator() {
     }));
     
     return baseRes;
-  }, [isLumpsum, amount, years, effectiveReturn, stepUp]);
+  }, [isLumpsum, amount, years, effectiveReturn, stepUp, fdRate, ppfRate]);
 
   const realValue = useMemo(() => {
     if (!inflationMode) return null;
@@ -600,24 +602,25 @@ export default function SIPCalculator() {
           </p>
         </div>
 
-        {/* Page Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
+        {/* Page Tabs — swipeable on mobile */}
+        <div className="pill-scroll bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
           {[
-            ["calc", "SIP / Lumpsum"],
-            ["swp", "SWP"],
-            ["goal", "Goal"],
-            ["elss", "ELSS Tax"],
-            ["fire", "FIRE"],
-            ["tax", "Tax P&L"],
-            ["date", "SIP Date"],
-          ].map(([id, label]) => (
+            ["calc", "SIP / Lumpsum", "SIP"],
+            ["swp", "SWP", "SWP"],
+            ["goal", "Goal", "Goal"],
+            ["elss", "ELSS Tax", "ELSS"],
+            ["fire", "FIRE", "FIRE"],
+            ["tax", "Tax P&L", "Tax"],
+            ["date", "SIP Date", "Date"],
+          ].map(([id, label, mobileLabel]) => (
             <button
               key={id}
               onClick={() => setPageTab(id)}
               className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 ${pageTab === id ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
             >
               {renderTabIcon(id, `w-4 h-4 ${pageTab === id ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500"}`)}
-              <span>{label}</span>
+              <span className="sm:hidden">{mobileLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
@@ -785,6 +788,31 @@ export default function SIPCalculator() {
                     suffix="%"
                   />
                 )}
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-4">
+                  <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                    Custom Benchmark Rates
+                  </span>
+                  <SIPSlider
+                    id="fd-rate-slider"
+                    label="Fixed Deposit (FD) Rate"
+                    value={fdRate}
+                    onChange={setFdRate}
+                    min={1}
+                    max={15}
+                    step={0.1}
+                    suffix="%"
+                  />
+                  <SIPSlider
+                    id="ppf-rate-slider"
+                    label="Public Provident Fund (PPF) Rate"
+                    value={ppfRate}
+                    onChange={setPpfRate}
+                    min={1}
+                    max={15}
+                    step={0.1}
+                    suffix="%"
+                  />
+                </div>
               </div>
             </div>
 
@@ -977,7 +1005,7 @@ export default function SIPCalculator() {
                       <Area
                         type="monotone"
                         dataKey="ppfValue"
-                        name="PPF (7.1%)"
+                        name={`PPF (${ppfRate}%)`}
                         stroke="#fca5a5"
                         strokeWidth={1.5}
                         strokeDasharray="5 5"
@@ -987,7 +1015,7 @@ export default function SIPCalculator() {
                       <Area
                         type="monotone"
                         dataKey="fdValue"
-                        name="FD (6.5%)"
+                        name={`FD (${fdRate}%)`}
                         stroke="#94a3b8"
                         strokeWidth={1.5}
                         strokeDasharray="5 5"
