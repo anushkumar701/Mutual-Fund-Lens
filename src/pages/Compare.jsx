@@ -2293,7 +2293,7 @@ export default function Compare() {
                             </tr>
                           );
                           return rows;
-                        }, [])}  {/* end .reduce */}
+                        }, [])}
                       </tbody>
                     </table>
                   </div>

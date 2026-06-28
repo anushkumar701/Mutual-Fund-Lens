@@ -931,7 +931,7 @@ export default function Portfolio() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">Mutual Fund Portfolio</h1>
-          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">
             Track your investments, analyze performance historical charts, and set up daily alerts.
           </p>
         </div>

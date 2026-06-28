@@ -443,3 +443,123 @@ input[type="range"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* ══ Mobile-First: Horizontal Pill / Tab Scroll Bar ════════════ */
+.pill-scroll {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.pill-scroll::-webkit-scrollbar {
+  display: none;
+}
+.pill-scroll > * {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+/* ══ Mobile Swipeable Tab Bar ═══════════════════════════════════ */
+.tab-scroll {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tab-scroll > button {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+/* ══ Mobile-friendly metric cards: always single column below 400px ═══ */
+@media (max-width: 400px) {
+  .mobile-grid-1 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ══ Active tab indicator pill on mobile tab bar ═══════════════ */
+.tab-active-indicator {
+  position: relative;
+}
+.tab-active-indicator::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  background: #2563eb;
+  border-radius: 99px;
+}
+
+/* ══ Compare page card carousel on mobile ══════════════════════ */
+@media (max-width: 768px) {
+  .compare-card-scroll {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    scrollbar-width: none;
+  }
+  .compare-card-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .compare-card-scroll > * {
+    flex: 0 0 min(280px, 85vw);
+    scroll-snap-align: start;
+  }
+}
+
+/* ══ Floating action bar above mobile bottom nav ══════════════ */
+.mobile-fab-bar {
+  position: fixed;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.mobile-fab-bar > * {
+  pointer-events: auto;
+}
+
+/* ══ Card compact variant for mobile ═══════════════════════════ */
+@media (max-width: 640px) {
+  .card-compact {
+    padding: 0.875rem !important;
+  }
+  .card-compact .card-title {
+    font-size: 0.875rem;
+  }
+  .card-compact .card-value {
+    font-size: 1.25rem;
+  }
+}
+
+/* ══ Hide on mobile / show on mobile helpers ═══════════════════ */
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+@media (min-width: 641px) {
+  .show-mobile-only {
+    display: none !important;
+  }
+}
+
