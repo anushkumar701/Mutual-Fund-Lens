@@ -2,7 +2,7 @@
 // Future-proof: modular sections, easy to extend
 import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { useFunds } from "../hooks/useFunds";
+import { useFunds, fetchFundDetail } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
 import ErrorState from "../components/ErrorState";
@@ -89,38 +89,38 @@ const SUBCAT_PALETTE = [
 
 const SUBCAT_DATA = {
   Equity: {
-    "Small Cap": [8.5, 62.4, 5.2, 11.2, 48.9, -15.2, -4.1, 28.5, 54.1, -1.5, 38.6, 29.8, 16.5, 19.5],
-    "Mid Cap": [6.1, 48.2, 2.5, 8.4, 39.1, -10.5, 0.2, 22.4, 40.2, 1.8, 30.4, 24.2, 14.1, 16.8],
-    "Large Cap": [4.2, 29.5, -2.1, 5.2, 26.8, 2.5, 10.5, 15.6, 24.5, 4.2, 18.6, 15.1, 10.5, 12.4],
-    "Flexi Cap": [5.3, 37.1, -0.5, 7.8, 31.2, -4.2, 6.8, 18.2, 31.4, 3.2, 22.5, 19.8, 12.1, 14.2],
-    "Multi Cap": [5.8, 41.5, 0.2, 9.1, 33.6, -6.8, 5.1, 19.5, 34.8, 2.8, 24.6, 21.4, 13.0, 15.0]
+    "Small Cap": [8.5, 62.4, 5.2, 11.2, 48.9, -15.2, -4.1, 28.5, 54.1, -1.5, 38.6, 29.8, 16.5],
+    "Mid Cap": [6.1, 48.2, 2.5, 8.4, 39.1, -10.5, 0.2, 22.4, 40.2, 1.8, 30.4, 24.2, 14.1],
+    "Large Cap": [4.2, 29.5, -2.1, 5.2, 26.8, 2.5, 10.5, 15.6, 24.5, 4.2, 18.6, 15.1, 10.5],
+    "Flexi Cap": [5.3, 37.1, -0.5, 7.8, 31.2, -4.2, 6.8, 18.2, 31.4, 3.2, 22.5, 19.8, 12.1],
+    "Multi Cap": [5.8, 41.5, 0.2, 9.1, 33.6, -6.8, 5.1, 19.5, 34.8, 2.8, 24.6, 21.4, 13.0]
   },
   Index: {
-    "Nifty 50": [6.5, 31.4, -4.1, 3.0, 28.6, 3.2, 12.0, 14.9, 24.1, 4.3, 19.4, 14.2, 9.5, 11.5],
-    "Nifty Next 50": [4.8, 44.2, 1.2, 7.5, 43.1, -8.5, 1.5, 18.6, 29.8, 2.1, 26.5, 22.1, 13.5, 15.2],
-    "Sensex": [6.8, 29.9, -5.0, 2.0, 28.0, 5.9, 14.4, 15.7, 22.0, 4.4, 18.7, 13.8, 9.2, 11.2],
-    "Nifty Midcap 150": [5.1, 52.6, 3.0, 9.2, 45.4, -12.4, -1.8, 23.0, 44.5, 1.5, 32.0, 26.8, 15.8, 18.0]
+    "Nifty 50": [6.5, 31.4, -4.1, 3.0, 28.6, 3.2, 12.0, 14.9, 24.1, 4.3, 19.4, 14.2, 9.5],
+    "Nifty Next 50": [4.8, 44.2, 1.2, 7.5, 43.1, -8.5, 1.5, 18.6, 29.8, 2.1, 26.5, 22.1, 13.5],
+    "Sensex": [6.8, 29.9, -5.0, 2.0, 28.0, 5.9, 14.4, 15.7, 22.0, 4.4, 18.7, 13.8, 9.2],
+    "Nifty Midcap 150": [5.1, 52.6, 3.0, 9.2, 45.4, -12.4, -1.8, 23.0, 44.5, 1.5, 32.0, 26.8, 15.8]
   },
   Hybrid: {
-    "Aggressive Hybrid": [7.2, 25.4, 1.8, 6.5, 20.1, -2.5, 8.2, 12.4, 21.0, 5.2, 16.5, 13.5, 9.5, 11.8],
-    "Balanced Advantage (DAA)": [6.8, 18.5, 2.2, 5.8, 14.5, 1.2, 9.1, 10.5, 16.2, 6.1, 13.2, 11.0, 8.2, 9.2],
-    "Arbitrage": [8.1, 8.4, 7.5, 6.8, 6.2, 6.0, 5.8, 4.1, 3.8, 4.5, 6.5, 6.8, 6.2, 6.5],
-    "Multi Asset": [6.5, 16.2, 2.8, 6.0, 12.1, 2.5, 8.5, 9.8, 14.0, 7.0, 12.8, 11.5, 8.5, 10.1]
+    "Aggressive Hybrid": [7.2, 25.4, 1.8, 6.5, 20.1, -2.5, 8.2, 12.4, 21.0, 5.2, 16.5, 13.5, 9.5],
+    "Balanced Advantage (DAA)": [6.8, 18.5, 2.2, 5.8, 14.5, 1.2, 9.1, 10.5, 16.2, 6.1, 13.2, 11.0, 8.2],
+    "Arbitrage": [8.1, 8.4, 7.5, 6.8, 6.2, 6.0, 5.8, 4.1, 3.8, 4.5, 6.5, 6.8, 6.2],
+    "Multi Asset": [6.5, 16.2, 2.8, 6.0, 12.1, 2.5, 8.5, 9.8, 14.0, 7.0, 12.8, 11.5, 8.5]
   },
   Debt: {
-    "Gilt (Govt Bonds)": [9.2, 12.5, 7.8, 11.5, 4.2, 6.5, 10.8, 9.2, 3.1, 0.8, 6.8, 7.2, 6.5, 7.0],
-    "Corporate Bond": [8.8, 10.5, 8.2, 9.5, 6.5, 6.2, 9.0, 8.4, 4.2, 2.1, 6.5, 7.5, 7.0, 7.4],
-    "Short Duration": [8.2, 9.2, 8.0, 8.5, 6.8, 6.5, 8.2, 7.8, 4.5, 3.0, 6.2, 7.0, 6.8, 6.9],
-    "Credit Risk": [9.5, 11.0, 8.5, 9.8, 7.2, 5.1, 7.5, 6.2, 3.0, -1.5, 7.0, 8.2, 7.5, 8.0]
+    "Gilt (Govt Bonds)": [9.2, 12.5, 7.8, 11.5, 4.2, 6.5, 10.8, 9.2, 3.1, 0.8, 6.8, 7.2, 6.5],
+    "Corporate Bond": [8.8, 10.5, 8.2, 9.5, 6.5, 6.2, 9.0, 8.4, 4.2, 2.1, 6.5, 7.5, 7.0],
+    "Short Duration": [8.2, 9.2, 8.0, 8.5, 6.8, 6.5, 8.2, 7.8, 4.5, 3.0, 6.2, 7.0, 6.8],
+    "Credit Risk": [9.5, 11.0, 8.5, 9.8, 7.2, 5.1, 7.5, 6.2, 3.0, -1.5, 7.0, 8.2, 7.5]
   },
   Liquid: {
-    "Liquid Fund": [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8, 7.1],
-    "Overnight Fund": [7.8, 7.9, 7.2, 6.5, 6.0, 6.1, 5.5, 3.5, 3.1, 4.0, 6.2, 6.4, 6.0, 6.3],
-    "Money Market": [8.5, 8.8, 8.1, 7.4, 6.8, 7.0, 6.6, 4.5, 3.9, 5.2, 7.2, 7.5, 7.1, 7.3]
+    "Liquid Fund": [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
+    "Overnight Fund": [7.8, 7.9, 7.2, 6.5, 6.0, 6.1, 5.5, 3.5, 3.1, 4.0, 6.2, 6.4, 6.0],
+    "Money Market": [8.5, 8.8, 8.1, 7.4, 6.8, 7.0, 6.6, 4.5, 3.9, 5.2, 7.2, 7.5, 7.1]
   },
   ELSS: {
-    "ELSS Tax Saver (Direct)": [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1, 15.1],
-    "ELSS Tax Saver (Regular)": [2.0, 32.8, -2.1, 7.8, 26.9, -4.8, 1.0, 11.8, 24.9, 1.1, 20.2, 18.2, 11.8, 13.8]
+    "ELSS Tax Saver (Direct)": [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
+    "ELSS Tax Saver (Regular)": [2.0, 32.8, -2.1, 7.8, 26.9, -4.8, 1.0, 11.8, 24.9, 1.1, 20.2, 18.2, 11.8]
   }
 };
 
@@ -144,6 +144,98 @@ const SUBCAT_ABBR = {
   "Nifty Midcap 150": "Midcap 150",
   "Nifty Next 50": "Next 50"
 };
+
+const SUBCAT_REPRESENTATIVE_CODES = {
+  "Small Cap": "125354",
+  "Mid Cap": "120847",
+  "Large Cap": "120194",
+  "Flexi Cap": "122639",
+  "Multi Cap": "120594",
+  "Nifty 50": "120503",
+  "Nifty Next 50": "120717",
+  "Sensex": "119799",
+  "Nifty Midcap 150": "147704",
+  "Aggressive Hybrid": "120366",
+  "Balanced Advantage (DAA)": "120302",
+  "Arbitrage": "120827",
+  "Multi Asset": "120285",
+  "Gilt (Govt Bonds)": "120171",
+  "Corporate Bond": "120147",
+  "Short Duration": "120166",
+  "Credit Risk": "120186",
+  "Liquid Fund": "120152",
+  "Overnight Fund": "146193",
+  "Money Market": "120119",
+  "ELSS Tax Saver (Direct)": "120502",
+  "ELSS Tax Saver (Regular)": "119598"
+};
+
+const SUBCAT_FALLBACKS = {
+  "Small Cap": 19.5,
+  "Mid Cap": 16.8,
+  "Large Cap": 12.4,
+  "Flexi Cap": 14.2,
+  "Multi Cap": 15.0,
+  "Nifty 50": 11.5,
+  "Nifty Next 50": 15.2,
+  "Sensex": 11.2,
+  "Nifty Midcap 150": 18.0,
+  "Aggressive Hybrid": 11.8,
+  "Balanced Advantage (DAA)": 9.2,
+  "Arbitrage": 6.5,
+  "Multi Asset": 10.1,
+  "Gilt (Govt Bonds)": 7.0,
+  "Corporate Bond": 7.4,
+  "Short Duration": 6.9,
+  "Credit Risk": 8.0,
+  "Liquid Fund": 7.1,
+  "Overnight Fund": 6.3,
+  "Money Market": 7.3,
+  "ELSS Tax Saver (Direct)": 15.1,
+  "ELSS Tax Saver (Regular)": 13.8
+};
+
+function parseNavDate(dateStr) {
+  const parts = dateStr.split("-").map(Number);
+  if (parts.length === 3) {
+    return new Date(parts[2], parts[1] - 1, parts[0]);
+  }
+  return new Date();
+}
+
+function getNavForYearBoundary(navs, year) {
+  const targetDate = new Date(year - 1, 11, 31); // Dec 31 of (year - 1)
+  let closestNav = null;
+  let minDiff = Infinity;
+  for (const item of navs) {
+    const d = parseNavDate(item.date);
+    const diff = Math.abs(d - targetDate);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestNav = parseFloat(item.nav);
+    }
+  }
+  return closestNav;
+}
+
+function getNavForYearEnd(navs, year, currentYear) {
+  if (year === currentYear) {
+    return parseFloat(navs[0].nav);
+  }
+  const targetDate = new Date(year, 11, 31); // Dec 31 of year
+  let closestNav = null;
+  let minDiff = Infinity;
+  for (const item of navs) {
+    const d = parseNavDate(item.date);
+    const diff = Math.abs(d - targetDate);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestNav = parseFloat(item.nav);
+    }
+  }
+  return closestNav;
+}
+
 
 
 // ─── Fund Search Box ───────────────────────────────────────────
@@ -447,6 +539,60 @@ export default function Dashboard() {
   const [watchlist] = useLocalStorage("fundlens_watchlist", []);
   const [modalFund, setModalFund] = useState(null);
   const [activeCategory, setActiveCategory] = useState("Equity");
+  const [dynamicSubcatReturns, setDynamicSubcatReturns] = useState({});
+
+  useEffect(() => {
+    let active = true;
+    const fetchDynamicReturns = async () => {
+      const results = {};
+      const currentYear = new Date().getFullYear();
+      
+      const tasks = Object.entries(SUBCAT_REPRESENTATIVE_CODES).map(async ([subcat, code]) => {
+        try {
+          const details = await fetchFundDetail(code);
+          if (details && details.data && details.data.length > 0) {
+            const navs = details.data;
+            const yearResults = {};
+            for (let y = 2026; y <= currentYear; y++) {
+              const startNav = getNavForYearBoundary(navs, y);
+              const endNav = getNavForYearEnd(navs, y, currentYear);
+              if (startNav && endNav) {
+                const ret = ((endNav - startNav) / startNav) * 100;
+                yearResults[y] = parseFloat(ret.toFixed(1));
+              } else {
+                yearResults[y] = SUBCAT_FALLBACKS[subcat] || 12.0;
+              }
+            }
+            results[subcat] = yearResults;
+          } else {
+            results[subcat] = getFallbacksForAllYears(subcat, currentYear);
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch dynamic returns for ${subcat}:`, err);
+          results[subcat] = getFallbacksForAllYears(subcat, currentYear);
+        }
+      });
+
+      await Promise.allSettled(tasks);
+      if (active) {
+        setDynamicSubcatReturns(results);
+      }
+    };
+
+    function getFallbacksForAllYears(subcat, currentYear) {
+      const res = {};
+      for (let y = 2026; y <= currentYear; y++) {
+        res[y] = SUBCAT_FALLBACKS[subcat] || 12.0;
+      }
+      return res;
+    }
+
+    fetchDynamicReturns();
+    return () => {
+      active = false;
+    };
+  }, []);
+
 
   const catStats = useMemo(() => {
     const c = {};
@@ -886,16 +1032,59 @@ export default function Dashboard() {
           </div>
           <div className="card p-4 overflow-x-auto custom-scrollbar pb-6">
             {(() => {
-              const YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
-              // Approximate median category returns (%) — industry averages
-              const DATA = {
-                Equity: [4.8, 32.9, -1.2, 8.5, 29.6, -2.1, 4.2, 14.7, 27.3, 3.1, 22.4, 18.2, 12.5, 14.5],
-                Index: [8.1, 31.2, -3.0, 4.4, 30.3, 4.6, 12.1, 15.2, 27.1, 4.6, 21.4, 17.3, 11.2, 13.0],
-                ELSS: [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1, 14.8],
-                Hybrid: [6.2, 22.8, 1.5, 7.2, 18.9, 2.1, 5.8, 10.7, 19.8, 6.5, 16.7, 13.2, 9.8, 10.5],
-                Debt: [8.5, 10.2, 8.2, 9.8, 6.1, 5.9, 9.4, 8.1, 3.7, 1.2, 6.3, 7.5, 7.1, 7.2],
-                Liquid: [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8, 6.9],
+              const currentYear = new Date().getFullYear();
+              const YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+              for (let y = 2026; y <= currentYear; y++) {
+                YEARS.push(y);
+              }
+
+              // Base historical returns up to 2025
+              const BASE_DATA = {
+                Equity: [4.8, 32.9, -1.2, 8.5, 29.6, -2.1, 4.2, 14.7, 27.3, 3.1, 22.4, 18.2, 12.5],
+                Index: [8.1, 31.2, -3.0, 4.4, 30.3, 4.6, 12.1, 15.2, 27.1, 4.6, 21.4, 17.3, 11.2],
+                ELSS: [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
+                Hybrid: [6.2, 22.8, 1.5, 7.2, 18.9, 2.1, 5.8, 10.7, 19.8, 6.5, 16.7, 13.2, 9.8],
+                Debt: [8.5, 10.2, 8.2, 9.8, 6.1, 5.9, 9.4, 8.1, 3.7, 1.2, 6.3, 7.5, 7.1],
+                Liquid: [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
               };
+
+              // Reconstruct full SUBCAT_DATA and DATA dynamically for current year + future years
+              const getDynamicSubcatReturn = (subcat, year) => {
+                return dynamicSubcatReturns[subcat]?.[year] ?? SUBCAT_FALLBACKS[subcat] ?? 12.0;
+              };
+
+              const getDynamicCategoryReturn = (cat, year) => {
+                const subcats = Object.keys(SUBCAT_DATA[cat] || {});
+                if (subcats.length === 0) return SUBCAT_FALLBACKS[cat] ?? 12.0;
+                let sum = 0;
+                for (const sub of subcats) {
+                  sum += getDynamicSubcatReturn(sub, year);
+                }
+                return parseFloat((sum / subcats.length).toFixed(1));
+              };
+
+              // Build active DATA map
+              const DATA = {};
+              Object.keys(BASE_DATA).forEach((cat) => {
+                const arr = [...BASE_DATA[cat]];
+                for (let y = 2026; y <= currentYear; y++) {
+                  arr.push(getDynamicCategoryReturn(cat, y));
+                }
+                DATA[cat] = arr;
+              });
+
+              // Build active subcat data map
+              const activeSubcatDataMap = {};
+              Object.keys(SUBCAT_DATA).forEach((cat) => {
+                activeSubcatDataMap[cat] = {};
+                Object.keys(SUBCAT_DATA[cat]).forEach((subcat) => {
+                  const arr = [...SUBCAT_DATA[cat][subcat]];
+                  for (let y = 2026; y <= currentYear; y++) {
+                    arr.push(getDynamicSubcatReturn(subcat, y));
+                  }
+                  activeSubcatDataMap[cat][subcat] = arr;
+                });
+              });
 
               const ranks = [0, 1, 2, 3, 4, 5];
 
@@ -908,6 +1097,7 @@ export default function Dashboard() {
                 list.sort((a, b) => b.returnVal - a.returnVal);
                 return { year, list };
               });
+
 
               return (
                 <div className="min-w-[1200px]">
@@ -984,7 +1174,7 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  {/* Overall Performance Analysis (Average Returns 2013-2026) */}
+                  {/* Overall Performance Analysis (Average Returns 2013 - Present) */}
                   {(() => {
                     const overallAverages = Object.entries(DATA).map(([category, returns]) => {
                       const sum = returns.reduce((acc, curr) => acc + curr, 0);
@@ -993,7 +1183,7 @@ export default function Dashboard() {
                     });
                     overallAverages.sort((a, b) => b.avg - a.avg);
 
-                    const subcatDataset = SUBCAT_DATA[activeCategory] || {};
+                    const subcatDataset = activeSubcatDataMap[activeCategory] || {};
                     const subcatList = Object.keys(subcatDataset);
                     const subcatRanks = subcatList.map((_, idx) => idx);
 
@@ -1017,7 +1207,7 @@ export default function Dashboard() {
                     return (
                       <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/60">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">
-                          Overall Performance Analysis (2013 - 2026 Average)
+                          Overall Performance Analysis (2013 - {currentYear} Average)
                         </h3>
                         <div className="flex flex-col gap-5">
                           {/* Category Ranking List */}
@@ -1164,7 +1354,7 @@ export default function Dashboard() {
                             {/* Average Performance Bar */}
                             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3">
                               <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-450 dark:text-slate-500">
-                                13-Year Average Return:
+                                {YEARS.length}-Year Average Return:
                               </span>
                               {subcatAverages.map((item, idx) => {
                                 const avgSubColor = SUBCAT_PALETTE[idx % SUBCAT_PALETTE.length];
