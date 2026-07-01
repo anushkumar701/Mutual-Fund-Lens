@@ -18,6 +18,7 @@ import {
   calculateGoalSIP,
   calculateELSSTaxSaving,
   calculateSWP,
+  calculateTaxes,
 } from "../utils/sipCalculations";
 import { formatINR } from "../utils/formatCurrency";
 import { fetchFundDetail } from "../hooks/useFunds";
@@ -571,6 +572,12 @@ export default function SIPCalculator() {
     return adjustForInflation(result.maturity, inflation, years);
   }, [inflationMode, result.maturity, inflation, years]);
 
+  const taxResult = useMemo(() => {
+    // For SIP with step-up, the final year SIP amount is amount * (1 + stepUp/100)^(years - 1)
+    const finalSip = isLumpsum ? 0 : amount * Math.pow(1 + stepUp / 100, years - 1);
+    return calculateTaxes("Equity", !isLumpsum, result.invested, result.maturity, years, effectiveReturn, finalSip);
+  }, [isLumpsum, result, years, effectiveReturn, amount, stepUp]);
+
   const wealthMultiple =
     result.invested > 0 ? (result.maturity / result.invested).toFixed(2) : "—";
 
@@ -828,7 +835,12 @@ export default function SIPCalculator() {
                   value={formatINR(result.returns)}
                 />
                 <ResultCard
-                  label="Maturity Value"
+                  label="Post-Tax Maturity"
+                  value={formatINR(taxResult.postTaxMaturity)}
+                  sub={`₹${formatINR(taxResult.tax)} tax deducted`}
+                />
+                <ResultCard
+                  label="Pre-Tax Maturity"
                   value={formatINR(result.maturity)}
                   accent
                   sub={`${wealthMultiple}× wealth multiple`}
@@ -840,6 +852,27 @@ export default function SIPCalculator() {
                     sub="Inflation-adjusted"
                   />
                 )}
+              </div>
+
+              <div className="card p-4 space-y-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 border-emerald-100 dark:border-emerald-800">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                    Tax Breakdown (Equity Fund)
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
+                      <div className="text-[10px] text-slate-500 uppercase">STCG (20%)</div>
+                      <div className="font-bold text-slate-700 dark:text-slate-300">₹{formatINR(taxResult.stcg)}</div>
+                    </div>
+                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
+                      <div className="text-[10px] text-slate-500 uppercase">LTCG (12.5%)</div>
+                      <div className="font-bold text-slate-700 dark:text-slate-300">₹{formatINR(taxResult.ltcg)}</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    *Assumes 1.25L LTCG exemption. SIPs have split STCG/LTCG. 
+                  </p>
+                </div>
               </div>
 
               <div className="card p-4 space-y-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 border-emerald-100 dark:border-emerald-800">

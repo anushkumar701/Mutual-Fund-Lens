@@ -1,4 +1,5 @@
 // utils/metrics.js
+import xirr from "xirr";
 
 function parseDate(dateStr) {
   if (!dateStr || typeof dateStr !== "string") return new Date(NaN);
@@ -359,4 +360,29 @@ export function calculateBestWorstMonth(navData) {
     worst: monthReturns[0],
     best: monthReturns[monthReturns.length - 1],
   };
+}
+
+/**
+ * Robust XIRR wrapper around the 'xirr' npm package
+ * Takes an array of cashflows: { amount, when }
+ * amount is negative for investments, positive for current value/withdrawals
+ */
+export function calculateTrueXIRR(cashflows) {
+  if (!cashflows || cashflows.length < 2) return null;
+  
+  // Must have at least one negative and one positive cashflow
+  const hasNegative = cashflows.some(c => c.amount < 0);
+  const hasPositive = cashflows.some(c => c.amount > 0);
+  if (!hasNegative || !hasPositive) return null;
+
+  try {
+    const rate = xirr(cashflows);
+    // Convert to percentage and guard against ridiculous bounds
+    const xirrPct = rate * 100;
+    if (!isFinite(xirrPct) || xirrPct < -100 || xirrPct > 1000) return null;
+    return xirrPct;
+  } catch (err) {
+    console.warn("XIRR calculation failed:", err.message);
+    return null;
+  }
 }
