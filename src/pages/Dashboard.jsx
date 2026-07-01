@@ -543,6 +543,7 @@ export default function Dashboard() {
   const [dynamicSubcatReturns, setDynamicSubcatReturns] = useState({});
   const [isWorstFirst, setIsWorstFirst] = useState(false);
   const [upMetric, setUpMetric] = useState("returns"); // 'returns' | 'volatility'
+  const [upGrouping, setUpGrouping] = useState("subcategory"); // 'subcategory' | 'category'
 
   useEffect(() => {
     let active = true;
@@ -1639,16 +1640,47 @@ export default function Dashboard() {
 
             // Sort by worst 5Y avg return
             rows.sort((a, b) => (a.avg5Y ?? a.avgAll) - (b.avg5Y ?? b.avgAll));
-            const worstRows = rows.slice(0, 8); // Show bottom 8
+            
+            let finalRows = [];
+            if (upGrouping === "subcategory") {
+              finalRows = rows.slice(0, 8); // Show bottom 8 subcategories
+            } else {
+              // Group by category and average the metrics
+              const catMap = {};
+              rows.forEach(r => {
+                if (!catMap[r.category]) {
+                  catMap[r.category] = { category: r.category, subcat: "All " + r.category, avg1Y: [], avg3Y: [], avg5Y: [], stdDev1Y: [], stdDev3Y: [], stdDev5Y: [] };
+                }
+                if (r.avg1Y !== null) catMap[r.category].avg1Y.push(r.avg1Y);
+                if (r.avg3Y !== null) catMap[r.category].avg3Y.push(r.avg3Y);
+                if (r.avg5Y !== null) catMap[r.category].avg5Y.push(r.avg5Y);
+                if (r.stdDev1Y !== null) catMap[r.category].stdDev1Y.push(r.stdDev1Y);
+                if (r.stdDev3Y !== null) catMap[r.category].stdDev3Y.push(r.stdDev3Y);
+                if (r.stdDev5Y !== null) catMap[r.category].stdDev5Y.push(r.stdDev5Y);
+              });
+              
+              finalRows = Object.values(catMap).map(c => ({
+                category: c.category,
+                subcat: c.subcat,
+                avg1Y: c.avg1Y.length ? Number((c.avg1Y.reduce((a,b)=>a+b,0)/c.avg1Y.length).toFixed(1)) : null,
+                avg3Y: c.avg3Y.length ? Number((c.avg3Y.reduce((a,b)=>a+b,0)/c.avg3Y.length).toFixed(1)) : null,
+                avg5Y: c.avg5Y.length ? Number((c.avg5Y.reduce((a,b)=>a+b,0)/c.avg5Y.length).toFixed(1)) : null,
+                stdDev1Y: c.stdDev1Y.length ? Number((c.stdDev1Y.reduce((a,b)=>a+b,0)/c.stdDev1Y.length).toFixed(1)) : null,
+                stdDev3Y: c.stdDev3Y.length ? Number((c.stdDev3Y.reduce((a,b)=>a+b,0)/c.stdDev3Y.length).toFixed(1)) : null,
+                stdDev5Y: c.stdDev5Y.length ? Number((c.stdDev5Y.reduce((a,b)=>a+b,0)/c.stdDev5Y.length).toFixed(1)) : null,
+              }));
+              // Sort categories by worst 5Y return
+              finalRows.sort((a, b) => (a.avg5Y ?? 0) - (b.avg5Y ?? 0));
+            }
 
             // Determine best (highest return) per column in returns mode
-            const best1YReturn  = Math.max(...worstRows.map(r => r.avg1Y ?? -Infinity));
-            const best3YReturn  = Math.max(...worstRows.map(r => r.avg3Y ?? -Infinity));
-            const best5YReturn  = Math.max(...worstRows.map(r => r.avg5Y ?? -Infinity));
+            const best1YReturn  = Math.max(...finalRows.map(r => r.avg1Y ?? -Infinity));
+            const best3YReturn  = Math.max(...finalRows.map(r => r.avg3Y ?? -Infinity));
+            const best5YReturn  = Math.max(...finalRows.map(r => r.avg5Y ?? -Infinity));
             // Determine safest (lowest std dev) per column in volatility mode
-            const safest1Y = Math.min(...worstRows.filter(r => r.stdDev1Y !== null).map(r => r.stdDev1Y));
-            const safest3Y = Math.min(...worstRows.filter(r => r.stdDev3Y !== null).map(r => r.stdDev3Y));
-            const safest5Y = Math.min(...worstRows.filter(r => r.stdDev5Y !== null).map(r => r.stdDev5Y));
+            const safest1Y = Math.min(...finalRows.filter(r => r.stdDev1Y !== null).map(r => r.stdDev1Y));
+            const safest3Y = Math.min(...finalRows.filter(r => r.stdDev3Y !== null).map(r => r.stdDev3Y));
+            const safest5Y = Math.min(...finalRows.filter(r => r.stdDev5Y !== null).map(r => r.stdDev5Y));
 
             const catColors = {
               Equity: "#2563eb", Index: "#0891b2", Hybrid: "#ea580c",
@@ -1680,31 +1712,58 @@ export default function Dashboard() {
                       Consistently Underperforming Asset Classes
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Bottom 8 sub-categories by 5-year average return — sorted lowest first
+                      {upGrouping === "subcategory" ? "Bottom 8 sub-categories by 5-year average return — sorted lowest first" : "Macro categories by 5-year average return — sorted lowest first"}
                     </p>
                   </div>
-                  {/* Returns vs Volatility toggle */}
-                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
-                    <button
-                      onClick={() => setUpMetric("returns")}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                        upMetric === "returns"
-                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      📈 Returns
-                    </button>
-                    <button
-                      onClick={() => setUpMetric("volatility")}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                        upMetric === "volatility"
-                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      〰️ Volatility
-                    </button>
+                  {/* Controls Container */}
+                  <div className="flex flex-col sm:flex-row items-end gap-3 mt-3 sm:mt-0">
+                    {/* Category vs Subcategory Toggle */}
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
+                      <button
+                        onClick={() => setUpGrouping("category")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          upGrouping === "category"
+                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        🗂️ Category
+                      </button>
+                      <button
+                        onClick={() => setUpGrouping("subcategory")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          upGrouping === "subcategory"
+                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        📂 Subcategory
+                      </button>
+                    </div>
+
+                    {/* Returns vs Volatility Toggle */}
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
+                      <button
+                        onClick={() => setUpMetric("returns")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          upMetric === "returns"
+                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        📈 Returns
+                      </button>
+                      <button
+                        onClick={() => setUpMetric("volatility")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          upMetric === "volatility"
+                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        〰️ Volatility
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1729,7 +1788,7 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                        {worstRows.map((row) => {
+                        {finalRows.map((row) => {
                           const catColor = catColors[row.category] || "#64748b";
                           const isBest1Y = row.avg1Y === best1YReturn;
                           const isBest3Y = row.avg3Y === best3YReturn;
@@ -1797,7 +1856,7 @@ export default function Dashboard() {
 
                   {/* Mobile: vertical cards */}
                   <div className="flex flex-col gap-3 sm:hidden">
-                    {worstRows.map((row) => {
+                    {finalRows.map((row) => {
                       const catColor = catColors[row.category] || "#64748b";
                       const isBest1Y = row.avg1Y === best1YReturn;
                       const isBest3Y = row.avg3Y === best3YReturn;
