@@ -148,7 +148,15 @@ export default function Portfolio() {
   const [detailsCache, setDetailsCache] = useState(() => {
     try {
       const saved = localStorage.getItem("fundlens_portfolio_details_cache");
-      return saved ? JSON.parse(saved) : {};
+      const savedTs = localStorage.getItem("fundlens_portfolio_details_cache_ts");
+      if (saved && savedTs) {
+        const ageHours = (Date.now() - parseInt(savedTs, 10)) / (1000 * 60 * 60);
+        // Invalidate cache if older than 4 hours so NAVs update daily
+        if (ageHours < 4) {
+          return JSON.parse(saved);
+        }
+      }
+      return {};
     } catch {
       return {};
     }
@@ -159,7 +167,10 @@ export default function Portfolio() {
 
   useEffect(() => {
     try {
-      localStorage.setItem("fundlens_portfolio_details_cache", JSON.stringify(detailsCache));
+      if (Object.keys(detailsCache).length > 0) {
+        localStorage.setItem("fundlens_portfolio_details_cache", JSON.stringify(detailsCache));
+        localStorage.setItem("fundlens_portfolio_details_cache_ts", Date.now().toString());
+      }
     } catch (e) {
       console.warn("Failed to save details cache to localStorage:", e);
     }

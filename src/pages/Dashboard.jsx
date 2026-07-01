@@ -1715,16 +1715,16 @@ export default function Dashboard() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800">
-                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-2">Subcategory</th>
-                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4">Category</th>
+                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-3 w-28">Category</th>
+                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-6">Subcategory</th>
                           <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "1-Year" : "1Y Volatility (σ)"}
+                            {upMetric === "returns" ? "1-Year" : "1Y Vol (σ)"}
                           </th>
                           <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "3-Year Avg" : "3Y Volatility (σ)"}
+                            {upMetric === "returns" ? "3-Year Avg" : "3Y Vol (σ)"}
                           </th>
                           <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "5-Year Avg" : "5Y Volatility (σ)"}
+                            {upMetric === "returns" ? "5-Year Avg" : "5Y Vol (σ)"}
                           </th>
                         </tr>
                       </thead>
@@ -1739,10 +1739,13 @@ export default function Dashboard() {
                           const isSafest5Y = row.stdDev5Y === safest5Y;
                           return (
                             <tr key={`${row.category}-${row.subcat}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                              <td className="py-3 pr-2 font-semibold text-slate-800 dark:text-slate-200">{row.subcat}</td>
-                              <td className="py-3 pr-4">
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: catColor }}>{row.category}</span>
+                              {/* Category — always visible */}
+                              <td className="py-3 pr-3">
+                                <span className="text-[9px] font-bold px-2 py-1 rounded-full text-white inline-block" style={{ background: catColor }}>{row.category}</span>
                               </td>
+                              {/* Subcategory — always visible */}
+                              <td className="py-3 pr-6 font-semibold text-slate-800 dark:text-slate-200">{row.subcat}</td>
+                              {/* Metric col 1 */}
                               <td className="py-3 text-center">
                                 {upMetric === "returns" ? (
                                   <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg1Y, isBest1Y)}`}>
@@ -1756,6 +1759,7 @@ export default function Dashboard() {
                                   </span>
                                 )}
                               </td>
+                              {/* Metric col 2 */}
                               <td className="py-3 text-center">
                                 {upMetric === "returns" ? (
                                   <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg3Y, isBest3Y)}`}>
@@ -1769,6 +1773,7 @@ export default function Dashboard() {
                                   </span>
                                 )}
                               </td>
+                              {/* Metric col 3 */}
                               <td className="py-3 text-center">
                                 {upMetric === "returns" ? (
                                   <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg5Y, isBest5Y)}`}>
@@ -1789,6 +1794,7 @@ export default function Dashboard() {
                     </table>
                   </div>
 
+
                   {/* Mobile: vertical cards */}
                   <div className="flex flex-col gap-3 sm:hidden">
                     {worstRows.map((row) => {
@@ -1804,12 +1810,14 @@ export default function Dashboard() {
                           key={`${row.category}-${row.subcat}-m`}
                           className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4"
                         >
-                          <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-start justify-between mb-3 gap-2">
                             <div>
-                              <div className="text-sm font-bold text-slate-900 dark:text-white">{row.subcat}</div>
-                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white mt-1 inline-block" style={{ background: catColor }}>{row.category}</span>
+                              <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Subcategory</div>
+                              <div className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{row.subcat}</div>
+                              <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-2">Category</div>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white mt-0.5 inline-block" style={{ background: catColor }}>{row.category}</span>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex-shrink-0">
                               <div className="text-[9px] text-slate-400 uppercase font-bold mb-1">5Y Avg</div>
                               <span className={`inline-flex items-center gap-1 font-black text-sm px-3 py-1 rounded-full border ${returnPillStyle(row.avg5Y, isBest5Y)}`}>
                                 {isBest5Y && <span>🏆</span>}
