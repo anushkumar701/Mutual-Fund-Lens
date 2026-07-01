@@ -26,6 +26,7 @@ export default function ThemeToggle() {
   }, []);
 
   const themes = [
+    { id: "system", label: "System (Auto)", icon: "🖥️", bg: "bg-gradient-to-r from-[#f0f4f8] to-[#0d1117]" },
     { id: "light", label: "Light Mode", icon: "☀️", bg: "bg-[#f0f4f8]" },
     { id: "dark", label: "Navy (Dark)", icon: "🌙", bg: "bg-[#0d1117]" },
     { id: "midnight", label: "Midnight Blue", icon: "🌌", bg: "bg-[#020617]" },

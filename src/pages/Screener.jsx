@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense, memo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFunds } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -8,6 +8,7 @@ import ErrorState from "../components/ErrorState";
 import { inferCategory } from "../utils/goalFilters";
 import { extractAMC, getPlanType, isFundClosed } from "../utils/fundFilters";
 import { getExpenseRatio, getER } from "../utils/expenseRatio";
+import { List as VirtualList } from "react-window";
 
 // lazy must be declared after all static imports
 const FundDetailModal = lazy(() => import("../components/FundDetailModal"));
@@ -892,33 +893,63 @@ export default function Screener() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filtered.slice(0, page).map((fund) => (
-                  <FundCard
-                    key={fund.schemeCode}
-                    fund={fund}
-                    watchlist={watchlist}
-                    setWatchlist={setWatchlist}
-                    compareList={compareList}
-                    setCompareList={setCompareList}
-                    onDetails={setModalFund}
-                  />
-                ))}
-              </div>
-              {filtered.length > page && (
-                <div className="text-center pt-4">
-                  <p className="text-xs text-slate-400 mb-2">
-                    Showing {Math.min(page, filtered.length)} of{" "}
-                    {filtered.length.toLocaleString("en-IN")}
-                  </p>
-                  <button
-                    onClick={() => setPage((p) => p + 48)}
-                    className="btn-secondary px-6 py-2.5"
-                  >
-                    Load More Funds
-                  </button>
-                </div>
-              )}
+              {(() => {
+                // Determine column count based on a rough viewport estimate
+                const colCount = typeof window !== "undefined"
+                  ? window.innerWidth >= 1280 ? 4
+                  : window.innerWidth >= 1024 ? 3
+                  : window.innerWidth >= 640  ? 2
+                  : 1
+                  : 1;
+                const rowCount = Math.ceil(filtered.length / colCount);
+                const ROW_HEIGHT = 260; // px per card row
+                const listHeight = Math.min(rowCount * ROW_HEIGHT, 800); // cap visible window
+
+                const Row = ({ index, style }) => {
+                  const startIdx = index * colCount;
+                  return (
+                    <div style={style} className={`grid gap-4`} key={index}
+                      // Inline grid-template-columns for dynamic col count
+                      // so Tailwind breakpoints aren't needed inside the virtual list
+                      // eslint-disable-next-line
+                      {...{ style: { ...style, display: "grid", gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`, gap: "1rem", paddingRight: "4px" } }}
+                    >
+                      {Array.from({ length: colCount }).map((_, colIdx) => {
+                        const fund = filtered[startIdx + colIdx];
+                        if (!fund) return <div key={colIdx} />;
+                        return (
+                          <FundCard
+                            key={fund.schemeCode}
+                            fund={fund}
+                            watchlist={watchlist}
+                            setWatchlist={setWatchlist}
+                            compareList={compareList}
+                            setCompareList={setCompareList}
+                            onDetails={setModalFund}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                };
+
+                return (
+                  <>
+                    <VirtualList
+                      height={listHeight}
+                      itemCount={rowCount}
+                      itemSize={ROW_HEIGHT}
+                      width="100%"
+                      overscanCount={3}
+                    >
+                      {Row}
+                    </VirtualList>
+                    <p className="text-center text-xs text-slate-400 mt-3">
+                      Showing {filtered.length.toLocaleString("en-IN")} funds (virtualised)
+                    </p>
+                  </>
+                );
+              })()}
             </>
           )}
         </div>

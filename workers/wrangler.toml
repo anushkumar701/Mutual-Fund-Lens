@@ -1,0 +1,10 @@
+name = "fundlens-api-proxy"
+main = "api-proxy.js"
+compatibility_date = "2024-05-30"
+
+# Deploy separately: cd workers && wrangler deploy
+# Then update useFunds.js BASE_URL to point to this worker's URL.
+# e.g. BASE_URL = "https://fundlens-api-proxy.<your-subdomain>.workers.dev/api/mf"
+
+[observability]
+enabled = true

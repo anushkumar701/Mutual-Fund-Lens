@@ -545,74 +545,99 @@ export default function Dashboard() {
   const [upMetric, setUpMetric] = useState("returns"); // 'returns' | 'volatility'
   const [upGrouping, setUpGrouping] = useState("subcategory"); // 'subcategory' | 'category'
 
-  // States for Underperforming Mutual Funds feature
+  // States for Mutual Fund Performance Explorer feature
   const [ufCategoryFilter, setUfCategoryFilter] = useState("All");
   const [ufSubcatFilter, setUfSubcatFilter] = useState("All");
+  const [ufPlanFilter, setUfPlanFilter] = useState("All");
+  const [ufTypeFilter, setUfTypeFilter] = useState("All");
+  const [ufSortOrder, setUfSortOrder] = useState("worst"); // 'worst' | 'best'
   const [ufLookback, setUfLookback] = useState(5);
   const [ufLoading, setUfLoading] = useState(false);
   const [ufFundsData, setUfFundsData] = useState(null);
 
-  const UNDERPERFORMING_UNIVERSE = [
-    { code: "125354", name: "Axis Small Cap Fund", category: "Equity", subcat: "Small Cap" },
-    { code: "119062", name: "SBI Small Cap Fund", category: "Equity", subcat: "Small Cap" },
-    { code: "120847", name: "HDFC Mid-Cap Opportunities Fund", category: "Equity", subcat: "Mid Cap" },
-    { code: "119063", name: "SBI Magnum Midcap Fund", category: "Equity", subcat: "Mid Cap" },
-    { code: "120194", name: "Nippon India Large Cap Fund", category: "Equity", subcat: "Large Cap" },
-    { code: "118272", name: "ICICI Prudential Bluechip Fund", category: "Equity", subcat: "Large Cap" },
-    { code: "122639", name: "Parag Parikh Flexi Cap Fund", category: "Equity", subcat: "Flexi Cap" },
-    { code: "118269", name: "ICICI Prudential Flexicap Fund", category: "Equity", subcat: "Flexi Cap" },
-    { code: "120503", name: "Nifty 50 Index", category: "Index", subcat: "Nifty 50" },
-    { code: "120147", name: "HDFC Corporate Bond Fund", category: "Debt", subcat: "Corporate Bond" },
-    { code: "119827", name: "SBI Magnum Gilt Fund", category: "Debt", subcat: "Gilt" },
-    { code: "120166", name: "HDFC Short Term Debt Fund", category: "Debt", subcat: "Short Duration" },
-    { code: "120366", name: "ICICI Prudential Equity & Debt Fund", category: "Hybrid", subcat: "Aggr Hybrid" },
-    { code: "120302", name: "ICICI Prudential Balanced Advantage", category: "Hybrid", subcat: "Balanced Adv" },
-    { code: "120827", name: "HDFC Arbitrage Fund", category: "Hybrid", subcat: "Arbitrage" },
-    { code: "120152", name: "HDFC Liquid Fund", category: "Liquid", subcat: "Liquid Fund" },
-    { code: "146193", name: "HDFC Overnight Fund", category: "Liquid", subcat: "Overnight Fund" }
+  const debouncedLookback = useDebounce(ufLookback, 500);
+
+  const FUNDS_UNIVERSE = [
+    { code: "125354", name: "Axis Small Cap Fund", category: "Equity", subcat: "Small Cap", plan: "Direct", type: "Growth" },
+    { code: "125353", name: "Axis Small Cap Fund", category: "Equity", subcat: "Small Cap", plan: "Regular", type: "Growth" },
+    { code: "119062", name: "SBI Small Cap Fund", category: "Equity", subcat: "Small Cap", plan: "Direct", type: "Growth" },
+    { code: "120847", name: "HDFC Mid-Cap Opportunities Fund", category: "Equity", subcat: "Mid Cap", plan: "Direct", type: "Growth" },
+    { code: "118989", name: "HDFC Mid-Cap Opportunities Fund", category: "Equity", subcat: "Mid Cap", plan: "Regular", type: "Growth" },
+    { code: "119063", name: "SBI Magnum Midcap Fund", category: "Equity", subcat: "Mid Cap", plan: "Direct", type: "Growth" },
+    { code: "120194", name: "Nippon India Large Cap Fund", category: "Equity", subcat: "Large Cap", plan: "Direct", type: "Growth" },
+    { code: "118272", name: "ICICI Prudential Bluechip Fund", category: "Equity", subcat: "Large Cap", plan: "Direct", type: "Growth" },
+    { code: "122639", name: "Parag Parikh Flexi Cap Fund", category: "Equity", subcat: "Flexi Cap", plan: "Direct", type: "Growth" },
+    { code: "118269", name: "ICICI Prudential Flexicap Fund", category: "Equity", subcat: "Flexi Cap", plan: "Direct", type: "Growth" },
+    { code: "120503", name: "Nifty 50 Index", category: "Index", subcat: "Nifty 50", plan: "Direct", type: "Growth" },
+    { code: "120147", name: "HDFC Corporate Bond Fund", category: "Debt", subcat: "Corporate Bond", plan: "Direct", type: "Growth" },
+    { code: "119827", name: "SBI Magnum Gilt Fund", category: "Debt", subcat: "Gilt", plan: "Direct", type: "Growth" },
+    { code: "120166", name: "HDFC Short Term Debt Fund", category: "Debt", subcat: "Short Duration", plan: "Direct", type: "Growth" },
+    { code: "120366", name: "ICICI Prudential Equity & Debt Fund", category: "Hybrid", subcat: "Aggr Hybrid", plan: "Direct", type: "Growth" },
+    { code: "120302", name: "ICICI Prudential Balanced Advantage", category: "Hybrid", subcat: "Balanced Adv", plan: "Direct", type: "Growth" },
+    { code: "120827", name: "HDFC Arbitrage Fund", category: "Hybrid", subcat: "Arbitrage", plan: "Direct", type: "Growth" },
+    { code: "120152", name: "HDFC Liquid Fund", category: "Liquid", subcat: "Liquid Fund", plan: "Direct", type: "Growth" },
+    { code: "146193", name: "HDFC Overnight Fund", category: "Liquid", subcat: "Overnight Fund", plan: "Direct", type: "Growth" },
+    { code: "120502", name: "Aditya Birla SL ELSS Tax Saver", category: "ELSS", subcat: "Tax Saver", plan: "Direct", type: "Growth" },
+    { code: "107745", name: "Aditya Birla SL ELSS Tax Saver (IDCW)", category: "ELSS", subcat: "Tax Saver", plan: "Direct", type: "IDCW" },
   ];
 
-  const handleAnalyzeUnderperforming = async () => {
-    setUfLoading(true);
-    let filtered = UNDERPERFORMING_UNIVERSE;
-    if (ufCategoryFilter !== "All") filtered = filtered.filter(f => f.category === ufCategoryFilter);
-    if (ufSubcatFilter !== "All") filtered = filtered.filter(f => f.subcat === ufSubcatFilter);
-    
-    const results = [];
-    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-    const targetMs = Date.now() - (ufLookback * oneYearMs);
+  useEffect(() => {
+    let active = true;
 
-    for (const fund of filtered) {
-      try {
-        const details = await fetchFundDetail(fund.code);
-        if (details && details.data && details.data.length > 0) {
-          const navData = details.data;
-          const currentNav = parseFloat(navData[0].nav);
-          // find nav closest to targetMs
-          let oldNav = null;
-          for (let i = 0; i < navData.length; i++) {
-            const rowDate = new Date(navData[i].date.split("-").reverse().join("-")).getTime();
-            if (rowDate <= targetMs) {
-              oldNav = parseFloat(navData[i].nav);
-              break;
+    const analyzeFunds = async () => {
+      // Don't fetch if debouncedLookback is invalid
+      if (!debouncedLookback || debouncedLookback < 1) {
+        setUfFundsData([]);
+        return;
+      }
+
+      setUfLoading(true);
+      let filtered = FUNDS_UNIVERSE;
+      if (ufCategoryFilter !== "All") filtered = filtered.filter(f => f.category === ufCategoryFilter);
+      if (ufSubcatFilter !== "All") filtered = filtered.filter(f => f.subcat === ufSubcatFilter);
+      if (ufPlanFilter !== "All") filtered = filtered.filter(f => f.plan === ufPlanFilter);
+      if (ufTypeFilter !== "All") filtered = filtered.filter(f => f.type === ufTypeFilter);
+      
+      const results = [];
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const targetMs = Date.now() - (debouncedLookback * oneYearMs);
+
+      for (const fund of filtered) {
+        try {
+          const details = await fetchFundDetail(fund.code);
+          if (active && details && details.data && details.data.length > 0) {
+            const navData = details.data;
+            const currentNav = parseFloat(navData[0].nav);
+            // find nav closest to targetMs
+            let oldNav = null;
+            for (let i = 0; i < navData.length; i++) {
+              const rowDate = new Date(navData[i].date.split("-").reverse().join("-")).getTime();
+              if (rowDate <= targetMs) {
+                oldNav = parseFloat(navData[i].nav);
+                break;
+              }
+            }
+            if (oldNav) {
+              const cagr = ((Math.pow(currentNav / oldNav, 1 / debouncedLookback)) - 1) * 100;
+              results.push({ ...fund, cagr: Number(cagr.toFixed(2)) });
             }
           }
-          if (oldNav) {
-            const absoluteReturn = ((currentNav - oldNav) / oldNav) * 100;
-            // Calculate annualized return (CAGR)
-            const cagr = ((Math.pow(currentNav / oldNav, 1 / ufLookback)) - 1) * 100;
-            results.push({ ...fund, cagr: Number(cagr.toFixed(2)) });
-          }
+        } catch (e) {
+          console.warn("Error fetching fund details", e);
         }
-      } catch (e) {
-        console.warn("Error fetching fund details", e);
       }
-    }
-    
-    results.sort((a, b) => a.cagr - b.cagr);
-    setUfFundsData(results);
-    setUfLoading(false);
-  };
+      
+      if (active) {
+        results.sort((a, b) => ufSortOrder === "worst" ? a.cagr - b.cagr : b.cagr - a.cagr);
+        setUfFundsData(results);
+        setUfLoading(false);
+      }
+    };
+
+    analyzeFunds();
+
+    return () => { active = false; };
+  }, [ufCategoryFilter, ufSubcatFilter, ufPlanFilter, ufTypeFilter, ufSortOrder, debouncedLookback]);
 
   useEffect(() => {
     let active = true;
@@ -1643,9 +1668,9 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* ── Consistently Underperforming Mutual Funds ── */}
+        {/* ── Mutual Fund Performance Explorer ── */}
         <section
-          aria-labelledby="underperf-heading"
+          aria-labelledby="explorer-heading"
           style={{
             contentVisibility: "auto",
             containIntrinsicSize: "auto 360px",
@@ -1655,19 +1680,57 @@ export default function Dashboard() {
             {/* Header */}
             <div className="p-5 pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 id="underperf-heading" className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-                  Consistently Underperforming Mutual Funds
+                <h2 id="explorer-heading" className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${ufSortOrder === "worst" ? "bg-red-500" : "bg-emerald-500"} animate-pulse flex-shrink-0`} />
+                  Mutual Fund Performance Explorer
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Filter by category/subcategory and analyze the worst performing funds over your chosen time horizon.
+                  Filter by category, plan, and timeframe to instantly analyze the {ufSortOrder === "worst" ? "worst" : "best"} performing funds. (Auto-updates)
                 </p>
+              </div>
+
+              {/* Toggles Container */}
+              <div className="flex flex-col sm:flex-row items-end gap-3 mt-3 sm:mt-0">
+                {/* Sort Mode Toggle */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
+                  <button
+                    onClick={() => setUfSortOrder("best")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                      ufSortOrder === "best"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    Top 🏆
+                  </button>
+                  <button
+                    onClick={() => setUfSortOrder("worst")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                      ufSortOrder === "worst"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    Bottom 📉
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Content & Controls */}
             <div className="p-4 sm:p-5">
-              <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 mb-6 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-3 mb-6 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 relative">
+                
+                {/* Loading overlay for the controls */}
+                {ufLoading && (
+                  <div className="absolute -top-3 -right-3">
+                    <span className="flex h-6 w-6">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-6 w-6 bg-blue-500 border-2 border-white dark:border-slate-800"></span>
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex flex-col w-full sm:w-auto flex-1 min-w-[120px]">
                   <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Category</label>
                   <select 
@@ -1679,7 +1742,7 @@ export default function Dashboard() {
                     className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   >
                     <option value="All">All Categories</option>
-                    {Array.from(new Set(UNDERPERFORMING_UNIVERSE.map(f => f.category))).map(cat => (
+                    {Array.from(new Set(FUNDS_UNIVERSE.map(f => f.category))).map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -1693,9 +1756,35 @@ export default function Dashboard() {
                     className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   >
                     <option value="All">All Subcategories</option>
-                    {Array.from(new Set(UNDERPERFORMING_UNIVERSE.filter(f => ufCategoryFilter === "All" || f.category === ufCategoryFilter).map(f => f.subcat))).map(scat => (
+                    {Array.from(new Set(FUNDS_UNIVERSE.filter(f => ufCategoryFilter === "All" || f.category === ufCategoryFilter).map(f => f.subcat))).map(scat => (
                       <option key={scat} value={scat}>{scat}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col w-full sm:w-auto flex-1 min-w-[100px]">
+                  <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Plan</label>
+                  <select 
+                    value={ufPlanFilter} 
+                    onChange={(e) => setUfPlanFilter(e.target.value)}
+                    className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="All">All Plans</option>
+                    <option value="Direct">Direct</option>
+                    <option value="Regular">Regular</option>
+                  </select>
+                </div>
+                
+                <div className="flex flex-col w-full sm:w-auto flex-1 min-w-[100px]">
+                  <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Type</label>
+                  <select 
+                    value={ufTypeFilter} 
+                    onChange={(e) => setUfTypeFilter(e.target.value)}
+                    className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Growth">Growth</option>
+                    <option value="IDCW">IDCW</option>
                   </select>
                 </div>
 
@@ -1703,35 +1792,19 @@ export default function Dashboard() {
                   <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Years Back</label>
                   <input 
                     type="number" 
-                    min="1" max="15" 
+                    min="1" max="25" 
                     value={ufLookback} 
-                    onChange={(e) => setUfLookback(Number(e.target.value) || 1)}
+                    onChange={(e) => setUfLookback(Number(e.target.value) || "")}
                     className="w-full text-sm font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center"
                   />
-                </div>
-
-                <div className="flex flex-col w-full sm:w-auto sm:self-end mt-2 sm:mt-0">
-                  <button 
-                    onClick={handleAnalyzeUnderperforming}
-                    disabled={ufLoading}
-                    className="h-[38px] px-5 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-blue-500/30 flex items-center justify-center gap-2"
-                  >
-                    {ufLoading ? (
-                      <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    )}
-                    Analyze
-                  </button>
                 </div>
               </div>
 
               {/* Data Table */}
               {ufFundsData === null ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                  <div className="text-4xl mb-3">📉</div>
-                  <h3 className="text-slate-900 dark:text-white font-bold mb-1">Ready to Analyze</h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">Select your filters and hit Analyze to fetch real-time historical NAV data for the worst performing mutual funds.</p>
+                  <div className="text-4xl mb-3">⏳</div>
+                  <h3 className="text-slate-900 dark:text-white font-bold mb-1">Initializing Analysis...</h3>
                 </div>
               ) : ufFundsData.length === 0 ? (
                 <div className="text-center py-12">
@@ -1746,7 +1819,8 @@ export default function Dashboard() {
                         <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[200px]">Fund Name</th>
                         <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-3">Category</th>
                         <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-6">Subcategory</th>
-                        <th className="text-right pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">{ufLookback}-Year CAGR</th>
+                        <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-4">Plan / Type</th>
+                        <th className="text-right pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">{ufLookback || 0}-Year CAGR</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
@@ -1758,6 +1832,12 @@ export default function Dashboard() {
                             <span className="text-[9px] font-bold px-2.5 py-1 rounded-full text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">{row.category}</span>
                           </td>
                           <td className="py-4 pr-6 font-semibold text-slate-600 dark:text-slate-300">{row.subcat}</td>
+                          <td className="py-4 pr-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] font-bold text-slate-500">{row.plan}</span>
+                              <span className="text-[9px] font-bold text-slate-500">{row.type}</span>
+                            </div>
+                          </td>
                           <td className="py-4 text-right">
                             <span className={`inline-flex items-center justify-center font-black text-sm px-3 py-1.5 rounded-full border shadow-sm min-w-[70px] ${
                               row.cagr < 0 ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800" :
