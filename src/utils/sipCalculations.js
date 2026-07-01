@@ -22,7 +22,10 @@ export function calculateSIP(monthlyAmount, years, annualReturn, stepUp = 0) {
   const su = Math.max(0, Math.min(Number(stepUp) || 0, 50));
   if (amt <= 0 || yrs <= 0) return zeroResult();
 
-  const r = ret / 100 / 12;
+  // Compound-correct monthly rate: (1 + annual_rate)^(1/12) - 1
+  // NOT annual_rate/12 which is a linear approximation that overestimates.
+  const annualRate = ret / 100;
+  const r = annualRate === 0 ? 0 : Math.pow(1 + annualRate, 1 / 12) - 1;
   const yearlyData = [];
   let totalInvested = 0;
   let baseInvested = 0;
@@ -105,7 +108,9 @@ export function adjustForInflation(nominalValue, inflationRate, years) {
  * Formula: PMT = FV × r / ((1+r)^n − 1)
  */
 export function calculateGoalSIP(targetAmount, years, annualReturn) {
-  const r = annualReturn / 100 / 12;
+  // Compound-correct monthly rate (matches main SIP engine)
+  const annualRate = annualReturn / 100;
+  const r = annualRate === 0 ? 0 : Math.pow(1 + annualRate, 1 / 12) - 1;
   const n = years * 12;
   if (r === 0) return Math.ceil(targetAmount / n);
   // Match the main SIP engine, which compounds each contribution immediately
@@ -179,7 +184,8 @@ export function calculateSWP(
     };
   }
 
-  const r = ret / 100 / 12;
+  // Compound-correct monthly rate
+  const r = ret === 0 ? 0 : Math.pow(1 + ret / 100, 1 / 12) - 1;
   const yearlyData = [];
   let currentBalance = principal;
   let totalWithdrawn = 0;

@@ -127,7 +127,7 @@ async function fetchFundListWithFallback() {
   try {
     const res = await fetchWithRetry(BASE_URL, {}, 1);
     if (Array.isArray(res.data) && res.data.length > 100) {
-      return { data: deduplicateFunds(res.data), source: "mfapi" };
+      return { data: deduplicateFunds(res.data), source: "mfapi", staleDate: null };
     }
     throw new Error("mfapi returned empty or invalid list");
   } catch (primaryErr) {
@@ -146,13 +146,32 @@ async function fetchFundListWithFallback() {
     const funds = parseAmfiNavText(res.data);
     if (funds.length < 100) throw new Error("AMFI returned too few records");
     console.info(`[FundLens] Loaded ${funds.length} funds from AMFI fallback.`);
-    return { data: deduplicateFunds(funds), source: "amfi" };
+    return { data: deduplicateFunds(funds), source: "amfi", staleDate: null };
   } catch (fallbackErr) {
     console.error("[FundLens] AMFI fallback also failed:", fallbackErr.message);
-    throw new Error(
-      "Both mfapi.in and AMFI are unreachable. Please try again later.",
-    );
   }
+
+  // BOTH sources down — serve last cached data (never blank screen)
+  try {
+    const idbCached = await getWithTimeout(FUND_LIST_CACHE_KEY, 2000);
+    if (idbCached && idbCached.data && idbCached.data.length > 100) {
+      const staleDate = idbCached.ts ? new Date(idbCached.ts) : null;
+      console.warn(
+        `[FundLens] Both APIs down. Serving stale cache from ${staleDate?.toLocaleDateString() || "unknown date"}.`,
+      );
+      return {
+        data: deduplicateFunds(idbCached.data),
+        source: "stale-cache",
+        staleDate,
+      };
+    }
+  } catch (cacheErr) {
+    console.error("[FundLens] Stale cache retrieval also failed:", cacheErr.message);
+  }
+
+  throw new Error(
+    "Both mfapi.in and AMFI are unreachable, and no cached data is available. Please check your internet connection and try again.",
+  );
 }
 
 export function useFunds(options = {}) {
@@ -225,21 +244,32 @@ export function useFunds(options = {}) {
         return;
       }
 
-      // 4. Network fetch
+      // 4. Network fetch (with stale-cache fallback built in)
       activeListFetchPromise = fetchFundListWithFallback()
-        .then(({ data }) => {
+        .then(({ data, source, staleDate }) => {
           memoryCachedList = data;
-          setWithTimeout(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
+          // Only update IDB cache if this is fresh data (not stale cache)
+          if (source !== "stale-cache") {
+            setWithTimeout(FUND_LIST_CACHE_KEY, { ts: Date.now(), data });
+          }
           activeListFetchPromise = null;
-          return data;
+          return { data, source, staleDate };
         })
         .catch((err) => {
           activeListFetchPromise = null;
           throw err;
         });
 
-      const data = await activeListFetchPromise;
-      if (ref.current) setFunds(deduplicateFunds(data));
+      const result = await activeListFetchPromise;
+      if (ref.current) {
+        setFunds(deduplicateFunds(result.data));
+        // If serving stale data, set a non-blocking warning instead of a hard error
+        if (result.source === "stale-cache" && result.staleDate) {
+          setError(
+            `Network unavailable. Showing cached data from ${result.staleDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Some information may be outdated.`,
+          );
+        }
+      }
     } catch (err) {
       if (ref.current) {
         setError(
@@ -310,22 +340,47 @@ export async function fetchFundDetail(schemeCode) {
       const idbCached = await getWithTimeout(idbKey);
       const now = Date.now();
 
+      // Align TTL with AMFI daily update (~11 PM IST)
+      // Calculate ms until next 11 PM IST from the cache timestamp
+      const DAILY_UPDATE_HOUR_IST = 23; // 11 PM IST
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // IST = UTC+5:30
+      let cacheTTL = 12 * 60 * 60 * 1000; // fallback 12h
+      if (idbCached && idbCached.timestamp) {
+        const cachedAtIST = new Date(idbCached.timestamp + IST_OFFSET_MS);
+        const nextUpdate = new Date(cachedAtIST);
+        nextUpdate.setUTCHours(DAILY_UPDATE_HOUR_IST - 5, 30, 0, 0); // 11PM IST in UTC
+        if (nextUpdate.getTime() <= idbCached.timestamp) {
+          nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
+        }
+        cacheTTL = nextUpdate.getTime() - idbCached.timestamp;
+      }
+
       if (
         idbCached &&
         idbCached.timestamp &&
-        now - idbCached.timestamp < 12 * 60 * 60 * 1000
+        now - idbCached.timestamp < cacheTTL
       ) {
         detailsMemoryCache.set(codeStr, idbCached.data);
         return idbCached.data;
       }
 
-      const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
-      const data = res.data;
-
-      detailsMemoryCache.set(codeStr, data);
-      await setWithTimeout(idbKey, { timestamp: now, data });
-
-      return data;
+      try {
+        const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
+        const data = res.data;
+        detailsMemoryCache.set(codeStr, data);
+        await setWithTimeout(idbKey, { timestamp: now, data });
+        return data;
+      } catch (networkErr) {
+        // Network failed — serve stale cached data if available (never blank)
+        if (idbCached && idbCached.data) {
+          console.warn(
+            `[FundLens] Network failed for fund ${codeStr}, serving stale cache.`,
+          );
+          detailsMemoryCache.set(codeStr, idbCached.data);
+          return idbCached.data;
+        }
+        throw networkErr;
+      }
     } finally {
       activeDetailFetchPromises.delete(codeStr);
     }
