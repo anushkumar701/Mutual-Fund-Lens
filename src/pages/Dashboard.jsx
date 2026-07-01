@@ -545,6 +545,75 @@ export default function Dashboard() {
   const [upMetric, setUpMetric] = useState("returns"); // 'returns' | 'volatility'
   const [upGrouping, setUpGrouping] = useState("subcategory"); // 'subcategory' | 'category'
 
+  // States for Underperforming Mutual Funds feature
+  const [ufCategoryFilter, setUfCategoryFilter] = useState("All");
+  const [ufSubcatFilter, setUfSubcatFilter] = useState("All");
+  const [ufLookback, setUfLookback] = useState(5);
+  const [ufLoading, setUfLoading] = useState(false);
+  const [ufFundsData, setUfFundsData] = useState(null);
+
+  const UNDERPERFORMING_UNIVERSE = [
+    { code: "125354", name: "Axis Small Cap Fund", category: "Equity", subcat: "Small Cap" },
+    { code: "119062", name: "SBI Small Cap Fund", category: "Equity", subcat: "Small Cap" },
+    { code: "120847", name: "HDFC Mid-Cap Opportunities Fund", category: "Equity", subcat: "Mid Cap" },
+    { code: "119063", name: "SBI Magnum Midcap Fund", category: "Equity", subcat: "Mid Cap" },
+    { code: "120194", name: "Nippon India Large Cap Fund", category: "Equity", subcat: "Large Cap" },
+    { code: "118272", name: "ICICI Prudential Bluechip Fund", category: "Equity", subcat: "Large Cap" },
+    { code: "122639", name: "Parag Parikh Flexi Cap Fund", category: "Equity", subcat: "Flexi Cap" },
+    { code: "118269", name: "ICICI Prudential Flexicap Fund", category: "Equity", subcat: "Flexi Cap" },
+    { code: "120503", name: "Nifty 50 Index", category: "Index", subcat: "Nifty 50" },
+    { code: "120147", name: "HDFC Corporate Bond Fund", category: "Debt", subcat: "Corporate Bond" },
+    { code: "119827", name: "SBI Magnum Gilt Fund", category: "Debt", subcat: "Gilt" },
+    { code: "120166", name: "HDFC Short Term Debt Fund", category: "Debt", subcat: "Short Duration" },
+    { code: "120366", name: "ICICI Prudential Equity & Debt Fund", category: "Hybrid", subcat: "Aggr Hybrid" },
+    { code: "120302", name: "ICICI Prudential Balanced Advantage", category: "Hybrid", subcat: "Balanced Adv" },
+    { code: "120827", name: "HDFC Arbitrage Fund", category: "Hybrid", subcat: "Arbitrage" },
+    { code: "120152", name: "HDFC Liquid Fund", category: "Liquid", subcat: "Liquid Fund" },
+    { code: "146193", name: "HDFC Overnight Fund", category: "Liquid", subcat: "Overnight Fund" }
+  ];
+
+  const handleAnalyzeUnderperforming = async () => {
+    setUfLoading(true);
+    let filtered = UNDERPERFORMING_UNIVERSE;
+    if (ufCategoryFilter !== "All") filtered = filtered.filter(f => f.category === ufCategoryFilter);
+    if (ufSubcatFilter !== "All") filtered = filtered.filter(f => f.subcat === ufSubcatFilter);
+    
+    const results = [];
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    const targetMs = Date.now() - (ufLookback * oneYearMs);
+
+    for (const fund of filtered) {
+      try {
+        const details = await fetchFundDetail(fund.code);
+        if (details && details.data && details.data.length > 0) {
+          const navData = details.data;
+          const currentNav = parseFloat(navData[0].nav);
+          // find nav closest to targetMs
+          let oldNav = null;
+          for (let i = 0; i < navData.length; i++) {
+            const rowDate = new Date(navData[i].date.split("-").reverse().join("-")).getTime();
+            if (rowDate <= targetMs) {
+              oldNav = parseFloat(navData[i].nav);
+              break;
+            }
+          }
+          if (oldNav) {
+            const absoluteReturn = ((currentNav - oldNav) / oldNav) * 100;
+            // Calculate annualized return (CAGR)
+            const cagr = ((Math.pow(currentNav / oldNav, 1 / ufLookback)) - 1) * 100;
+            results.push({ ...fund, cagr: Number(cagr.toFixed(2)) });
+          }
+        }
+      } catch (e) {
+        console.warn("Error fetching fund details", e);
+      }
+    }
+    
+    results.sort((a, b) => a.cagr - b.cagr);
+    setUfFundsData(results);
+    setUfLoading(false);
+  };
+
   useEffect(() => {
     let active = true;
     const fetchDynamicReturns = async () => {
@@ -1564,7 +1633,7 @@ export default function Dashboard() {
                     );
                   })()}
 
-                  <p className="text-[10px] text-slate-700 dark:text-slate-400 mt-4">
+                  <p className="text-[10px] text-slate-700 dark:text-400 mt-4">
                     * Approximate median category returns. Actual individual
                     fund returns vary. Source: industry estimates.
                   </p>
@@ -1574,7 +1643,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* ── Consistently Underperforming Asset Classes ── */}
+        {/* ── Consistently Underperforming Mutual Funds ── */}
         <section
           aria-labelledby="underperf-heading"
           style={{
@@ -1582,344 +1651,130 @@ export default function Dashboard() {
             containIntrinsicSize: "auto 360px",
           }}
         >
-          {(() => {
-            // ONE_YEAR_VOLATILITY — real historical standard deviation data per subcategory
-            const ONE_YEAR_VOLATILITY = {
-              // Equity
-              "Small Cap":   { stdDev1Y: 28.4, stdDev3Y: 24.1, stdDev5Y: 22.8 },
-              "Mid Cap":     { stdDev1Y: 22.1, stdDev3Y: 19.5, stdDev5Y: 18.2 },
-              "Large Cap":   { stdDev1Y: 14.8, stdDev3Y: 13.2, stdDev5Y: 12.6 },
-              "Flexi Cap":   { stdDev1Y: 17.6, stdDev3Y: 15.8, stdDev5Y: 14.9 },
-              "Multi Cap":   { stdDev1Y: 18.9, stdDev3Y: 16.4, stdDev5Y: 15.7 },
-              // Index
-              "Nifty 50":        { stdDev1Y: 13.5, stdDev3Y: 12.1, stdDev5Y: 11.8 },
-              "Nifty Next 50":   { stdDev1Y: 19.2, stdDev3Y: 16.9, stdDev5Y: 15.4 },
-              "Sensex":          { stdDev1Y: 12.8, stdDev3Y: 11.4, stdDev5Y: 10.9 },
-              "Nifty Midcap 150":{ stdDev1Y: 21.3, stdDev3Y: 18.7, stdDev5Y: 17.2 },
-              // Hybrid
-              "Aggressive Hybrid":        { stdDev1Y: 13.2, stdDev3Y: 11.6, stdDev5Y: 10.8 },
-              "Balanced Advantage (DAA)": { stdDev1Y: 9.4,  stdDev3Y: 8.2,  stdDev5Y: 7.8  },
-              "Arbitrage":                { stdDev1Y: 1.8,  stdDev3Y: 1.6,  stdDev5Y: 1.5  },
-              "Multi Asset":              { stdDev1Y: 10.1, stdDev3Y: 8.9,  stdDev5Y: 8.3  },
-              // Debt
-              "Gilt (Govt Bonds)": { stdDev1Y: 8.4,  stdDev3Y: 7.2, stdDev5Y: 6.8 },
-              "Corporate Bond":    { stdDev1Y: 4.6,  stdDev3Y: 4.1, stdDev5Y: 3.9 },
-              "Short Duration":    { stdDev1Y: 3.2,  stdDev3Y: 2.9, stdDev5Y: 2.7 },
-              "Credit Risk":       { stdDev1Y: 6.8,  stdDev3Y: 5.4, stdDev5Y: 5.1 },
-              // Liquid
-              "Liquid Fund":    { stdDev1Y: 0.8,  stdDev3Y: 0.7, stdDev5Y: 0.6 },
-              "Overnight Fund": { stdDev1Y: 0.5,  stdDev3Y: 0.4, stdDev5Y: 0.4 },
-              "Money Market":   { stdDev1Y: 1.1,  stdDev3Y: 0.9, stdDev5Y: 0.8 },
-              // ELSS
-              "ELSS Tax Saver (Direct)":  { stdDev1Y: 18.2, stdDev3Y: 16.4, stdDev5Y: 15.1 },
-              "ELSS Tax Saver (Regular)": { stdDev1Y: 18.8, stdDev3Y: 16.9, stdDev5Y: 15.6 },
-            };
+          <div className="card overflow-hidden">
+            {/* Header */}
+            <div className="p-5 pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 id="underperf-heading" className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                  Consistently Underperforming Mutual Funds
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Filter by category/subcategory and analyze the worst performing funds over your chosen time horizon.
+                </p>
+              </div>
+            </div>
 
-            // Compute multi-period returns per subcategory
-            const rows = [];
-            Object.entries(SUBCAT_DATA).forEach(([category, subcats]) => {
-              Object.entries(subcats).forEach(([subcat, returns]) => {
-                const len = returns.length;
-                const avg1Y  = len >= 1  ? returns[len - 1]  : null;
-                const avg3Y  = len >= 3  ? (returns.slice(len - 3).reduce((a,b)=>a+b,0) / 3)  : null;
-                const avg5Y  = len >= 5  ? (returns.slice(len - 5).reduce((a,b)=>a+b,0) / 5)  : null;
-                const avgAll = returns.reduce((a,b)=>a+b,0) / len;
-                const vol = ONE_YEAR_VOLATILITY[subcat] || { stdDev1Y: null, stdDev3Y: null, stdDev5Y: null };
-                rows.push({
-                  category, subcat,
-                  avg1Y: avg1Y !== null ? parseFloat(avg1Y.toFixed(1)) : null,
-                  avg3Y: avg3Y !== null ? parseFloat(avg3Y.toFixed(1)) : null,
-                  avg5Y: avg5Y !== null ? parseFloat(avg5Y.toFixed(1)) : null,
-                  avgAll: parseFloat(avgAll.toFixed(1)),
-                  stdDev1Y: vol.stdDev1Y,
-                  stdDev3Y: vol.stdDev3Y,
-                  stdDev5Y: vol.stdDev5Y,
-                });
-              });
-            });
-
-            // Sort by worst 5Y avg return
-            rows.sort((a, b) => (a.avg5Y ?? a.avgAll) - (b.avg5Y ?? b.avgAll));
-            
-            let finalRows = [];
-            if (upGrouping === "subcategory") {
-              finalRows = rows.slice(0, 8); // Show bottom 8 subcategories
-            } else {
-              // Group by category and average the metrics
-              const catMap = {};
-              rows.forEach(r => {
-                if (!catMap[r.category]) {
-                  catMap[r.category] = { category: r.category, subcat: "All " + r.category, avg1Y: [], avg3Y: [], avg5Y: [], stdDev1Y: [], stdDev3Y: [], stdDev5Y: [] };
-                }
-                if (r.avg1Y !== null) catMap[r.category].avg1Y.push(r.avg1Y);
-                if (r.avg3Y !== null) catMap[r.category].avg3Y.push(r.avg3Y);
-                if (r.avg5Y !== null) catMap[r.category].avg5Y.push(r.avg5Y);
-                if (r.stdDev1Y !== null) catMap[r.category].stdDev1Y.push(r.stdDev1Y);
-                if (r.stdDev3Y !== null) catMap[r.category].stdDev3Y.push(r.stdDev3Y);
-                if (r.stdDev5Y !== null) catMap[r.category].stdDev5Y.push(r.stdDev5Y);
-              });
-              
-              finalRows = Object.values(catMap).map(c => ({
-                category: c.category,
-                subcat: c.subcat,
-                avg1Y: c.avg1Y.length ? Number((c.avg1Y.reduce((a,b)=>a+b,0)/c.avg1Y.length).toFixed(1)) : null,
-                avg3Y: c.avg3Y.length ? Number((c.avg3Y.reduce((a,b)=>a+b,0)/c.avg3Y.length).toFixed(1)) : null,
-                avg5Y: c.avg5Y.length ? Number((c.avg5Y.reduce((a,b)=>a+b,0)/c.avg5Y.length).toFixed(1)) : null,
-                stdDev1Y: c.stdDev1Y.length ? Number((c.stdDev1Y.reduce((a,b)=>a+b,0)/c.stdDev1Y.length).toFixed(1)) : null,
-                stdDev3Y: c.stdDev3Y.length ? Number((c.stdDev3Y.reduce((a,b)=>a+b,0)/c.stdDev3Y.length).toFixed(1)) : null,
-                stdDev5Y: c.stdDev5Y.length ? Number((c.stdDev5Y.reduce((a,b)=>a+b,0)/c.stdDev5Y.length).toFixed(1)) : null,
-              }));
-              // Sort categories by worst 5Y return
-              finalRows.sort((a, b) => (a.avg5Y ?? 0) - (b.avg5Y ?? 0));
-            }
-
-            // Determine best (highest return) per column in returns mode
-            const best1YReturn  = Math.max(...finalRows.map(r => r.avg1Y ?? -Infinity));
-            const best3YReturn  = Math.max(...finalRows.map(r => r.avg3Y ?? -Infinity));
-            const best5YReturn  = Math.max(...finalRows.map(r => r.avg5Y ?? -Infinity));
-            // Determine safest (lowest std dev) per column in volatility mode
-            const safest1Y = Math.min(...finalRows.filter(r => r.stdDev1Y !== null).map(r => r.stdDev1Y));
-            const safest3Y = Math.min(...finalRows.filter(r => r.stdDev3Y !== null).map(r => r.stdDev3Y));
-            const safest5Y = Math.min(...finalRows.filter(r => r.stdDev5Y !== null).map(r => r.stdDev5Y));
-
-            const catColors = {
-              Equity: "#2563eb", Index: "#0891b2", Hybrid: "#ea580c",
-              Debt: "#16a34a", Liquid: "#0d9488", ELSS: "#7c3aed",
-            };
-
-            const returnPillStyle = (val, isBest) => {
-              if (isBest) return "bg-emerald-600 text-white border-emerald-700";
-              if (val === null) return "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500";
-              if (val < 0) return "bg-red-500 text-white border-red-600";
-              if (val < 5) return "bg-orange-500 text-white border-orange-600";
-              return "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
-            };
-            const volPillStyle = (val, isSafest) => {
-              if (isSafest) return "bg-emerald-600 text-white border-emerald-700";
-              if (val === null) return "bg-slate-100 dark:bg-slate-700 text-slate-400";
-              if (val <= 2) return "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300";
-              if (val <= 8) return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300";
-              return "bg-red-500 text-white border-red-600";
-            };
-
-            return (
-              <div className="card overflow-hidden">
-                {/* Header */}
-                <div className="p-5 pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 id="underperf-heading" className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-                      Consistently Underperforming Asset Classes
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      {upGrouping === "subcategory" ? "Bottom 8 sub-categories by 5-year average return — sorted lowest first" : "Macro categories by 5-year average return — sorted lowest first"}
-                    </p>
-                  </div>
-                  {/* Controls Container */}
-                  <div className="flex flex-col sm:flex-row items-end gap-3 mt-3 sm:mt-0">
-                    {/* Category vs Subcategory Toggle */}
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
-                      <button
-                        onClick={() => setUpGrouping("category")}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          upGrouping === "category"
-                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                        }`}
-                      >
-                        🗂️ Category
-                      </button>
-                      <button
-                        onClick={() => setUpGrouping("subcategory")}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          upGrouping === "subcategory"
-                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                        }`}
-                      >
-                        📂 Subcategory
-                      </button>
-                    </div>
-
-                    {/* Returns vs Volatility Toggle */}
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
-                      <button
-                        onClick={() => setUpMetric("returns")}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          upMetric === "returns"
-                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                        }`}
-                      >
-                        📈 Returns
-                      </button>
-                      <button
-                        onClick={() => setUpMetric("volatility")}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          upMetric === "volatility"
-                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                        }`}
-                      >
-                        〰️ Volatility
-                      </button>
-                    </div>
-                  </div>
+            {/* Content & Controls */}
+            <div className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 mb-6 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col w-full sm:w-auto flex-1 min-w-[120px]">
+                  <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Category</label>
+                  <select 
+                    value={ufCategoryFilter} 
+                    onChange={(e) => {
+                      setUfCategoryFilter(e.target.value);
+                      setUfSubcatFilter("All");
+                    }}
+                    className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="All">All Categories</option>
+                    {Array.from(new Set(UNDERPERFORMING_UNIVERSE.map(f => f.category))).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex flex-col w-full sm:w-auto flex-1 min-w-[120px]">
+                  <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Subcategory</label>
+                  <select 
+                    value={ufSubcatFilter} 
+                    onChange={(e) => setUfSubcatFilter(e.target.value)}
+                    className="w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="All">All Subcategories</option>
+                    {Array.from(new Set(UNDERPERFORMING_UNIVERSE.filter(f => ufCategoryFilter === "All" || f.category === ufCategoryFilter).map(f => f.subcat))).map(scat => (
+                      <option key={scat} value={scat}>{scat}</option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Content */}
-                <div className="p-4 sm:p-5">
-                  {/* Desktop: table */}
-                  <div className="hidden sm:block overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800">
-                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-3 w-28">Category</th>
-                          <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-6">Subcategory</th>
-                          <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "1-Year" : "1Y Vol (σ)"}
-                          </th>
-                          <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "3-Year Avg" : "3Y Vol (σ)"}
-                          </th>
-                          <th className="text-center pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24">
-                            {upMetric === "returns" ? "5-Year Avg" : "5Y Vol (σ)"}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                        {finalRows.map((row) => {
-                          const catColor = catColors[row.category] || "#64748b";
-                          const isBest1Y = row.avg1Y === best1YReturn;
-                          const isBest3Y = row.avg3Y === best3YReturn;
-                          const isBest5Y = row.avg5Y === best5YReturn;
-                          const isSafest1Y = row.stdDev1Y === safest1Y;
-                          const isSafest3Y = row.stdDev3Y === safest3Y;
-                          const isSafest5Y = row.stdDev5Y === safest5Y;
-                          return (
-                            <tr key={`${row.category}-${row.subcat}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                              {/* Category — always visible */}
-                              <td className="py-3 pr-3">
-                                <span className="text-[9px] font-bold px-2 py-1 rounded-full text-white inline-block" style={{ background: catColor }}>{row.category}</span>
-                              </td>
-                              {/* Subcategory — always visible */}
-                              <td className="py-3 pr-6 font-semibold text-slate-800 dark:text-slate-200">{row.subcat}</td>
-                              {/* Metric col 1 */}
-                              <td className="py-3 text-center">
-                                {upMetric === "returns" ? (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg1Y, isBest1Y)}`}>
-                                    {isBest1Y && <span>🏆</span>}
-                                    {row.avg1Y !== null ? `${row.avg1Y > 0 ? "+" : ""}${row.avg1Y}%` : "N/A"}
-                                  </span>
-                                ) : (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${volPillStyle(row.stdDev1Y, isSafest1Y)}`}>
-                                    {isSafest1Y && <span>🛡️</span>}
-                                    {row.stdDev1Y !== null ? `${row.stdDev1Y}%` : "N/A"}
-                                  </span>
-                                )}
-                              </td>
-                              {/* Metric col 2 */}
-                              <td className="py-3 text-center">
-                                {upMetric === "returns" ? (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg3Y, isBest3Y)}`}>
-                                    {isBest3Y && <span>🏆</span>}
-                                    {row.avg3Y !== null ? `${row.avg3Y > 0 ? "+" : ""}${row.avg3Y}%` : "N/A"}
-                                  </span>
-                                ) : (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${volPillStyle(row.stdDev3Y, isSafest3Y)}`}>
-                                    {isSafest3Y && <span>🛡️</span>}
-                                    {row.stdDev3Y !== null ? `${row.stdDev3Y}%` : "N/A"}
-                                  </span>
-                                )}
-                              </td>
-                              {/* Metric col 3 */}
-                              <td className="py-3 text-center">
-                                {upMetric === "returns" ? (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${returnPillStyle(row.avg5Y, isBest5Y)}`}>
-                                    {isBest5Y && <span>🏆</span>}
-                                    {row.avg5Y !== null ? `${row.avg5Y > 0 ? "+" : ""}${row.avg5Y}%` : "N/A"}
-                                  </span>
-                                ) : (
-                                  <span className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-1 rounded-full border ${volPillStyle(row.stdDev5Y, isSafest5Y)}`}>
-                                    {isSafest5Y && <span>🛡️</span>}
-                                    {row.stdDev5Y !== null ? `${row.stdDev5Y}%` : "N/A"}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="flex flex-col w-full sm:w-24 flex-shrink-0">
+                  <label className="text-[10px] font-extrabold uppercase text-slate-500 mb-1 ml-1">Years Back</label>
+                  <input 
+                    type="number" 
+                    min="1" max="15" 
+                    value={ufLookback} 
+                    onChange={(e) => setUfLookback(Number(e.target.value) || 1)}
+                    className="w-full text-sm font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center"
+                  />
+                </div>
 
-
-                  {/* Mobile: vertical cards */}
-                  <div className="flex flex-col gap-3 sm:hidden">
-                    {finalRows.map((row) => {
-                      const catColor = catColors[row.category] || "#64748b";
-                      const isBest1Y = row.avg1Y === best1YReturn;
-                      const isBest3Y = row.avg3Y === best3YReturn;
-                      const isBest5Y = row.avg5Y === best5YReturn;
-                      const isSafest1Y = row.stdDev1Y === safest1Y;
-                      const isSafest3Y = row.stdDev3Y === safest3Y;
-                      const isSafest5Y = row.stdDev5Y === safest5Y;
-                      return (
-                        <div
-                          key={`${row.category}-${row.subcat}-m`}
-                          className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4"
-                        >
-                          <div className="flex items-start justify-between mb-3 gap-2">
-                            <div>
-                              <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Subcategory</div>
-                              <div className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{row.subcat}</div>
-                              <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-2">Category</div>
-                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white mt-0.5 inline-block" style={{ background: catColor }}>{row.category}</span>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="text-[9px] text-slate-400 uppercase font-bold mb-1">5Y Avg</div>
-                              <span className={`inline-flex items-center gap-1 font-black text-sm px-3 py-1 rounded-full border ${returnPillStyle(row.avg5Y, isBest5Y)}`}>
-                                {isBest5Y && <span>🏆</span>}
-                                {row.avg5Y !== null ? `${row.avg5Y > 0 ? "+" : ""}${row.avg5Y}%` : "N/A"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { label: "1-Year", retVal: row.avg1Y, isBest: isBest1Y, volVal: row.stdDev1Y, isSafest: isSafest1Y },
-                              { label: "3-Year", retVal: row.avg3Y, isBest: isBest3Y, volVal: row.stdDev3Y, isSafest: isSafest3Y },
-                              { label: "5-Year", retVal: row.avg5Y, isBest: isBest5Y, volVal: row.stdDev5Y, isSafest: isSafest5Y },
-                            ].map(({ label, retVal, isBest, volVal, isSafest }) => (
-                              <div key={label} className="flex flex-col items-center gap-1">
-                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</div>
-                                {/* Returns */}
-                                <span className={`inline-flex items-center gap-0.5 font-black text-[10px] px-2 py-0.5 rounded-full border ${returnPillStyle(retVal, isBest)}`}>
-                                  {isBest && <span>🏆</span>}
-                                  {retVal !== null ? `${retVal > 0 ? "+" : ""}${retVal}%` : "—"}
-                                </span>
-                                {/* Volatility */}
-                                <span className={`inline-flex items-center gap-0.5 font-semibold text-[9px] px-2 py-0.5 rounded-full ${volPillStyle(volVal, isSafest)}`}>
-                                  {isSafest && <span>🛡️</span>}
-                                  {volVal !== null ? `σ ${volVal}%` : "—"}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p className="text-[10px] text-slate-500 dark:text-slate-500 mt-4 flex items-start gap-1.5">
-                    <svg className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>🏆 Best return in each column · 🛡️ Safest (lowest σ volatility) · σ = standard deviation. Data based on historical category averages 2013–2025.</span>
-                  </p>
+                <div className="flex flex-col w-full sm:w-auto sm:self-end mt-2 sm:mt-0">
+                  <button 
+                    onClick={handleAnalyzeUnderperforming}
+                    disabled={ufLoading}
+                    className="h-[38px] px-5 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-blue-500/30 flex items-center justify-center gap-2"
+                  >
+                    {ufLoading ? (
+                      <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    )}
+                    Analyze
+                  </button>
                 </div>
               </div>
-            );
-          })()}
+
+              {/* Data Table */}
+              {ufFundsData === null ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                  <div className="text-4xl mb-3">📉</div>
+                  <h3 className="text-slate-900 dark:text-white font-bold mb-1">Ready to Analyze</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">Select your filters and hit Analyze to fetch real-time historical NAV data for the worst performing mutual funds.</p>
+                </div>
+              ) : ufFundsData.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-slate-500 dark:text-slate-400">No funds found matching these exact criteria or time horizon.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                        <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-12">Rank</th>
+                        <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 min-w-[200px]">Fund Name</th>
+                        <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-3">Category</th>
+                        <th className="text-left pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-6">Subcategory</th>
+                        <th className="text-right pb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">{ufLookback}-Year CAGR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                      {ufFundsData.map((row, idx) => (
+                        <tr key={row.code} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="py-4 font-bold text-slate-400">{idx + 1}</td>
+                          <td className="py-4 pr-4 font-bold text-slate-900 dark:text-white text-sm">{row.name}</td>
+                          <td className="py-4 pr-3">
+                            <span className="text-[9px] font-bold px-2.5 py-1 rounded-full text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">{row.category}</span>
+                          </td>
+                          <td className="py-4 pr-6 font-semibold text-slate-600 dark:text-slate-300">{row.subcat}</td>
+                          <td className="py-4 text-right">
+                            <span className={`inline-flex items-center justify-center font-black text-sm px-3 py-1.5 rounded-full border shadow-sm min-w-[70px] ${
+                              row.cagr < 0 ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800" :
+                              row.cagr < 7 ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800" :
+                              "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+                            }`}>
+                              {row.cagr > 0 ? "+" : ""}{row.cagr}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
 
 
