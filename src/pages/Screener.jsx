@@ -9,6 +9,7 @@ import { inferCategory } from "../utils/goalFilters";
 import { extractAMC, getPlanType, isFundClosed } from "../utils/fundFilters";
 import { getExpenseRatio, getER } from "../utils/expenseRatio";
 import { List as VirtualList } from "react-window";
+import Fuse from "fuse.js";
 
 // lazy must be declared after all static imports
 const FundDetailModal = lazy(() => import("../components/FundDetailModal"));
@@ -326,20 +327,27 @@ export default function Screener() {
     return c;
   }, [funds]);
 
-  const filtered = useMemo(() => {
-    let list =
-      tab === "watchlist"
-        ? funds.filter((f) =>
-            watchlist.map(String).includes(String(f.schemeCode)),
-          )
-        : funds;
+  const fuseIndex = useMemo(() => {
+    if (!funds || funds.length === 0) return null;
+    return new Fuse(funds, {
+      keys: ["schemeName", "schemeCode"],
+      threshold: 0.3, // fuzzy threshold
+      distance: 100,
+    });
+  }, [funds]);
 
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      list = list.filter(
-        (f) =>
-          f.schemeName.toLowerCase().includes(q) ||
-          String(f.schemeCode).includes(q),
+  const filtered = useMemo(() => {
+    let list = funds;
+
+    // Search is handled first via Fuse.js if query exists
+    if (debouncedSearch.trim() && fuseIndex) {
+      list = fuseIndex.search(debouncedSearch).map(result => result.item);
+    }
+
+    // Tab filter
+    if (tab === "watchlist") {
+      list = list.filter((f) =>
+        watchlist.map(String).includes(String(f.schemeCode)),
       );
     }
     if (!showClosed) list = list.filter((f) => !isFundClosed(f.schemeName));
@@ -725,10 +733,22 @@ export default function Screener() {
                   </p>
                 )}
                 {plan === "Regular" && (
-                  <p className="text-[10px] text-orange-600 mt-1">
-                    Regular plans include distributor commission — costs you
-                    more.
-                  </p>
+                  <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 rounded-lg">
+                    <p className="text-[11px] font-bold text-orange-800 dark:text-orange-400 mb-2 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                      Hidden Commission Impact (Assuming 1% higher ER)
+                    </p>
+                    <div className="flex gap-2 text-center">
+                      <div className="flex-1 bg-white dark:bg-[#111622] rounded p-2 border border-orange-100 dark:border-orange-800/30">
+                        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">₹10k/mo SIP • 10 Yrs</div>
+                        <div className="text-xs font-black text-rose-500 mt-0.5">Lose ~₹2.1 Lakhs</div>
+                      </div>
+                      <div className="flex-1 bg-white dark:bg-[#111622] rounded p-2 border border-orange-100 dark:border-orange-800/30">
+                        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">₹10k/mo SIP • 20 Yrs</div>
+                        <div className="text-xs font-black text-rose-500 mt-0.5">Lose ~₹12.8 Lakhs</div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
               <div>

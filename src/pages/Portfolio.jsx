@@ -13,6 +13,8 @@ import {
   STORAGE_KEYS,
   loadAndMigrateHoldings,
 } from "../config/financial";
+import { calculateTrueXIRR } from "../utils/metrics";
+import { inferCategory } from "../utils/goalFilters";
 
 const PortfolioCharts = lazy(() => import("../components/PortfolioCharts"));
 
@@ -144,37 +146,52 @@ export default function Portfolio() {
     }
   };
 
-  // Cached fund details (NAV list, current price)
-  const [detailsCache, setDetailsCache] = useState(() => {
-    try {
-      const saved = localStorage.getItem("fundlens_portfolio_details_cache");
-      const savedTs = localStorage.getItem("fundlens_portfolio_details_cache_ts");
-      if (saved && savedTs) {
-        const ageHours = (Date.now() - parseInt(savedTs, 10)) / (1000 * 60 * 60);
-        // Invalidate cache if older than 4 hours so NAVs update daily
-        if (ageHours < 4) {
-          return JSON.parse(saved);
-        }
-      }
-      return {};
-    } catch {
-      return {};
-    }
-  });
+  // Cached fund details (NAV list, current price) moved to IndexedDB (5-10MB limit safe)
+  const [detailsCache, setDetailsCache] = useState({});
+  const [detailsCacheLoaded, setDetailsCacheLoaded] = useState(false);
+  
   // Mirror detailsCache in a ref so effects can read the current value
   // without needing it in their dependency arrays (avoids stale-closure bugs).
   const detailsCacheRef = useRef(detailsCache);
 
   useEffect(() => {
-    try {
-      if (Object.keys(detailsCache).length > 0) {
-        localStorage.setItem("fundlens_portfolio_details_cache", JSON.stringify(detailsCache));
-        localStorage.setItem("fundlens_portfolio_details_cache_ts", Date.now().toString());
+    const loadCache = async () => {
+      try {
+        const { get } = await import("idb-keyval");
+        const saved = await get("fundlens_portfolio_details_cache");
+        const savedTs = await get("fundlens_portfolio_details_cache_ts");
+        if (saved && savedTs) {
+          const ageHours = (Date.now() - parseInt(savedTs, 10)) / (1000 * 60 * 60);
+          // Invalidate cache if older than 12 hours (aligns roughly with AMFI daily updates)
+          if (ageHours < 12) {
+            setDetailsCache(saved);
+            detailsCacheRef.current = saved;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load details cache from IndexedDB:", e);
+      } finally {
+        setDetailsCacheLoaded(true);
       }
-    } catch (e) {
-      console.warn("Failed to save details cache to localStorage:", e);
-    }
-  }, [detailsCache]);
+    };
+    loadCache();
+  }, []);
+
+  useEffect(() => {
+    if (!detailsCacheLoaded) return;
+    const saveCache = async () => {
+      try {
+        if (Object.keys(detailsCache).length > 0) {
+          const { set } = await import("idb-keyval");
+          await set("fundlens_portfolio_details_cache", detailsCache);
+          await set("fundlens_portfolio_details_cache_ts", Date.now().toString());
+        }
+      } catch (e) {
+        console.warn("Failed to save details cache to IndexedDB:", e);
+      }
+    };
+    saveCache();
+  }, [detailsCache, detailsCacheLoaded]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [editNavLoading, setEditNavLoading] = useState(false);
@@ -229,7 +246,7 @@ export default function Portfolio() {
   // Load details for all holdings when they mount or change.
   // Uses holdingsSafe (schema-migrated) so stale/corrupt entries never hit the API.
   useEffect(() => {
-    if (holdingsSafe.length === 0) return;
+    if (!detailsCacheLoaded || holdingsSafe.length === 0) return;
     
     let isMounted = true;
     const fetchAllDetails = async () => {
@@ -759,6 +776,18 @@ export default function Portfolio() {
       ? (totalDailyChange / (totalCurrent - totalDailyChange)) * 100 
       : 0;
 
+    // Calculate overall portfolio XIRR
+    const cashflows = [];
+    holdingRows.forEach(h => {
+      if (h.amount > 0) {
+        cashflows.push({ amount: -h.amount, when: new Date(h.investedDate) });
+      }
+    });
+    if (totalCurrent > 0) {
+      cashflows.push({ amount: totalCurrent, when: new Date() });
+    }
+    const portfolioXirr = calculateTrueXIRR(cashflows);
+
     return {
       totalInvested,
       totalCurrent,
@@ -766,6 +795,7 @@ export default function Portfolio() {
       totalGainLossPct,
       totalDailyChange,
       totalDailyChangePct,
+      xirr: portfolioXirr,
       holdings: holdingRows,
     };
   }, [holdingsSafe, detailsCache]);
@@ -803,6 +833,18 @@ export default function Portfolio() {
         ? (g.dailyChange / (currentValue - g.dailyChange)) * 100
         : 0;
 
+      // Calculate fund-level XIRR
+      const cashflows = [];
+      g.transactions.forEach(t => {
+        if (t.amount > 0) {
+          cashflows.push({ amount: -t.amount, when: new Date(t.investedDate) });
+        }
+      });
+      if (currentValue > 0) {
+        cashflows.push({ amount: currentValue, when: new Date() });
+      }
+      const fundXirr = calculateTrueXIRR(cashflows);
+
       return {
         ...g,
         currentValue,
@@ -810,6 +852,7 @@ export default function Portfolio() {
         gainLossPct,
         avgBuyNav,
         dailyChangePct,
+        xirr: fundXirr,
       };
     }).sort((a, b) => b.currentValue - a.currentValue);
   }, [portfolioSummary.holdings]);
@@ -883,6 +926,49 @@ export default function Portfolio() {
     });
     return Object.entries(groups).map(([name, value]) => ({ name, value }));
   }, [portfolioSummary.holdings, portfolioSummary.totalCurrent]);
+
+  const overlapWarnings = useMemo(() => {
+    if (!consolidatedHoldings || consolidatedHoldings.length < 2) return [];
+    
+    // Quick local subcat inferrer for overlap check
+    const localGetSubCat = (name) => {
+      const n = name.toLowerCase();
+      if (n.includes("small") && n.includes("cap")) return "Small Cap";
+      if (n.includes("mid") && n.includes("cap")) return "Mid Cap";
+      if (n.includes("large") && n.includes("cap")) return "Large Cap";
+      if (n.includes("flexi") && n.includes("cap")) return "Flexi Cap";
+      if (n.includes("multi") && n.includes("cap")) return "Multi Cap";
+      if (n.includes("elss") || n.includes("tax saver")) return "ELSS";
+      if (n.includes("value") || n.includes("contra")) return "Value/Contra";
+      if (n.includes("focused")) return "Focused";
+      if (n.includes("sector") || n.includes("thematic") || n.includes("pharma") || n.includes("tech") || n.includes("auto") || n.includes("infra") || n.includes("financial") || n.includes("bank")) return "Sector/Thematic";
+      if (n.includes("index") || n.includes("nifty") || n.includes("sensex")) return "Index";
+      return "Other";
+    };
+
+    const subcats = {};
+    consolidatedHoldings.forEach(c => {
+      const cat = inferCategory(c.schemeName);
+      if (cat !== 'Equity') return; 
+      const sc = localGetSubCat(c.schemeName);
+      if (sc && sc !== 'Other') {
+        if (!subcats[sc]) subcats[sc] = [];
+        subcats[sc].push(c);
+      }
+    });
+
+    const warnings = [];
+    for (const [sc, funds] of Object.entries(subcats)) {
+      if (funds.length > 1) {
+        warnings.push({
+          subCat: sc,
+          count: funds.length,
+          funds: funds.map(f => f.schemeName)
+        });
+      }
+    }
+    return warnings;
+  }, [consolidatedHoldings]);
 
   // Export holdings as a JSON file — revoke URL after click to prevent memory leak
   const handleExport = () => {
@@ -1006,7 +1092,7 @@ export default function Portfolio() {
         <div className="space-y-6">
           
           {/* Summary Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Current Portfolio Value</span>
               <div className="text-2xl font-black mt-1.5">{formatCurrencyINR(portfolioSummary.totalCurrent)}</div>
@@ -1029,6 +1115,16 @@ export default function Portfolio() {
                 {portfolioSummary.totalGainLoss >= 0 ? "▲" : "▼"}{" "}
                 {portfolioSummary.totalGainLossPct.toFixed(2)}%
                 <span className="text-slate-400 font-normal">(Absolute)</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Actual Return (XIRR)</span>
+              <div className={`text-2xl font-black mt-1.5 ${portfolioSummary.xirr === null ? "text-slate-600 dark:text-slate-400" : portfolioSummary.xirr >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                {portfolioSummary.xirr !== null ? `${portfolioSummary.xirr >= 0 ? "+" : ""}${portfolioSummary.xirr.toFixed(2)}%` : "N/A"}
+              </div>
+              <div className="mt-2 text-xs font-bold text-slate-400 flex items-center gap-1">
+                Annualized Yield
               </div>
             </div>
 
@@ -1229,6 +1325,34 @@ export default function Portfolio() {
               </div>
             )}
           </div>
+          
+          {/* Overlap Analyzer */}
+          {overlapWarnings.length > 0 && (
+            <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2 mb-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Portfolio Overlap Warning
+              </h3>
+              <p className="text-xs text-orange-700 dark:text-orange-300 mb-3">
+                You hold multiple funds in the same equity sub-category. This often leads to stock overlap, reducing diversification and increasing fees.
+              </p>
+              <div className="space-y-3">
+                {overlapWarnings.map((w, idx) => (
+                  <div key={idx} className="bg-white/60 dark:bg-black/20 rounded-lg p-3 border border-orange-100/50 dark:border-orange-800/30">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-500 block mb-1">
+                      {w.subCat} ({w.count} Funds)
+                    </span>
+                    <ul className="list-disc list-inside text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      {w.funds.map((fName, i) => (
+                        <li key={i} className="truncate">{fName}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Holdings List Section */}
           <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -1271,10 +1395,11 @@ export default function Portfolio() {
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      <th className="px-5 py-3 w-[35%]">Mutual Fund</th>
+                      <th className="px-5 py-3 w-[30%]">Mutual Fund</th>
                       <th className="px-5 py-3 text-right">Invested Amount</th>
                       <th className="px-5 py-3 text-right">Current Value</th>
                       <th className="px-5 py-3 text-right">Total Profit / Loss</th>
+                      <th className="px-5 py-3 text-right">XIRR</th>
                       <th className="px-5 py-3 text-right">Units Held</th>
                       <th className="px-5 py-3 text-right">Avg Buy NAV</th>
                       <th className="px-5 py-3 text-right">Current NAV</th>
@@ -1319,6 +1444,11 @@ export default function Portfolio() {
                               <div className={`text-[10px] font-bold mt-1 ${c.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                 {c.gainLoss >= 0 ? "▲" : "▼"} {c.gainLossPct.toFixed(2)}%
                               </div>
+                            </td>
+                            <td className="px-5 py-4 text-right font-bold text-slate-700 dark:text-slate-300">
+                              <span className={c.xirr === null ? "text-slate-500" : c.xirr >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                                {c.xirr !== null ? `${c.xirr >= 0 ? "+" : ""}${c.xirr.toFixed(1)}%` : "N/A"}
+                              </span>
                             </td>
                             <td className="px-5 py-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
                               {c.totalUnits.toFixed(4)}
@@ -1528,7 +1658,7 @@ export default function Portfolio() {
                           <div className={`text-[10px] font-bold mt-1 ${h.gainLoss >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                             {h.gainLoss >= 0 ? "▲" : "▼"} {h.gainLossPct.toFixed(2)}%
                             {h.cagr !== null && (
-                              <span className="text-slate-400 font-normal"> ({h.cagr.toFixed(1)}% CAGR)</span>
+                              <span className="text-slate-400 font-normal"> ({h.cagr.toFixed(1)}% XIRR)</span>
                             )}
                           </div>
                         </td>

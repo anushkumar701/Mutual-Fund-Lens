@@ -238,3 +238,67 @@ export function calculateSWP(
     ranOutMonth,
   };
 }
+
+/**
+ * Post-tax return calculator (Budget 2024/2026 rules)
+ * Equity: STCG (<= 1yr) = 20%, LTCG (> 1yr) = 12.5% above ₹1.25L
+ * Debt: Slab rate (assume 30% for high bracket) on all gains, no LTCG benefit
+ * 
+ * @param {string} fundType "Equity" | "Debt"
+ * @param {boolean} isSIP true if SIP, false if lumpsum
+ * @param {number} totalInvested
+ * @param {number} maturity
+ * @param {number} years 
+ * @param {number} annualReturn percentage (e.g. 12)
+ * @param {number} finalYearSIPAmount the monthly SIP amount in the final year (for step-up)
+ */
+export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, annualReturn, finalYearSIPAmount = 0) {
+  const totalGain = maturity - totalInvested;
+  if (totalGain <= 0) return { stcg: 0, ltcg: 0, tax: 0, postTaxMaturity: maturity, postTaxReturn: 0 };
+
+  if (fundType === "Debt") {
+    // Debt is fully taxed at slab rate (assuming 30% for conservative worst-case planning)
+    const tax = totalGain * 0.30;
+    return { stcg: 0, ltcg: 0, tax, postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
+  }
+
+  // Equity calculations
+  let stcg = 0;
+  let ltcg = 0;
+
+  if (years <= 1) {
+    // All gains are short-term
+    stcg = totalGain;
+  } else {
+    if (!isSIP) {
+      // Lumpsum > 1 year -> all LTCG
+      ltcg = totalGain;
+    } else {
+      // SIP: last 12 months are STCG, rest is LTCG
+      // Compound-correct monthly rate
+      const r = Math.pow(1 + annualReturn / 100, 1 / 12) - 1;
+      let stInvested = 0;
+      let stValue = 0;
+      for (let m = 1; m <= 12; m++) {
+        stInvested += finalYearSIPAmount;
+        // The instalment made 'm' months ago compounded for 'm' months
+        stValue += finalYearSIPAmount * Math.pow(1 + r, m);
+      }
+      stcg = Math.max(0, stValue - stInvested);
+      ltcg = Math.max(0, totalGain - stcg);
+    }
+  }
+
+  const stcgTax = stcg * 0.20; // 20% STCG
+  const taxableLtcg = Math.max(0, ltcg - 125000); // 1.25L exemption
+  const ltcgTax = taxableLtcg * 0.125; // 12.5% LTCG
+  const tax = stcgTax + ltcgTax;
+
+  return {
+    stcg: Math.round(stcg),
+    ltcg: Math.round(ltcg),
+    tax: Math.round(tax),
+    postTaxMaturity: Math.round(maturity - tax),
+    postTaxReturn: Math.round(totalGain - tax)
+  };
+}
