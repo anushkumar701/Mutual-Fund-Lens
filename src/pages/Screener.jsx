@@ -5,7 +5,7 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce } from "../hooks/useDebounce";
 import SkeletonCard from "../components/SkeletonCard";
 import ErrorState from "../components/ErrorState";
-import { inferCategory } from "../utils/goalFilters";
+import { inferCategory, isSolutionOriented } from "../utils/goalFilters";
 import { extractAMC, getPlanType, isFundClosed } from "../utils/fundFilters";
 import { getExpenseRatio, getER } from "../utils/expenseRatio";
 import { List as VirtualList } from "react-window";
@@ -101,6 +101,13 @@ const FundCard = memo(function FundCard({
           CLOSED / MATURED FUND
         </div>
       )}
+      
+      {/* SEBI 2026 Solution-Oriented warning */}
+      {!closed && isSolutionOriented(fund.schemeName) && (
+        <div className="bg-red-50 dark:bg-red-950/80 border-b border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-[9px] font-bold text-center py-1.5 px-2 uppercase tracking-wide">
+          ⚠️ SEBI '26: Closed to New Subscriptions
+        </div>
+      )}
 
       <div className="p-4 flex flex-col gap-3 flex-1">
         {/* Top badges */}
@@ -153,31 +160,38 @@ const FundCard = memo(function FundCard({
         </div>
 
         {/* ER + plan tip */}
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="text-slate-500 dark:text-slate-400">
-            Expense Ratio:{" "}
-            <strong
-              className={
-                er > 1 ? "text-red-500" : "text-slate-700 dark:text-slate-300"
-              }
-            >
-              {er !== null ? `${er}%/yr` : "N/A"}
-            </strong>
-            {er !== null && (
-              <span
-                className={`ml-1 text-[8px] font-bold px-1 py-0.5 rounded ${
-                  erData.source === "amfi"
-                    ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
-                    : "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400"
-                }`}
+        <div className="flex flex-col gap-0.5 text-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 dark:text-slate-400">
+              Expense Ratio:{" "}
+              <strong
+                className={
+                  er > 1 ? "text-red-500" : "text-slate-700 dark:text-slate-300"
+                }
               >
-                {erData.source === "amfi" ? "AMFI" : "Custom"}
+                {er !== null ? `${er}%/yr` : "N/A"}
+              </strong>
+              {er !== null && (
+                <span
+                  className={`ml-1 text-[8px] font-bold px-1 py-0.5 rounded ${
+                    erData.source === "amfi"
+                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
+                      : "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400"
+                  }`}
+                >
+                  {erData.source === "amfi" ? "AMFI" : "Custom"}
+                </span>
+              )}
+            </span>
+            {plan === "Regular" && (
+              <span className="text-orange-600 dark:text-orange-400 font-medium text-[9px]">
+                Higher fee
               </span>
             )}
-          </span>
-          {plan === "Regular" && (
-            <span className="text-orange-600 dark:text-orange-400 font-medium text-[9px]">
-              Higher fee
+          </div>
+          {erData.ber !== null && (
+            <span className="text-[9px] text-slate-400 dark:text-slate-500">
+              (BER: {erData.ber}% + Levies: {erData.levies}%)
             </span>
           )}
         </div>

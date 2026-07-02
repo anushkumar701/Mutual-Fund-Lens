@@ -1,6 +1,6 @@
-// hooks/useFunds.js
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "../utils/queryClient";
+import { getMergerChain, spliceNavHistories } from "../utils/schemeMergers";
 
 const BASE_URL = "https://api.mfapi.in/mf";
 const AMFI_NAV_URL = "https://portal.amfiindia.com/spages/NAVAll.txt";
@@ -114,12 +114,69 @@ export function useFunds(options = {}) {
 
 export async function fetchFundDetail(schemeCode) {
   const codeStr = String(schemeCode);
+  const idbKey = `fund_detail_${codeStr}`;
 
   return queryClient.fetchQuery({
     queryKey: ["fundDetail", codeStr],
     queryFn: async () => {
-      const res = await fetchWithRetry(`${BASE_URL}/${codeStr}`);
-      return res.data;
+      let idbCached = null;
+      try {
+        const { get } = await import("idb-keyval");
+        idbCached = await get(idbKey);
+        
+        // If we have a fresh IDB cache, use it immediately
+        if (idbCached && idbCached.timestamp) {
+          const now = Date.now();
+          const DAILY_UPDATE_HOUR_IST = 23; 
+          const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+          const cachedAtIST = new Date(idbCached.timestamp + IST_OFFSET_MS);
+          const nextUpdate = new Date(cachedAtIST);
+          nextUpdate.setUTCHours(DAILY_UPDATE_HOUR_IST - 5, 30, 0, 0); 
+          if (nextUpdate.getTime() <= idbCached.timestamp) {
+            nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
+          }
+          const cacheTTL = nextUpdate.getTime() - idbCached.timestamp;
+          
+          if (now - idbCached.timestamp < cacheTTL) {
+            return idbCached.data;
+          }
+        }
+      } catch (e) { /* ignore idb read errors */ }
+
+      try {
+        const chain = getMergerChain(codeStr);
+        const responses = [];
+        for (let i = 0; i < chain.length; i++) {
+          try {
+            const res = await fetchWithRetry(`${BASE_URL}/${chain[i]}`);
+            responses.push(res.data);
+          } catch (err) {
+            // Only throw if the primary (active) code fails. Ignore missing history.
+            if (i === 0) throw err;
+            console.warn(`[FundLens] Missing historical data for merged code ${chain[i]}`);
+          }
+        }
+        
+        const finalData = responses[0];
+        for (let i = 1; i < responses.length; i++) {
+          finalData.data = spliceNavHistories(responses[i].data, finalData.data);
+        }
+        
+        // Save to IDB for next time (page refresh)
+        try {
+          const { set } = await import("idb-keyval");
+          await set(idbKey, { timestamp: Date.now(), data: finalData });
+        } catch (e) { /* ignore */ }
+        
+        return finalData;
+      } catch (networkErr) {
+        // Fallback to stale IDB cache if network fails (e.g. rate limit)
+        if (idbCached && idbCached.data) {
+          console.warn(`[FundLens] Network failed for ${codeStr}, serving stale cache.`);
+          return idbCached.data;
+        }
+        throw networkErr;
+      }
     },
     // Align TTL with AMFI daily update (~11 PM IST)
     staleTime: 12 * 60 * 60 * 1000,

@@ -79,6 +79,41 @@ export function calculateFundMetrics(navData) {
   const return3Y = calcCAGR(getNavAgo(3), 3);
   const return5Y = calcCAGR(getNavAgo(5), 5);
   const return10Y = calcCAGR(getNavAgo(10), 10);
+  
+  let rolling3YReturns = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const startNav = sorted[i].nav;
+    const startTs = sorted[i].ts;
+    const targetDate = new Date(startTs);
+    targetDate.setFullYear(targetDate.getFullYear() + 3);
+    const targetTs = targetDate.getTime();
+    
+    // Quick bounds check - if targetTs is beyond our latest data, we can break
+    if (targetTs > sorted[sorted.length - 1].ts + 15 * 24 * 60 * 60 * 1000) break;
+    
+    const endIdx = binarySearchClosest(sorted, targetTs);
+    if (endIdx > i && Math.abs(sorted[endIdx].ts - targetTs) <= 15 * 24 * 60 * 60 * 1000) {
+      const endNav = sorted[endIdx].nav;
+      const cagr = (Math.pow(endNav / startNav, 1 / 3) - 1) * 100;
+      rolling3YReturns.push(cagr);
+    }
+  }
+
+  let rolling3Y = null;
+  let rolling3YData = null;
+  if (rolling3YReturns.length > 0) {
+    rolling3YReturns.sort((a, b) => a - b);
+    const count = rolling3YReturns.length;
+    const avg = rolling3YReturns.reduce((a, b) => a + b, 0) / count;
+    const min = rolling3YReturns[0];
+    const max = rolling3YReturns[count - 1];
+    const median = count % 2 === 0
+      ? (rolling3YReturns[count / 2 - 1] + rolling3YReturns[count / 2]) / 2
+      : rolling3YReturns[Math.floor(count / 2)];
+    rolling3Y = avg;
+    rolling3YData = { avg, min, max, median, count };
+  }
+
   // Use longest available return period for Sortino so numerator & denominator cover same timespan
   const sortinoReturn = return5Y ?? return3Y ?? return1Y;
 
@@ -87,6 +122,8 @@ export function calculateFundMetrics(navData) {
     return3Y,
     return5Y,
     return10Y,
+    rolling3Y,
+    rolling3YData,
     maxDrawdown: maxDrawdown * 100,
     volatility,
     sharpe: calculateSharpeRatio(return1Y, volatility),

@@ -91,17 +91,30 @@ function lookupAMFI(schemeName) {
     direct = false;
   }
 
+  const formatEntry = (e) => {
+    if (direct) {
+      if (e.d !== undefined) return { totalTer: e.d, ber: e.dBer ?? null };
+      if (e.r !== undefined) return { totalTer: e.r, ber: e.rBer ?? null };
+    } else {
+      if (e.r !== undefined) return { totalTer: e.r, ber: e.rBer ?? null };
+      if (e.d !== undefined) return { totalTer: e.d, ber: e.dBer ?? null };
+    }
+    return null;
+  };
+
   // Exact match
   const entry = terFunds[key];
   if (entry) {
-    return direct ? (entry.d ?? entry.r ?? null) : (entry.r ?? entry.d ?? null);
+    const res = formatEntry(entry);
+    if (res) return res;
   }
 
   // Partial match: try finding a key that starts with or contains our normalized name
   // (handles minor naming differences between mfapi and AMFI)
   for (const [k, e] of terEntries) {
     if (k.includes(key) || key.includes(k)) {
-      return direct ? (e.d ?? e.r ?? null) : (e.r ?? e.d ?? null);
+      const res = formatEntry(e);
+      if (res) return res;
     }
   }
 
@@ -163,25 +176,28 @@ export function clearUserER(schemeCode) {
  *
  * @param {string} schemeName - The full scheme name
  * @param {string|number} [schemeCode] - Optional scheme code for user override lookup
- * @returns {{ value: number|null, source: 'user'|'amfi'|'none', label: string }}
+ * @returns {{ value: number|null, ber: number|null, levies: number|null, source: 'user'|'amfi'|'none', label: string }}
  */
 export function getExpenseRatio(schemeName, schemeCode) {
   // 1. User override
   if (schemeCode) {
     const userER = getUserOverride(schemeCode);
     if (userER !== null) {
-      return { value: userER, source: "user", label: "Custom" };
+      return { value: userER, ber: null, levies: null, source: "user", label: "Custom" };
     }
   }
 
   // 2. AMFI data
-  const amfiER = lookupAMFI(schemeName);
-  if (amfiER !== null) {
-    return { value: amfiER, source: "amfi", label: "AMFI" };
+  const amfiData = lookupAMFI(schemeName);
+  if (amfiData !== null) {
+    const totalTer = amfiData.totalTer;
+    const ber = amfiData.ber;
+    const levies = ber !== null && totalTer > ber ? parseFloat((totalTer - ber).toFixed(2)) : null;
+    return { value: totalTer, ber, levies, source: "amfi", label: "AMFI" };
   }
 
   // No fallback
-  return { value: null, source: "none", label: "N/A" };
+  return { value: null, ber: null, levies: null, source: "none", label: "N/A" };
 }
 
 /**

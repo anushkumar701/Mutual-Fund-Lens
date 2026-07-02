@@ -16,9 +16,9 @@ import {
   calculateLumpsum,
   adjustForInflation,
   calculateGoalSIP,
-  calculateELSSTaxSaving,
   calculateSWP,
   calculateTaxes,
+  computeFIFOTax,
 } from "../utils/sipCalculations";
 import { formatINR } from "../utils/formatCurrency";
 import { fetchFundDetail } from "../hooks/useFunds";
@@ -167,14 +167,87 @@ function renderStepIcon(name, cls) {
   }
 }
 
-function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
+function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate, isSIP, buyAmount, buyDate, sellAmount }) {
   const sellFY = getSellFY(sellDate);
   // eslint-disable-next-line no-unused-vars
   const { rules, fyKey, fyLabel } = resolveRules(sellFY);
-  const isEquity = fundType === "equity";
+  const isEquity = fundType === "equity" || fundType === "Equity";
   const fmt = (v) => `₹${Math.round(v).toLocaleString("en-IN")}`;
   const holdYrs = (holdingMonths / 12).toFixed(1);
   const holdMo = Math.round(holdingMonths);
+
+  // ── SIP FIFO Tax Calculation ────────────────────────────────────────────────
+  if (isSIP) {
+    const months = Math.max(1, Math.floor(holdingMonths));
+    const totalInvested = buyAmount * months;
+    const finalGain = sellAmount - totalInvested;
+    
+    if (finalGain <= 0) {
+      return {
+        taxType: "Capital Loss (No Tax)",
+        taxAmount: 0,
+        fyLabel,
+        rulesNote: rules.note,
+        steps: [
+          {
+            icon: "loss",
+            title: "You made a loss",
+            body: `You invested ${fmt(totalInvested)} but received ${fmt(sellAmount)}. No tax is due.`,
+          },
+          {
+            icon: "refresh",
+            title: "Carry-forward benefit (Updated Rules)",
+            body: "Under new FY 2026-27 rules, a capital loss can only be offset once. You cannot continuously roll over unused losses across multiple future years like before.",
+          },
+        ],
+        pillColor: "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300",
+      };
+    }
+
+    // Synthesize FIFO lots growing linearly to match exact final value
+    // This perfectly distributes the final value across time
+    const transactions = [];
+    const bD = new Date(buyDate);
+    const r = (sellAmount - totalInvested) / (buyAmount * ((months * (months + 1)) / 2));
+    
+    for (let i = 1; i <= months; i++) {
+      const lotBuyDate = new Date(bD);
+      lotBuyDate.setMonth(lotBuyDate.getMonth() + (months - i));
+      const lotSellValue = buyAmount * (1 + r * i);
+      transactions.push({ buyDate: lotBuyDate.toISOString(), amount: buyAmount, sellValue: lotSellValue });
+    }
+
+    const { totalSTCG, totalLTCG, totalSlabGain, tax } = computeFIFOTax(transactions, sellDate, fundType, taxSlab);
+    
+    return {
+      taxType: `SIP FIFO Tax`,
+      taxAmount: tax,
+      fyLabel,
+      rulesNote: rules.note,
+      steps: [
+        {
+          icon: "calculator",
+          title: "FIFO Allocation Applied",
+          body: `SIP instalments are taxed First-In-First-Out. Out of your total gain of ${fmt(finalGain)}:`,
+        },
+        {
+          icon: "clock",
+          title: "Short-Term vs Long-Term",
+          body: isEquity 
+            ? `Gain on units < 12mo old (STCG): ${fmt(totalSTCG)}. Gain on older units (LTCG): ${fmt(totalLTCG)}.`
+            : `Slab rate gain: ${fmt(totalSlabGain)}. (12.5% LTCG: ${fmt(totalLTCG)})`,
+        },
+        {
+          icon: "fee",
+          title: `Total Tax Payable: ${fmt(tax)}`,
+          body: isEquity
+            ? `Includes 20% STCG and 12.5% LTCG (after ₹1.25L exemption on the LTCG portion).`
+            : `Includes slab rate and flat LTCG if applicable, without ₹1.25L exemption.`,
+        }
+      ],
+      pillColor: "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300",
+    };
+  }
 
   // ── Loss ──────────────────────────────────────────────────────────────────
   if (gain <= 0) {
@@ -191,12 +264,12 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
         },
         {
           icon: "refresh",
-          title: "Carry-forward benefit",
-          body: "This loss can be carried forward for up to 8 financial years and set off against future capital gains.",
+          title: "Carry-forward benefit (Updated Rules)",
+          body: "Under new FY 2026-27 rules, a capital loss can only be offset once. You cannot continuously roll over unused losses across multiple future years like before.",
         },
         {
           icon: "info",
-          title: "Tip",
+          title: "Offset matching",
           body: "Short-term capital loss can offset both short-term and long-term gains. Long-term loss can only offset long-term gains.",
         },
       ],
@@ -231,6 +304,11 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
             title: "Money-saving tip",
             body: `If you wait until this fund completes 12 months, the STCG rate of ${ratePct}% drops to LTCG rate of ${(rules.equity.ltcgRate * 100).toFixed(1)}% — and first ${fmt(rules.equity.ltcgExemption)} is tax-free!`,
           },
+          {
+            icon: "info",
+            title: "⚠️ Section 87A does NOT cover this",
+            body: "Even if your total income is under ₹12 lakh, the Section 87A rebate does NOT apply to capital gains tax (STCG or LTCG). This tax is payable separately.",
+          },
         ],
         pillColor:
           "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300",
@@ -264,6 +342,11 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
                 ? `Your gain of ${fmt(gain)} is within the ${fmt(exemption)} exemption limit — tax payable is ₹0!`
                 : `Taxable gain = ${fmt(gain)} − ${fmt(exemption)} = ${fmt(taxableGain)}. Tax = ${fmt(taxableGain)} × ${ratePct}% = ${fmt(tax)}.`,
           },
+          {
+            icon: "info",
+            title: "⚠️ Section 87A does NOT cover this",
+            body: "Even if your total income is under ₹12 lakh, the Section 87A rebate does NOT apply to capital gains tax (STCG or LTCG). This tax is payable separately.",
+          },
         ],
         pillColor:
           "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300",
@@ -271,11 +354,101 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
     }
   }
 
-  // ── Debt / Liquid ─────────────────────────────────────────────────────────
-  // Post Apr 2023: all debt gains taxed at slab (rules.debt.allRate === 'slab')
-  // Pre Apr 2023 debt with ltcgRate could be added back when needed via TAX_RULES
-  const useSlabRate = rules.debt.allRate === "slab";
-  if (useSlabRate) {
+  // ── Gold / International ──────────────────────────────────────────────────
+  if (fundType === "Gold/Intl") {
+    if (holdingMonths < 24) {
+      const tax = gain * (taxSlab / 100);
+      return {
+        taxType: `STCG @ Slab (${taxSlab}%)`,
+        taxAmount: tax,
+        fyLabel,
+        rulesNote: rules.note,
+        steps: [
+          {
+            icon: "clock",
+            title: `Held less than 24 months`,
+            body: `For gold and international funds, holding less than 2 years means gains are added to your income and taxed at your slab rate.`,
+          },
+          {
+            icon: "bank",
+            title: `Slab rate applied: ${taxSlab}%`,
+            body: `Tax = ${fmt(gain)} × ${taxSlab}% = ${fmt(tax)}.`,
+          },
+        ],
+        pillColor:
+          "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300",
+      };
+    } else {
+      const tax = gain * 0.125;
+      return {
+        taxType: `LTCG @ 12.5%`,
+        taxAmount: tax,
+        fyLabel,
+        rulesNote: rules.note,
+        steps: [
+          {
+            icon: "trophy",
+            title: `Held 24+ months (LTCG)`,
+            body: `You held for more than 24 months. For gold and international funds, this qualifies for a flat 12.5% LTCG rate.`,
+          },
+          {
+            icon: "calculator",
+            title: "No ₹1.25L Exemption",
+            body: `Unlike equity funds, there is no tax-free exemption for gold/international funds. The entire gain is taxable. Tax = ${fmt(gain)} × 12.5% = ${fmt(tax)}.`,
+          },
+        ],
+        pillColor:
+          "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300",
+      };
+    }
+  }
+
+  // ── Grandfathered Debt (Pre Apr 2023) ─────────────────────────────────────
+  if (fundType === "Debt_Pre2023") {
+    if (holdingMonths < 24) {
+      const tax = gain * (taxSlab / 100);
+      return {
+        taxType: `STCG @ Slab (${taxSlab}%)`,
+        taxAmount: tax,
+        fyLabel,
+        rulesNote: "Old Debt Rules: Units purchased before 1 Apr 2023",
+        steps: [
+          {
+            icon: "clock",
+            title: `Held less than 24 months`,
+            body: `Short-term gains on grandfathered debt funds are taxed at your slab rate.`,
+          },
+        ],
+        pillColor:
+          "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
+      };
+    } else {
+      const tax = gain * 0.125;
+      return {
+        taxType: `LTCG @ 12.5%`,
+        taxAmount: tax,
+        fyLabel,
+        rulesNote: "Grandfathered Debt Rules",
+        steps: [
+          {
+            icon: "calendar",
+            title: "Grandfathered Debt Units",
+            body: `Because these units were purchased before April 1, 2023, they retain LTCG benefits. Held for >24 months, taxed at a flat 12.5%.`,
+          },
+          {
+            icon: "calculator",
+            title: "Tax calculation",
+            body: `Tax = ${fmt(gain)} × 12.5% = ${fmt(tax)}. (Indexation benefit is no longer applicable after Budget 2024).`,
+          },
+        ],
+        pillColor:
+          "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
+      };
+    }
+  }
+
+  // ── Debt / Liquid (Post Apr 2023) ─────────────────────────────────────────
+  if (fundType === "Debt" || fundType === "debt" || fundType === "Liquid") {
     const tax = gain * (taxSlab / 100);
     return {
       taxType: `Slab Rate @ ${taxSlab}%`,
@@ -303,29 +476,6 @@ function buildTaxResult({ fundType, gain, holdingMonths, taxSlab, sellDate }) {
         "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300",
     };
   }
-  // Fallback: pre-2023 debt LTCG with indexation (kept for historical dates)
-  const tax =
-    holdingMonths >= (rules.debt.ltcgMonths || 36)
-      ? gain * (rules.debt.ltcgRate || 0.2)
-      : gain * (taxSlab / 100);
-  return {
-    taxType:
-      holdingMonths >= (rules.debt.ltcgMonths || 36)
-        ? `LTCG @ ${(rules.debt.ltcgRate * 100).toFixed(0)}% (with indexation)`
-        : `STCG @ slab yes${taxSlab}%`,
-    taxAmount: tax,
-    fyLabel,
-    rulesNote: rules.note,
-    steps: [
-      {
-        icon: "calendar",
-        title: "Old debt rules applied",
-        body: `Your sell date falls under older tax rules (${fyLabel}). LTCG on debt was ${(rules.debt.ltcgRate * 100).toFixed(0)}% with indexation for holds > ${rules.debt.ltcgMonths} months.`,
-      },
-    ],
-    pillColor:
-      "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
-  };
 }
 
 function renderTabIcon(id, cls) {
@@ -376,6 +526,7 @@ export default function SIPCalculator() {
   const [swpWithdrawal, setSwpWithdrawal] = useState(10000);
   const [swpReturn, setSwpReturn] = useState(8);
   const [swpYears, setSwpYears] = useState(10);
+  const [swpFundType, setSwpFundType] = useState("Equity");
   const [swpShowTable, setSwpShowTable] = useState(false);
   // FIRE state
   const [fireMonthlyExpense, setFireMonthlyExpense] = useState(50000);
@@ -388,6 +539,7 @@ export default function SIPCalculator() {
 
   // Tax P&L state
   const [taxFundType, setTaxFundType] = useState("equity");
+  const [taxIsSIP, setTaxIsSIP] = useState(false);
   const [taxBuyAmount, setTaxBuyAmount] = useState(100000);
   const [taxSellAmount, setTaxSellAmount] = useState(150000);
   const [taxBuyDate, setTaxBuyDate] = useState("2023-01-15");
@@ -564,6 +716,9 @@ export default function SIPCalculator() {
       ppfValue: ppfRes.yearlyData[i]?.value || 0,
     }));
     
+    baseRes.fdMaturity = fdRes.maturity;
+    baseRes.ppfMaturity = ppfRes.maturity;
+    
     return baseRes;
   }, [isLumpsum, amount, years, effectiveReturn, stepUp, fdRate, ppfRate]);
 
@@ -591,8 +746,8 @@ export default function SIPCalculator() {
     [elssAmount, taxSlab],
   );
   const swpResult = useMemo(
-    () => calculateSWP(swpInvestment, swpWithdrawal, swpReturn, swpYears),
-    [swpInvestment, swpWithdrawal, swpReturn, swpYears],
+    () => calculateSWP(swpInvestment, swpWithdrawal, swpReturn, swpYears, swpFundType),
+    [swpInvestment, swpWithdrawal, swpReturn, swpYears, swpFundType],
   );
 
   return (
@@ -845,6 +1000,16 @@ export default function SIPCalculator() {
                   accent
                   sub={`${wealthMultiple}× wealth multiple`}
                 />
+                <ResultCard
+                  label="FD Maturity"
+                  value={formatINR(result.fdMaturity)}
+                  sub={`at ${fdRate}% interest`}
+                />
+                <ResultCard
+                  label="PPF Maturity"
+                  value={formatINR(result.ppfMaturity)}
+                  sub={`at ${ppfRate}% interest`}
+                />
                 {inflationMode && realValue !== null && (
                   <ResultCard
                     label={`Real Value (at ${inflation}% inflation)`}
@@ -862,11 +1027,11 @@ export default function SIPCalculator() {
                   <div className="grid grid-cols-2 gap-2 mt-3">
                     <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
                       <div className="text-[10px] text-slate-500 uppercase">STCG (20%)</div>
-                      <div className="font-bold text-slate-700 dark:text-slate-300">₹{formatINR(taxResult.stcg)}</div>
+                      <div className="font-bold text-slate-700 dark:text-slate-300">{formatINR(taxResult.stcg)}</div>
                     </div>
                     <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
                       <div className="text-[10px] text-slate-500 uppercase">LTCG (12.5%)</div>
-                      <div className="font-bold text-slate-700 dark:text-slate-300">₹{formatINR(taxResult.ltcg)}</div>
+                      <div className="font-bold text-slate-700 dark:text-slate-300">{formatINR(taxResult.ltcg)}</div>
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
@@ -1156,6 +1321,27 @@ export default function SIPCalculator() {
                   lump sum corpus and how long it will last.
                 </p>
               </div>
+
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                  Fund Type (For Exit Load)
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ["Equity", "Equity (1% for <1Yr)"],
+                    ["ELSS", "ELSS (0% after 3Yr)"],
+                    ["Debt", "Debt / Liquid (0%)"],
+                  ].map(([v, l]) => (
+                    <button
+                      key={v}
+                      onClick={() => setSwpFundType(v)}
+                      className={`py-2 px-1 text-[10px] font-semibold rounded-xl border transition-all text-center ${swpFundType === v ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <SIPSlider
                 id="swp-investment"
                 label="Total Investment (Initial Corpus)"
@@ -1246,6 +1432,11 @@ export default function SIPCalculator() {
                   label="Total Returns Earned"
                   value={formatINR(swpResult.totalReturns)}
                   sub="Accrued interest"
+                />
+                <ResultCard
+                  label="Est. Exit Load"
+                  value={formatINR(swpResult.totalExitLoad)}
+                  sub="Deducted in Year 1"
                 />
               </div>
 
@@ -1422,6 +1613,9 @@ export default function SIPCalculator() {
                             <th className="px-4 py-3 text-right font-semibold">
                               Interest Earned So Far (₹)
                             </th>
+                            <th className="px-4 py-3 text-right font-semibold text-orange-500/80">
+                              Exit Load Deducted (₹)
+                            </th>
                             <th className="px-4 py-3 text-right font-semibold">
                               Remaining Balance (₹)
                             </th>
@@ -1441,6 +1635,9 @@ export default function SIPCalculator() {
                               </td>
                               <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-400 tabular-nums">
                                 {formatINR(row.returns)}
+                              </td>
+                              <td className="px-4 py-2 text-right text-orange-600 dark:text-orange-400 tabular-nums font-semibold">
+                                {row.exitLoad > 0 ? `-${formatINR(row.exitLoad)}` : "—"}
                               </td>
                               <td
                                 className={`px-4 py-2 text-right font-bold tabular-nums ${row.value === 0 ? "text-red-500" : "text-slate-900 dark:text-white"}`}
@@ -2084,14 +2281,15 @@ export default function SIPCalculator() {
         {/* ─ TAX P&L CALCULATOR ─ */}
         {pageTab === "tax" &&
           (() => {
-            const gain = taxSellAmount - taxBuyAmount;
             const buyD = new Date(taxBuyDate);
             const sellD = new Date(taxSellDate);
-            const holdingDays = Math.max(
-              0,
-              Math.round((sellD - buyD) / 86400000),
-            );
+            const holdingDays = Math.max(0, Math.round((sellD - buyD) / 86400000));
             const holdingMonths = holdingDays / 30.44;
+            const totalInvested = taxIsSIP 
+              ? taxBuyAmount * Math.max(1, Math.floor(holdingMonths))
+              : taxBuyAmount;
+            const gain = taxSellAmount - totalInvested;
+
             // ✅ Config-driven: picks the right budget year automatically
             const result = buildTaxResult({
               fundType: taxFundType,
@@ -2099,6 +2297,10 @@ export default function SIPCalculator() {
               holdingMonths,
               taxSlab,
               sellDate: taxSellDate,
+              buyDate: taxBuyDate,
+              buyAmount: taxBuyAmount,
+              sellAmount: taxSellAmount,
+              isSIP: taxIsSIP,
             });
             const { taxType, taxAmount, fyLabel, rulesNote, steps, pillColor } =
               result;
@@ -2133,15 +2335,17 @@ export default function SIPCalculator() {
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
                       Fund Type
                     </p>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         ["equity", "📈 Equity / ELSS / Index"],
-                        ["debt", "🏦 Debt / Liquid"],
+                        ["Debt", "🏦 Debt / Liquid (Post-Apr'23)"],
+                        ["Debt_Pre2023", "🏛️ Debt (Bought Pre-Apr'23)"],
+                        ["Gold/Intl", "🌍 Gold / International"],
                       ].map(([v, l]) => (
                         <button
                           key={v}
                           onClick={() => setTaxFundType(v)}
-                          className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${taxFundType === v ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400"}`}
+                          className={`flex-1 py-2 px-1 text-[11px] font-semibold rounded-xl border transition-all text-center ${taxFundType === v ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
                         >
                           {l}
                         </button>
@@ -2149,9 +2353,29 @@ export default function SIPCalculator() {
                     </div>
                   </div>
 
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      Investment Type
+                    </p>
+                    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 w-full">
+                      <button
+                        onClick={() => setTaxIsSIP(false)}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${!taxIsSIP ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+                      >
+                        Lumpsum
+                      </button>
+                      <button
+                        onClick={() => setTaxIsSIP(true)}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${taxIsSIP ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+                      >
+                        SIP
+                      </button>
+                    </div>
+                  </div>
+
                   <SIPSlider
                     id="tax-buy-amount"
-                    label="Amount Invested (Buy Value)"
+                    label={taxIsSIP ? "Monthly SIP Amount" : "Amount Invested (Buy Value)"}
                     value={taxBuyAmount}
                     onChange={setTaxBuyAmount}
                     min={1000}
@@ -2162,7 +2386,7 @@ export default function SIPCalculator() {
                   />
                   <SIPSlider
                     id="tax-sell-amount"
-                    label="Amount Received (Sell Value)"
+                    label={taxIsSIP ? "Final Value (Sell Amount)" : "Amount Received (Sell Value)"}
                     value={taxSellAmount}
                     onChange={setTaxSellAmount}
                     min={1000}
@@ -2178,7 +2402,7 @@ export default function SIPCalculator() {
                         htmlFor="tax-buy-date"
                         className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1"
                       >
-                        Buy Date
+                        {taxIsSIP ? "SIP Start Date" : "Buy Date"}
                       </label>
                       <input
                         id="tax-buy-date"

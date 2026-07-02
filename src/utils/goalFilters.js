@@ -66,6 +66,19 @@ export function inferCategory(schemeName) {
     name.includes("money market")
   )
     return "Liquid";
+  // Gold / International — distinct tax rules (24mo threshold, no ₹1.25L exemption)
+  if (
+    name.includes("gold") ||
+    name.includes("silver") ||
+    name.includes("international") ||
+    name.includes("global") ||
+    name.includes("us equity") ||
+    name.includes("nasdaq") ||
+    name.includes("s&p 500") ||
+    name.includes("overseas") ||
+    name.includes("foreign")
+  )
+    return "Gold/Intl";
   if (
     name.includes("index") ||
     name.includes("nifty") ||
@@ -74,6 +87,13 @@ export function inferCategory(schemeName) {
     name.includes("nse")
   )
     return "Index";
+  // Life Cycle Funds — new SEBI 2026 category replacing solution-oriented
+  if (
+    name.includes("life cycle") ||
+    name.includes("target year") ||
+    name.includes("target date")
+  )
+    return "Life Cycle";
   // Hybrid MUST come before Debt/Equity — funds like "HDFC Equity & Debt Fund" would otherwise misclassify as Debt
   if (
     name.includes("hybrid") ||
@@ -108,6 +128,21 @@ export function inferCategory(schemeName) {
   return "Other";
 }
 
+/**
+ * Solution-Oriented funds (Retirement, Children's) — SEBI 2026 regulation
+ * stopped accepting new subscriptions from 1 Apr 2026.
+ * Use this to display a warning banner in Screener/Compare.
+ */
+export function isSolutionOriented(schemeName) {
+  const name = (schemeName || "").toLowerCase();
+  return (
+    name.includes("retirement") ||
+    name.includes("pension") ||
+    name.includes("children") ||
+    name.includes("child benefit")
+  );
+}
+
 export const CATEGORY_COLORS = {
   Equity: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   Debt: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
@@ -116,5 +151,9 @@ export const CATEGORY_COLORS = {
   Liquid: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
   Index:
     "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  "Gold/Intl":
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  "Life Cycle":
+    "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
   Other: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
 };

@@ -95,9 +95,11 @@ function parseCsv(raw) {
 
   const header = parseRow(lines[0]).map((h) => h.toLowerCase());
 
-  // Find the "total TER" columns
+  // Find the "total TER" and "Base TER" columns
   const regTotalIdx = header.findIndex((h) => h.includes('regular') && h.includes('total ter'));
   const dirTotalIdx = header.findIndex((h) => h.includes('direct') && h.includes('total ter'));
+  const regBerIdx = header.findIndex((h) => h.includes('regular') && h.includes('base ter'));
+  const dirBerIdx = header.findIndex((h) => h.includes('direct') && h.includes('base ter'));
   const nameIdx = 0; // First column is always the scheme name
 
   if (regTotalIdx === -1 && dirTotalIdx === -1) {
@@ -105,7 +107,7 @@ function parseCsv(raw) {
     throw new Error('Cannot find "Total TER" columns in CSV');
   }
 
-  console.log(`  Column mapping: name=${nameIdx}, regularTotalTER=${regTotalIdx}, directTotalTER=${dirTotalIdx}`);
+  console.log(`  Column mapping: name=${nameIdx}, regTotal=${regTotalIdx}, dirTotal=${dirTotalIdx}, regBer=${regBerIdx}, dirBer=${dirBerIdx}`);
 
   const map = {};
   let parsed = 0;
@@ -118,6 +120,8 @@ function parseCsv(raw) {
 
     const regTer = regTotalIdx !== -1 ? parseFloat(row[regTotalIdx]) : NaN;
     const dirTer = dirTotalIdx !== -1 ? parseFloat(row[dirTotalIdx]) : NaN;
+    const regBer = regBerIdx !== -1 ? parseFloat(row[regBerIdx]) : NaN;
+    const dirBer = dirBerIdx !== -1 ? parseFloat(row[dirBerIdx]) : NaN;
 
     if (isNaN(regTer) && isNaN(dirTer)) { skipped++; continue; }
 
@@ -125,8 +129,14 @@ function parseCsv(raw) {
     if (!key) { skipped++; continue; }
 
     const entry = {};
-    if (!isNaN(regTer) && regTer >= 0 && regTer <= 5) entry.r = Math.round(regTer * 100) / 100;
-    if (!isNaN(dirTer) && dirTer >= 0 && dirTer <= 5) entry.d = Math.round(dirTer * 100) / 100;
+    if (!isNaN(regTer) && regTer >= 0 && regTer <= 5) {
+      entry.r = Math.round(regTer * 100) / 100;
+      if (!isNaN(regBer) && regBer >= 0) entry.rBer = Math.round(regBer * 100) / 100;
+    }
+    if (!isNaN(dirTer) && dirTer >= 0 && dirTer <= 5) {
+      entry.d = Math.round(dirTer * 100) / 100;
+      if (!isNaN(dirBer) && dirBer >= 0) entry.dBer = Math.round(dirBer * 100) / 100;
+    }
 
     if (Object.keys(entry).length > 0) {
       map[key] = entry;

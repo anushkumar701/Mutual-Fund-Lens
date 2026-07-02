@@ -515,21 +515,29 @@ export default function FundDetailModal({ schemeCode, schemeName, onClose }) {
                     return (
                       <div
                         key={period}
-                        className={`rounded-xl p-3 text-center border ${val === null ? "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700" : isPos ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900" : "bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900"}`}
+                        className={`rounded-xl p-3 text-center border flex flex-col justify-center ${val === null ? "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 col-span-2" : isPos ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900" : "bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900"}`}
                       >
                         <p className="text-[10px] text-slate-500 mb-1">
                           {period}
                         </p>
-                        <p
-                          className={`text-sm font-bold ${val === null ? "text-slate-500" : isPos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
-                        >
-                          {val === null ? "—" : `${isPos ? "+" : ""}${val}%`}
-                        </p>
-                        <p className="text-[9px] text-slate-500">
-                          {period.includes("Y") && parseInt(period) > 1
-                            ? "CAGR"
-                            : "Abs"}
-                        </p>
+                        {val === null ? (
+                          <p className="text-[10px] font-medium text-slate-400 italic leading-tight">
+                            Launched {nav?.[nav.length - 1]?.date}<br/>(Insufficient history)
+                          </p>
+                        ) : (
+                          <>
+                            <p
+                              className={`text-sm font-bold ${isPos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                            >
+                              {isPos ? "+" : ""}{val}%
+                            </p>
+                            <p className="text-[9px] text-slate-500">
+                              {period.includes("Y") && parseInt(period) > 1
+                                ? "CAGR"
+                                : "Abs"}
+                            </p>
+                          </>
+                        )}
                       </div>
                     );
                   })}

@@ -1325,33 +1325,7 @@ export default function Portfolio() {
               </div>
             )}
           </div>
-          
-          {/* Overlap Analyzer */}
-          {overlapWarnings.length > 0 && (
-            <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2 mb-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                Portfolio Overlap Warning
-              </h3>
-              <p className="text-xs text-orange-700 dark:text-orange-300 mb-3">
-                You hold multiple funds in the same equity sub-category. This often leads to stock overlap, reducing diversification and increasing fees.
-              </p>
-              <div className="space-y-3">
-                {overlapWarnings.map((w, idx) => (
-                  <div key={idx} className="bg-white/60 dark:bg-black/20 rounded-lg p-3 border border-orange-100/50 dark:border-orange-800/30">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-500 block mb-1">
-                      {w.subCat} ({w.count} Funds)
-                    </span>
-                    <ul className="list-disc list-inside text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {w.funds.map((fName, i) => (
-                        <li key={i} className="truncate">{fName}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Holdings List Section */}
           <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">

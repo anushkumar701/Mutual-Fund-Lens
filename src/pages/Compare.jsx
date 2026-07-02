@@ -19,10 +19,10 @@ import { formatINR } from "../utils/formatCurrency";
 import {
   calculateFundMetrics,
   calculateHistoricalSIP,
-  calculateCorrelation,
   calculateBestWorstMonth,
 } from "../utils/metrics";
-import { getER } from "../utils/expenseRatio";
+import { getExpenseRatio } from "../utils/expenseRatio";
+import { isSolutionOriented } from "../utils/goalFilters";
 import {
   getFundAgeYears,
   buildChartData,
@@ -56,7 +56,7 @@ const POPULAR_FUNDS = [
   { name: "Nippon India Small Cap", code: "118778" },
 ];
 
-function TERInput({ codeStr, fundName, initialValue, onSave }) {
+function TERInput({ codeStr, fundName, initialValue, onSave, erData }) {
   const [val, setVal] = useState(String(initialValue));
   useEffect(() => {
     setVal(String(initialValue));
@@ -71,7 +71,7 @@ function TERInput({ codeStr, fundName, initialValue, onSave }) {
   };
 
   return (
-    <div className="flex items-center gap-1.5 mb-3 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1.5">
+    <div className="relative flex items-center gap-1.5 mb-4 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1.5">
       <span className="text-[10px] text-slate-400 whitespace-nowrap">
         Expense Ratio:
       </span>
@@ -99,6 +99,11 @@ function TERInput({ codeStr, fundName, initialValue, onSave }) {
         >
           Save
         </button>
+      )}
+      {erData?.ber != null && (
+        <div className="absolute -bottom-4 left-2 text-[8px] text-slate-400">
+          (BER: {erData.ber}% + Levies: {erData.levies}%)
+        </div>
       )}
     </div>
   );
@@ -1159,135 +1164,7 @@ export default function Compare() {
             </div>
           ) : (
             <>
-              {/* Mutual Fund Overlap & Correlation Heatmap Matrix */}
-              {fundData.length >= 2 && (
-                <div className="card p-5 bg-[#161b27] border border-slate-800/80 text-white shadow-xl space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-lg shadow-sm">
-                      🧬
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-100 text-sm">
-                        Portfolio Correlation & Diversification Heatmap
-                      </h3>
-                      <p className="text-[10px] text-slate-400">
-                        Pearson Correlation Matrix based on daily return fluctuations. Values close to 1.0 (100%) mean the funds move in lockstep, offering zero diversification benefit.
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-slate-800">
-                    <table className="w-full text-left border-collapse min-w-[500px]">
-                      <thead>
-                        <tr className="border-b border-slate-800 bg-slate-900/50">
-                          <th className="p-3.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider w-1/4">Fund Name</th>
-                          {fundData.map((f, idx) => (
-                            <th key={f.schemeCode} className="p-3.5 text-[10px] uppercase font-bold text-slate-400 tracking-wider text-center font-mono">
-                              F{idx + 1}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fundData.map((f1, idx1) => {
-                          const name1 = f1.meta?.scheme_name || `Fund ${idx1 + 1}`;
-                          return (
-                            <tr key={f1.schemeCode} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/20 transition-colors">
-                              <td className="p-3 text-xs font-semibold text-slate-300">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-4.5 h-4.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[9px] font-mono flex items-center justify-center">
-                                    F{idx1 + 1}
-                                  </span>
-                                  <span className="line-clamp-1 max-w-[180px]" title={name1}>
-                                    {name1}
-                                  </span>
-                                </div>
-                              </td>
-                              {fundData.map((f2, idx2) => {
-                                if (idx1 === idx2) {
-                                  return (
-                                    <td key={f2.schemeCode} className="p-3 text-center bg-slate-900/40 text-[10px] font-bold text-slate-500 font-mono">
-                                      1.00 (100%)
-                                    </td>
-                                  );
-                                }
-                                
-                                // Calculate correlation
-                                const corr = calculateCorrelation(f1.navData, f2.navData);
-                                if (corr === null) {
-                                  return (
-                                    <td key={f2.schemeCode} className="p-3 text-center text-[10px] text-slate-600 font-mono">
-                                      N/A
-                                    </td>
-                                  );
-                                }
-
-                                const scoreVal = Math.max(0, corr * 100);
-                                const isHigh = scoreVal > 85;
-                                const isMed = scoreVal > 50;
-                                
-                                let cellBg = "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20";
-                                let borderCol = "border-emerald-500/20";
-                                let statusLabel = "Excellent Diversification ✓";
-                                
-                                if (isHigh) {
-                                  cellBg = "bg-red-500/10 text-red-400 hover:bg-red-500/20";
-                                  borderCol = "border-red-500/20";
-                                  statusLabel = "High Overlap (Redundant)";
-                                } else if (isMed) {
-                                  cellBg = "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20";
-                                  borderCol = "border-amber-500/20";
-                                  statusLabel = "Moderate Overlap";
-                                }
-
-                                return (
-                                  <td
-                                    key={f2.schemeCode}
-                                    className={`p-3 text-center border-l ${borderCol} ${cellBg} transition-all duration-150 relative group cursor-help`}
-                                  >
-                                    <span className="text-xs font-black font-mono">
-                                      {corr.toFixed(2)}
-                                    </span>
-                                    <span className="text-[9px] block font-semibold opacity-80">
-                                      ({scoreVal.toFixed(0)}%)
-                                    </span>
-                                    
-                                    {/* Interactive popover tooltip on cell hover */}
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 hidden group-hover:block z-50 bg-slate-950 text-white text-[10px] p-2.5 rounded-xl shadow-2xl w-48 text-center pointer-events-none border border-slate-800">
-                                      <p className="font-extrabold text-slate-300 mb-1">Diversification Audit</p>
-                                      <p className="text-slate-500 border-b border-slate-800 pb-1 mb-1 font-mono">F{idx1 + 1} vs F{idx2 + 1}</p>
-                                      <p className="text-slate-400">Overlap: <strong className="text-white">{scoreVal.toFixed(1)}%</strong></p>
-                                      <p className="text-slate-400">Correlation: <strong className="text-white">{corr.toFixed(3)}</strong></p>
-                                      <p className={`font-bold mt-1.5 ${isHigh ? "text-red-400" : isMed ? "text-amber-400" : "text-emerald-400"}`}>
-                                        {statusLabel}
-                                      </p>
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  <div className="flex gap-4 flex-wrap text-[10px] text-slate-400 bg-slate-900/30 p-3 rounded-lg border border-slate-800/40">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded bg-red-500/20 border border-red-500/40 inline-block" />
-                      <strong>&gt; 0.85 Correlation:</strong> High Overlap. Funds hold similar stocks; holding both adds no real diversification.
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/40 inline-block" />
-                      <strong>0.50 - 0.85 Correlation:</strong> Moderate overlap. Standard core portfolio compatibility.
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/40 inline-block" />
-                      <strong>&lt; 0.50 Correlation:</strong> Excellent Diversification. Funds move independently, lowering overall portfolio risk.
-                    </span>
-                  </div>
-                </div>
-              )}
 
               {/* Fund cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1298,12 +1175,18 @@ export default function Compare() {
 
                   if (fund) {
                     return (
-                      <ComparedFundCard
-                        key={codeStr}
-                        fund={fund}
-                        color={color}
-                        onRemove={() => removeFund(codeStr)}
-                      />
+                      <div key={codeStr} className="flex flex-col gap-2 h-full">
+                        <ComparedFundCard
+                          fund={fund}
+                          color={color}
+                          onRemove={() => removeFund(codeStr)}
+                        />
+                        {isSolutionOriented(fund.meta?.scheme_name) && (
+                          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 p-2 rounded-lg text-[10px] text-red-800 dark:text-red-300 font-medium text-center">
+                            ⚠️ SEBI 2026: Closed to new subscriptions
+                          </div>
+                        )}
+                      </div>
                     );
                   }
 
@@ -2156,6 +2039,29 @@ export default function Compare() {
                             isReturn: true,
                           },
                           {
+                            key: "rolling3Y",
+                            label: "3Y Rolling Return",
+                            desc: "Average 3-Year CAGR rolled daily. Higher indicates consistent returns.",
+                            format: (val, m) => {
+                              if (val == null) return "—";
+                              if (!m || !m.rolling3YData) return `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+                              const d = m.rolling3YData;
+                              return (
+                                <div className="flex flex-col items-end">
+                                  <span>{val >= 0 ? "+" : ""}{val.toFixed(2)}%</span>
+                                  <div className="text-[9px] text-slate-400 font-normal mt-1 leading-tight flex flex-col items-end opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <span>Min: <span className="font-medium text-slate-500 dark:text-slate-400">{d.min >= 0 ? "+" : ""}{d.min.toFixed(1)}%</span></span>
+                                    <span>Max: <span className="font-medium text-slate-500 dark:text-slate-400">{d.max >= 0 ? "+" : ""}{d.max.toFixed(1)}%</span></span>
+                                    <span>Med: <span className="font-medium text-slate-500 dark:text-slate-400">{d.median >= 0 ? "+" : ""}{d.median.toFixed(1)}%</span></span>
+                                  </div>
+                                </div>
+                              );
+                            },
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
                             key: "return5Y",
                             label: "5Y CAGR",
                             desc: "Compound Annual Growth Rate over 5 years.",
@@ -2278,15 +2184,21 @@ export default function Compare() {
                                     key={idx}
                                     className="px-4 py-3 tabular-nums"
                                   >
-                                    <span
-                                      className={`inline-block font-semibold text-sm ${returnColor} ${
-                                        isBest
-                                          ? "bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded ring-1 ring-emerald-200 dark:ring-emerald-800"
-                                          : ""
-                                      }`}
-                                    >
-                                      {metric.format(val)}
-                                    </span>
+                                    {val == null ? (
+                                      <span className="text-[10px] text-slate-400 italic font-medium whitespace-nowrap">
+                                        Launched {fundData[idx].data[fundData[idx].data.length - 1].date} <br/>(Insufficient history)
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className={`inline-block font-semibold text-sm ${returnColor} ${
+                                          isBest
+                                            ? "bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded ring-1 ring-emerald-200 dark:ring-emerald-800"
+                                            : ""
+                                        }`}
+                                      >
+                                        {metric.format(val, fundMetricsMap[fundData[idx].schemeCode])}
+                                      </span>
+                                    )}
                                   </td>
                                 );
                               })}
@@ -2525,16 +2437,17 @@ export default function Compare() {
                     const sipResult = sipResults[i];
 
                     const codeStr = String(fund.schemeCode);
-                    const defaultTER = getER(
+                    const erData = getExpenseRatio(
                       fund.meta?.scheme_name,
                       fund.schemeCode,
                     );
+                    const defaultTER = erData.value ?? 0;
                     const fundTER = sipFundTER[codeStr] ?? defaultTER;
 
                     return (
                       <div
                         key={`sip-${fund.schemeCode}`}
-                        className="border border-slate-100 dark:border-slate-700 rounded-xl p-4 relative overflow-hidden"
+                        className="border border-slate-100 dark:border-slate-700 rounded-xl p-4 relative overflow-visible"
                       >
                         <div
                           className="absolute top-0 left-0 w-1 h-full"
@@ -2553,6 +2466,7 @@ export default function Compare() {
                           fundName={fund.meta?.scheme_name || fund.schemeCode}
                           initialValue={fundTER}
                           onSave={setFundTER}
+                          erData={erData}
                         />
 
                         {!sipResult ? (
@@ -2896,11 +2810,10 @@ export default function Compare() {
                   </div>
                 </div>
               </div>
-              <div className="mt-6 bg-slate-100 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center uppercase tracking-wide font-medium">
-                  This analysis is auto-generated from historical NAV data. It
-                  is not investment advice. Please consult a SEBI-registered
-                  investment advisor before making any financial decisions.
+              <div className="mt-6 bg-amber-50 dark:bg-amber-950/40 p-5 rounded-xl border border-amber-200 dark:border-amber-900/50 flex items-start gap-3">
+                <span className="text-xl shrink-0 mt-0.5">⚠️</span>
+                <p className="text-sm text-amber-900 dark:text-amber-200 leading-relaxed font-medium">
+                  This analysis is auto-generated from publicly available NAV data and does not constitute investment advice, a recommendation, or published research. FundLens is not SEBI-registered as an Investment Adviser or Research Analyst. Past performance does not guarantee future results. Consult a qualified financial advisor before investing.
                 </p>
               </div>
             </div>

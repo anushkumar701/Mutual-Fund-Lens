@@ -160,6 +160,7 @@ export function calculateSWP(
   withdrawalPerMonth,
   annualReturn,
   years,
+  fundType = "Equity"
 ) {
   const principal = Math.max(
     0,
@@ -190,11 +191,13 @@ export function calculateSWP(
   let currentBalance = principal;
   let totalWithdrawn = 0;
   let totalReturns = 0;
+  let totalExitLoad = 0;
   let ranOutYear = null;
   let ranOutMonth = null;
   let monthCount = 0;
 
   for (let y = 1; y <= yrs; y++) {
+    let yearlyExitLoad = 0;
     for (let m = 0; m < 12; m++) {
       monthCount++;
       if (currentBalance <= 0) {
@@ -210,9 +213,17 @@ export function calculateSWP(
         currentBalance + interestEarned,
         withdrawal,
       );
-      currentBalance = currentBalance + interestEarned - actualWithdrawal;
+      
+      let exitLoad = 0;
+      if (monthCount <= 12 && fundType === "Equity") {
+        exitLoad = actualWithdrawal * 0.01; // 1% exit load for first 12 months
+      }
+
+      currentBalance = currentBalance + interestEarned - actualWithdrawal - exitLoad;
       totalWithdrawn += actualWithdrawal;
       totalReturns += interestEarned;
+      yearlyExitLoad += exitLoad;
+      totalExitLoad += exitLoad;
 
       if (currentBalance <= 0 && ranOutYear === null) {
         ranOutYear = Math.ceil(monthCount / 12);
@@ -225,6 +236,7 @@ export function calculateSWP(
       withdrawn: Math.round(totalWithdrawn),
       value: Math.round(currentBalance),
       returns: Math.round(totalReturns),
+      exitLoad: Math.round(yearlyExitLoad),
     });
   }
 
@@ -233,6 +245,7 @@ export function calculateSWP(
     totalWithdrawn: Math.round(totalWithdrawn),
     finalValue: Math.round(currentBalance),
     totalReturns: Math.round(totalReturns),
+    totalExitLoad: Math.round(totalExitLoad),
     yearlyData,
     ranOutYear,
     ranOutMonth,
@@ -240,29 +253,62 @@ export function calculateSWP(
 }
 
 /**
- * Post-tax return calculator (Budget 2024/2026 rules)
- * Equity: STCG (<= 1yr) = 20%, LTCG (> 1yr) = 12.5% above ₹1.25L
- * Debt: Slab rate (assume 30% for high bracket) on all gains, no LTCG benefit
- * 
- * @param {string} fundType "Equity" | "Debt"
- * @param {boolean} isSIP true if SIP, false if lumpsum
- * @param {number} totalInvested
- * @param {number} maturity
- * @param {number} years 
- * @param {number} annualReturn percentage (e.g. 12)
- * @param {number} finalYearSIPAmount the monthly SIP amount in the final year (for step-up)
+ * Post-tax return calculator (Budget 2024/2026 + SEBI 2026 rules)
+ *
+ * Fund types and their tax treatment:
+ *   "Equity"    — STCG (<= 12mo) = 20%, LTCG (> 12mo) = 12.5% above ₹1.25L exemption
+ *   "Debt"      — All gains at slab rate (30% assumed). Post-Apr-2023 purchases only.
+ *   "Debt_Pre2023" — Grandfathered: units bought before 1 Apr 2023 get 12.5% LTCG after 24mo hold.
+ *   "Gold/Intl" — Under 24mo = slab-rate STCG, 24mo+ = 12.5% LTCG on FULL gain (zero exemption).
+ *
+ * @param {string}  fundType  "Equity" | "Debt" | "Debt_Pre2023" | "Gold/Intl"
+ * @param {boolean} isSIP     true if SIP, false if lumpsum
+ * @param {number}  totalInvested
+ * @param {number}  maturity
+ * @param {number}  years
+ * @param {number}  annualReturn  percentage (e.g. 12)
+ * @param {number}  finalYearSIPAmount  monthly SIP amount in the final year (for step-up)
  */
 export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, annualReturn, finalYearSIPAmount = 0) {
   const totalGain = maturity - totalInvested;
   if (totalGain <= 0) return { stcg: 0, ltcg: 0, tax: 0, postTaxMaturity: maturity, postTaxReturn: 0 };
 
+  // ── Gold / International Funds ─────────────────────────────────────────────
+  // 24-month threshold. LTCG = 12.5% on FULL gain (the ₹1.25L carve-out is equity-only).
+  if (fundType === "Gold/Intl") {
+    const holdMonths = years * 12;
+    if (holdMonths < 24) {
+      // STCG at slab rate
+      const tax = totalGain * 0.30;
+      return { stcg: Math.round(totalGain), ltcg: 0, tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
+    }
+    // LTCG at 12.5%, no exemption
+    const tax = totalGain * 0.125;
+    return { stcg: 0, ltcg: Math.round(totalGain), tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
+  }
+
+  // ── Grandfathered Debt (purchased before 1 Apr 2023) ───────────────────────
+  // These units still get LTCG treatment: 12.5% after a 24-month hold, even on
+  // redemptions happening now in FY 2026-27. Units < 24mo are slab-rate STCG.
+  if (fundType === "Debt_Pre2023") {
+    const holdMonths = years * 12;
+    if (holdMonths < 24) {
+      const tax = totalGain * 0.30;
+      return { stcg: Math.round(totalGain), ltcg: 0, tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
+    }
+    // LTCG at 12.5%, no exemption (debt exemption was never ₹1.25L — that's equity-only)
+    const tax = totalGain * 0.125;
+    return { stcg: 0, ltcg: Math.round(totalGain), tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
+  }
+
+  // ── Debt (post-Apr-2023 purchases) ─────────────────────────────────────────
   if (fundType === "Debt") {
-    // Debt is fully taxed at slab rate (assuming 30% for conservative worst-case planning)
+    // All gains at slab rate (assuming 30% for conservative worst-case planning)
     const tax = totalGain * 0.30;
     return { stcg: 0, ltcg: 0, tax, postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
   }
 
-  // Equity calculations
+  // ── Equity / ELSS / Index ──────────────────────────────────────────────────
   let stcg = 0;
   let ltcg = 0;
 
@@ -290,7 +336,7 @@ export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, 
   }
 
   const stcgTax = stcg * 0.20; // 20% STCG
-  const taxableLtcg = Math.max(0, ltcg - 125000); // 1.25L exemption
+  const taxableLtcg = Math.max(0, ltcg - 125000); // 1.25L exemption (equity-only)
   const ltcgTax = taxableLtcg * 0.125; // 12.5% LTCG
   const tax = stcgTax + ltcgTax;
 
@@ -300,5 +346,66 @@ export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, 
     tax: Math.round(tax),
     postTaxMaturity: Math.round(maturity - tax),
     postTaxReturn: Math.round(totalGain - tax)
+  };
+}
+
+/**
+ * Exact FIFO tax calculation for multiple lots.
+ * @param {Array<{buyDate: string, amount: number, sellValue: number}>} transactions 
+ * @param {string} sellDate 
+ * @param {string} fundType "Equity" | "Debt" | "Debt_Pre2023" | "Gold/Intl"
+ * @param {number} taxSlab percentage (e.g. 30)
+ */
+export function computeFIFOTax(transactions, sellDate, fundType, taxSlab = 30) {
+  // Sort oldest first
+  const sorted = [...transactions].sort((a, b) => new Date(a.buyDate) - new Date(b.buyDate));
+  
+  let totalSTCG = 0;
+  let totalLTCG = 0;
+  let totalSlabGain = 0;
+  
+  const sellD = new Date(sellDate);
+
+  for (const lot of sorted) {
+    const buyD = new Date(lot.buyDate);
+    const holdDays = (sellD - buyD) / 86400000;
+    const holdMonths = holdDays / 30.44;
+    const gain = lot.sellValue - lot.amount;
+
+    if (fundType === "Equity" || fundType === "equity") {
+      if (holdMonths <= 12) totalSTCG += gain;
+      else totalLTCG += gain;
+    } else if (fundType === "Gold/Intl") {
+      if (holdMonths < 24) totalSlabGain += gain;
+      else totalLTCG += gain; // Taxed at 12.5% no exemption
+    } else if (fundType === "Debt_Pre2023") {
+      if (holdMonths < 24) totalSlabGain += gain;
+      else totalLTCG += gain; // Taxed at 12.5% no exemption
+    } else {
+      // Debt post-2023 or Liquid
+      totalSlabGain += gain;
+    }
+  }
+
+  // Calculate tax
+  let tax = 0;
+  if (fundType === "Equity" || fundType === "equity") {
+    const stcgTax = Math.max(0, totalSTCG) * 0.20;
+    const taxableLtcg = Math.max(0, totalLTCG - 125000);
+    const ltcgTax = taxableLtcg * 0.125;
+    tax = stcgTax + ltcgTax;
+  } else if (fundType === "Gold/Intl" || fundType === "Debt_Pre2023") {
+    const slabTax = Math.max(0, totalSlabGain) * (taxSlab / 100);
+    const ltcgTax = Math.max(0, totalLTCG) * 0.125; // NO 1.25L exemption
+    tax = slabTax + ltcgTax;
+  } else {
+    tax = Math.max(0, totalSlabGain) * (taxSlab / 100);
+  }
+
+  return {
+    totalSTCG: Math.max(0, totalSTCG),
+    totalLTCG: Math.max(0, totalLTCG),
+    totalSlabGain: Math.max(0, totalSlabGain),
+    tax: Math.round(tax)
   };
 }
