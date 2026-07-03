@@ -2186,7 +2186,7 @@ export default function Compare() {
                                   >
                                     {val == null ? (
                                       <span className="text-[10px] text-slate-400 italic font-medium whitespace-nowrap">
-                                        Launched {fundData[idx].data[fundData[idx].data.length - 1].date} <br/>(Insufficient history)
+                                        Launched {fundData[idx]?.data?.[fundData[idx]?.data?.length - 1]?.date || "Unknown"} <br/>(Insufficient history)
                                       </span>
                                     ) : (
                                       <span
@@ -2196,7 +2196,7 @@ export default function Compare() {
                                             : ""
                                         }`}
                                       >
-                                        {metric.format(val, fundMetricsMap[fundData[idx].schemeCode])}
+                                        {metric.format(val, fundMetricsMap[fundData[idx]?.schemeCode])}
                                       </span>
                                     )}
                                   </td>
