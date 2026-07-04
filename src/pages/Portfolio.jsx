@@ -894,11 +894,11 @@ export default function Portfolio() {
     if (holdingsSafe.length === 0) return [];
     const allLoaded = holdingsSafe.every((h) => {
       const isManual = typeof h.schemeCode === "string" && h.schemeCode.startsWith("manual-");
-      return isManual || detailsCache[h.schemeCode]?.sortedNavs;
+      return isManual || failedPortfolioCodes.has(h.schemeCode) || detailsCache[h.schemeCode]?.sortedNavs;
     });
     if (!allLoaded) return [];
-    return generateHistoricalData(holdingsSafe, detailsCache);
-  }, [holdingsSafe, detailsCache]);
+    return generateHistoricalData(holdingsSafe, detailsCache, failedPortfolioCodes);
+  }, [holdingsSafe, detailsCache, failedPortfolioCodes]);
 
   // Filter historical growth data by time range
   const filteredChartData = useMemo(() => {
@@ -2126,7 +2126,7 @@ export default function Portfolio() {
 }
 
 // Generate sampled historical data values for Recharts AreaChart
-function generateHistoricalData(holdings, detailsMap) {
+function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
   let oldestDate = new Date();
   holdings.forEach((h) => {
     if (h.investedDate) {
@@ -2166,7 +2166,7 @@ function generateHistoricalData(holdings, detailsMap) {
           totalInvestedValue += h.amount;
 
           const details = detailsMap[h.schemeCode];
-          if (details?.sortedNavs) {
+          if (details?.sortedNavs && !failedPortfolioCodes?.has(h.schemeCode)) {
             const navVal = getNavOnDate(details.sortedNavs, ts);
             totalCurrentValue += h.units * navVal;
           } else {
