@@ -23,7 +23,7 @@ export function getMergerChain(code) {
     const nextLayer = [];
     for (const c of currentLayer) {
       const parents = Object.entries(mergers)
-        .filter(([oldCode, newCode]) => newCode === c)
+        .filter(([, newCode]) => newCode === c)
         .map(([oldCode]) => oldCode);
       nextLayer.push(...parents);
       chain.push(...parents);

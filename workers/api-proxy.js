@@ -8,7 +8,6 @@ const AMFI_NAV_URL = "https://portal.amfiindia.com/spages/NAVAll.txt";
 
 // Cache TTLs
 const FUND_LIST_TTL = 24 * 60 * 60; // 24h for full scheme list (~40k, rarely changes)
-const FUND_DETAIL_TTL = calculateTTLToNextAMFIUpdate(); // Dynamic TTL till next 11PM IST
 
 function calculateTTLToNextAMFIUpdate() {
   // AMFI updates NAVs daily around 11 PM IST (17:30 UTC)

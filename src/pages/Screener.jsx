@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense, memo } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense, memo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFunds } from "../hooks/useFunds";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -104,7 +104,7 @@ const FundCard = memo(function FundCard({
       {/* SEBI 2026 Solution-Oriented warning */}
       {!closed && isSolutionOriented(fund.schemeName) && (
         <div className="bg-red-50 dark:bg-red-950/80 border-b border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-[9px] font-bold text-center py-1.5 px-2 uppercase tracking-wide">
-          ⚠️ SEBI '26: Closed to New Subscriptions
+          ⚠️ SEBI &apos;26: Closed to New Subscriptions
         </div>
       )}
 
@@ -445,6 +445,7 @@ export default function Screener() {
     erMax,
     amc,
     sort,
+    fuseIndex,
   ]);
 
   const activeCount = useMemo(

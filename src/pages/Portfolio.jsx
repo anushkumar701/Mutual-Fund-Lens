@@ -14,7 +14,6 @@ import {
   loadAndMigrateHoldings,
 } from "../config/financial";
 import { calculateTrueXIRR } from "../utils/metrics";
-import { inferCategory } from "../utils/goalFilters";
 
 const PortfolioCharts = lazy(() => import("../components/PortfolioCharts"));
 
@@ -314,7 +313,7 @@ export default function Portfolio() {
     return () => {
       isMounted = false;
     };
-  }, [holdingsSafe]);
+  }, [holdingsSafe, detailsCacheLoaded]);
 
   // Autocomplete fund matching
   const searchResults = useMemo(() => {
@@ -927,48 +926,6 @@ export default function Portfolio() {
     return Object.entries(groups).map(([name, value]) => ({ name, value }));
   }, [portfolioSummary.holdings, portfolioSummary.totalCurrent]);
 
-  const overlapWarnings = useMemo(() => {
-    if (!consolidatedHoldings || consolidatedHoldings.length < 2) return [];
-    
-    // Quick local subcat inferrer for overlap check
-    const localGetSubCat = (name) => {
-      const n = name.toLowerCase();
-      if (n.includes("small") && n.includes("cap")) return "Small Cap";
-      if (n.includes("mid") && n.includes("cap")) return "Mid Cap";
-      if (n.includes("large") && n.includes("cap")) return "Large Cap";
-      if (n.includes("flexi") && n.includes("cap")) return "Flexi Cap";
-      if (n.includes("multi") && n.includes("cap")) return "Multi Cap";
-      if (n.includes("elss") || n.includes("tax saver")) return "ELSS";
-      if (n.includes("value") || n.includes("contra")) return "Value/Contra";
-      if (n.includes("focused")) return "Focused";
-      if (n.includes("sector") || n.includes("thematic") || n.includes("pharma") || n.includes("tech") || n.includes("auto") || n.includes("infra") || n.includes("financial") || n.includes("bank")) return "Sector/Thematic";
-      if (n.includes("index") || n.includes("nifty") || n.includes("sensex")) return "Index";
-      return "Other";
-    };
-
-    const subcats = {};
-    consolidatedHoldings.forEach(c => {
-      const cat = inferCategory(c.schemeName);
-      if (cat !== 'Equity') return; 
-      const sc = localGetSubCat(c.schemeName);
-      if (sc && sc !== 'Other') {
-        if (!subcats[sc]) subcats[sc] = [];
-        subcats[sc].push(c);
-      }
-    });
-
-    const warnings = [];
-    for (const [sc, funds] of Object.entries(subcats)) {
-      if (funds.length > 1) {
-        warnings.push({
-          subCat: sc,
-          count: funds.length,
-          funds: funds.map(f => f.schemeName)
-        });
-      }
-    }
-    return warnings;
-  }, [consolidatedHoldings]);
 
   // Export holdings as a JSON file — revoke URL after click to prevent memory leak
   const handleExport = () => {

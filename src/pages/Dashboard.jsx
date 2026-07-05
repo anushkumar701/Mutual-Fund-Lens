@@ -542,8 +542,6 @@ export default function Dashboard() {
   const [activeCategory, setActiveCategory] = useState("Equity");
   const [dynamicSubcatReturns, setDynamicSubcatReturns] = useState({});
   const [isWorstFirst, setIsWorstFirst] = useState(false);
-  const [upMetric, setUpMetric] = useState("returns"); // 'returns' | 'volatility'
-  const [upGrouping, setUpGrouping] = useState("subcategory"); // 'subcategory' | 'category'
 
 
   useEffect(() => {
