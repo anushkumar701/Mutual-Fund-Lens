@@ -52,7 +52,7 @@ const ROUTE_SEO = {
   },
 };
 
-const BASE_URL = "https://fundlens.netlify.app";
+const BASE_URL = "https://mutualfundscreener.pages.dev";
 
 function PageSEOUpdater() {
   const { pathname } = useLocation();
