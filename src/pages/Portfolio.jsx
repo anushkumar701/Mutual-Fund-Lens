@@ -14,6 +14,9 @@ import {
   loadAndMigrateHoldings,
 } from "../config/financial";
 import { calculateTrueXIRR } from "../utils/metrics";
+import { useGoals } from "../hooks/useGoals";
+import GoalCard from "../components/GoalCard";
+import GoalForm from "../components/GoalForm";
 
 const PortfolioCharts = lazy(() => import("../components/PortfolioCharts"));
 
@@ -82,6 +85,9 @@ const calculateStampDuty = calcStampDuty;
 export default function Portfolio() {
   const addToast = useToast();
   const { funds, loading: listLoading } = useFunds();
+  const { goals, addGoal, updateGoal, deleteGoal } = useGoals();
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [showGoalForm, setShowGoalForm] = useState(false);
 
   // Portfolio items in LocalStorage — run schema migration on every load
   // so old saved data is automatically upgraded to the current shape.
@@ -231,7 +237,7 @@ export default function Portfolio() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmModalDelete, setConfirmModalDelete] = useState(false);
   const [chartRange, setChartRange] = useState("all");
-  const [viewMode, setViewMode] = useState("fund"); // "fund" or "transaction"
+  const [viewMode, setViewMode] = useState("fund"); // "fund", "transaction", "goals"
   const [expandedFunds, setExpandedFunds] = useState({});
   const toggleFundExpand = (code) => {
     setExpandedFunds((prev) => ({
@@ -1318,10 +1324,80 @@ export default function Portfolio() {
                 >
                   📝 Transaction View
                 </button>
+                <button
+                  onClick={() => setViewMode("goals")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === "goals"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  🎯 Goals Planner
+                </button>
               </div>
             </div>
             
-            {viewMode === "fund" ? (
+            {viewMode === "goals" ? (
+              <div className="space-y-6 animate-fade-in pt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-slate-900 dark:text-white">Goal-Based Portfolio Planner</h3>
+                  {!showGoalForm && (
+                    <button
+                      onClick={() => { setEditingGoal(null); setShowGoalForm(true); }}
+                      className="btn-primary text-xs py-1.5 px-3"
+                    >
+                      + Add Goal
+                    </button>
+                  )}
+                </div>
+                
+                {showGoalForm && (
+                  <GoalForm
+                    initialGoal={editingGoal}
+                    holdings={portfolioSummary.holdings}
+                    onSave={(g) => {
+                      if (g.id) updateGoal(g.id, g);
+                      else addGoal(g);
+                      setShowGoalForm(false);
+                      setEditingGoal(null);
+                      addToast(editingGoal ? "Goal updated!" : "Goal created!", "success");
+                    }}
+                    onCancel={() => { setShowGoalForm(false); setEditingGoal(null); }}
+                  />
+                )}
+
+                {!showGoalForm && goals.length === 0 && (
+                  <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                    <p className="text-sm text-slate-500 mb-3">No financial goals set yet.</p>
+                    <button
+                      onClick={() => setShowGoalForm(true)}
+                      className="btn-primary text-sm py-2 px-4"
+                    >
+                      Create Your First Goal
+                    </button>
+                  </div>
+                )}
+
+                {!showGoalForm && goals.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {goals.map(goal => (
+                      <GoalCard
+                        key={goal.id}
+                        goal={goal}
+                        portfolioHoldings={portfolioSummary.holdings}
+                        onEdit={(g) => { setEditingGoal(g); setShowGoalForm(true); }}
+                        onDelete={(id) => {
+                          if (window.confirm("Are you sure you want to delete this goal?")) {
+                            deleteGoal(id);
+                            addToast("Goal deleted", "success");
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : viewMode === "fund" ? (
               <div className="overflow-x-auto -mx-5">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
