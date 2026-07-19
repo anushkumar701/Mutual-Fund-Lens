@@ -120,8 +120,8 @@ describe("GoalYears", () => {
 
 describe("SWP — r=0 guard", () => {
   it("0% return SWP depletes linearly", () => {
-    // ₹12L corpus, ₹10K/month withdrawal, 0% return, 10 years
-    const result = calculateSWP(1200000, 10000, 0, 10);
+    // ₹12L corpus, ₹10K/month withdrawal, 0% return, 10 years, using 'Debt' to avoid equity exit load
+    const result = calculateSWP(1200000, 10000, 0, 10, "Debt");
     expect(result.totalWithdrawn).toBe(1200000);
     expect(result.finalValue).toBe(0);
     expect(result.ranOutYear).toBe(10); // runs out at exactly 10 years

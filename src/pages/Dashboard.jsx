@@ -1575,7 +1575,9 @@ export default function Dashboard() {
 
                                 const rawStats = Object.values(fundStats).map(f => {
                                   const stdDev = calcStdDev(f.returns);
-                                  const meanRet = f.returns.reduce((a,b) => a+b, 0) / f.returns.length;
+                                  // Geometric mean (CAGR) for historical returns average
+                                  const product = f.returns.reduce((acc, r) => acc * (1 + r / 100), 1);
+                                  const meanRet = (Math.pow(product, 1 / f.returns.length) - 1) * 100;
                                   let volLevel = "High";
                                   if(stdDev < 12) volLevel = "Low";
                                   else if(stdDev < 20) volLevel = "Medium";
@@ -1679,6 +1681,16 @@ export default function Dashboard() {
                                           ))}
                                         </tbody>
                                       </table>
+                                    </div>
+                                  </div>
+
+                                  {/* Simulated Data Info Banner */}
+                                  <div className="mt-3 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/50 dark:border-blue-900/30 flex items-start gap-2.5">
+                                    <svg className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                                      <span className="font-bold text-blue-700 dark:text-blue-400">Illustrative Performance Model:</span> Due to API rate limit constraints and lookup latency for thousands of legacy schemes, individual fund rankings and historical leaders are generated using an illustrative simulation. The annual return percentages represent realistic simulated performance metrics calibrated to match the {"category's"} actual historical averages.
                                     </div>
                                   </div>
 

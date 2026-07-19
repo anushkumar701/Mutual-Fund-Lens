@@ -124,6 +124,16 @@ export function calculateFundMetrics(navData) {
     return calculateVolatility(oneYearSlice);
   })();
 
+  const sortinoNavSlice = (() => {
+    if (!navData) return null;
+    let years = 5;
+    if (return5Y !== null) years = 5;
+    else if (return3Y !== null) years = 3;
+    else years = 1;
+    // newest-first slice: take trading days for the corresponding period (plus 1 to have returns)
+    return navData.slice(0, Math.min(navData.length, years * 252 + 1));
+  })();
+
   return {
     return1Y,
     return3Y,
@@ -135,8 +145,8 @@ export function calculateFundMetrics(navData) {
     volatility,
     sharpe: calculateSharpeRatio(return1Y, vol1Y),
     sortino:
-      sortinoReturn !== null
-        ? calculateSortinoRatio(navData, sortinoReturn)
+      sortinoReturn !== null && sortinoNavSlice !== null
+        ? calculateSortinoRatio(sortinoNavSlice, sortinoReturn)
         : null,
   };
 }
