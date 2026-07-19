@@ -1346,9 +1346,10 @@ export default function Dashboard() {
                     });
 
                     const subcatAverages = Object.entries(subcatDataset).map(([subcategory, returns]) => {
-                      const sum = returns.reduce((acc, curr) => acc + curr, 0);
-                      const avg = sum / returns.length;
-                      return { subcategory, avg };
+                      // Geometric mean (CAGR) — industry standard for multi-year return averages
+                      const product = returns.reduce((acc, r) => acc * (1 + r / 100), 1);
+                      const geoMean = (Math.pow(product, 1 / returns.length) - 1) * 100;
+                      return { subcategory, avg: parseFloat(geoMean.toFixed(2)) };
                     });
                     subcatAverages.sort((a, b) => isWorstFirst ? a.avg - b.avg : b.avg - a.avg);
 
@@ -1540,7 +1541,7 @@ export default function Dashboard() {
                                   Historical Leaders: {activeLeaderSubcat || subcatAverages[0].subcategory}
                                 </h4>
                                 <span className="text-[9px] text-slate-500 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
-                                  Top 6 Funds by Year
+                                  Top 6 Funds by Year · Illustrative Data
                                 </span>
                               </div>
 
@@ -1571,21 +1572,33 @@ export default function Dashboard() {
                                   return Math.sqrt(variance);
                                 };
 
-                                const fundStatsArray = Object.values(fundStats).map(f => {
+                                const rawStats = Object.values(fundStats).map(f => {
                                   const stdDev = calcStdDev(f.returns);
                                   const meanRet = f.returns.reduce((a,b) => a+b, 0) / f.returns.length;
                                   let volLevel = "High";
                                   if(stdDev < 12) volLevel = "Low";
                                   else if(stdDev < 20) volLevel = "Medium";
-                                  
-                                  const consistencyScore = f.top6 * 2 + f.top1;
-                                  const score = meanRet + consistencyScore - stdDev;
-                                  
-                                  let retRating = meanRet > 25 ? "Excellent" : meanRet > 18 ? "Very Good" : meanRet > 12 ? "Good" : "Average";
-                                  let consRating = consistencyScore > 15 ? "Excellent" : consistencyScore > 10 ? "Very Good" : consistencyScore > 5 ? "Good" : "Average";
-                                  let volRating = stdDev < 12 ? "Excellent" : stdDev < 18 ? "Very Good" : stdDev < 25 ? "Good" : "Average";
-                                  
-                                  return { ...f, stdDev, meanRet, volLevel, score, retRating, consRating, volRating };
+                                  return { ...f, stdDev, meanRet, volLevel };
+                                });
+
+                                // Min-max normalization for All Rounder composite score
+                                const minRet = Math.min(...rawStats.map(f => f.meanRet));
+                                const maxRet = Math.max(...rawStats.map(f => f.meanRet));
+                                const minCons = Math.min(...rawStats.map(f => f.top6));
+                                const maxCons = Math.max(...rawStats.map(f => f.top6));
+                                const minVol = Math.min(...rawStats.map(f => f.stdDev));
+                                const maxVol = Math.max(...rawStats.map(f => f.stdDev));
+                                const norm = (val, min, max) => max === min ? 50 : ((val - min) / (max - min)) * 100;
+
+                                const fundStatsArray = rawStats.map(f => {
+                                  // Consistency: Top-1 finishes weighted 3×, Top-6 appearances 1× (Top-1 is a stronger signal)
+                                  const consistencyScore = f.top1 * 3 + f.top6;
+                                  // Normalized All Rounder: 35% return + 35% consistency + 30% low-volatility
+                                  const normReturn = norm(f.meanRet, minRet, maxRet);
+                                  const normConsistency = norm(f.top6, minCons, maxCons);
+                                  const normVolatility = maxVol === minVol ? 50 : ((maxVol - f.stdDev) / (maxVol - minVol)) * 100; // inverted: lower vol = higher score
+                                  const score = normReturn * 0.35 + normConsistency * 0.35 + normVolatility * 0.30;
+                                  return { ...f, consistencyScore, score };
                                 });
                                 const top1Sorted = [...fundStatsArray].sort((a, b) => b.top1 - a.top1).map(f => [f.name, f.top1]);
                                 

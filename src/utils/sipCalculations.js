@@ -368,8 +368,8 @@ export function computeFIFOTax(transactions, sellDate, fundType, taxSlab = 30) {
 
   for (const lot of sorted) {
     const buyD = new Date(lot.buyDate);
-    const holdDays = (sellD - buyD) / 86400000;
-    const holdMonths = holdDays / 30.44;
+    // Calendar month calculation (IT Act uses calendar months, not day-based approximation)
+    const holdMonths = (sellD.getFullYear() - buyD.getFullYear()) * 12 + (sellD.getMonth() - buyD.getMonth()) + (sellD.getDate() >= buyD.getDate() ? 0 : -1);
     const gain = lot.sellValue - lot.amount;
 
     if (fundType === "Equity" || fundType === "equity") {
