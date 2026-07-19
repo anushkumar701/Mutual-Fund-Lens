@@ -1567,7 +1567,6 @@ export default function Dashboard() {
                                 const fundStatsArray = Object.values(fundStats);
                                 
                                 const top1Sorted = [...fundStatsArray].sort((a, b) => b.top1 - a.top1).map(f => [f.name, f.top1]);
-                                const top6Sorted = [...fundStatsArray].sort((a, b) => b.top6 - a.top6).map(f => [f.name, f.top6]);
                                 
                                 const bestConsistentSorted = [...fundStatsArray].sort((a, b) => {
                                   if(b.top6 !== a.top6) return b.top6 - a.top6;
@@ -1583,7 +1582,6 @@ export default function Dashboard() {
                                 })).sort((a, b) => b.highestReturn - a.highestReturn);
 
                                 const top1Names = new Set(top1Sorted.slice(0, 3).map(x => x[0]));
-                                const top6Names = new Set(top6Sorted.slice(0, 3).map(x => x[0]));
 
                                 return (
                                   <>
@@ -1591,10 +1589,6 @@ export default function Dashboard() {
                                       <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
                                         Top-1 Leaders
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                        <span className="w-2.5 h-2.5 rounded-sm bg-indigo-400"></span>
-                                        Top-6 Leaders
                                       </div>
                                     </div>
 
@@ -1622,18 +1616,15 @@ export default function Dashboard() {
                                               {YEARS.map(y => {
                                                 const fund = leadersData[y][rank - 1];
                                                 const isTop1 = top1Names.has(fund.name);
-                                                const isTop6 = !isTop1 && top6Names.has(fund.name);
                                                 
                                                 return (
                                                   <td key={y} className="py-2.5 px-3">
                                                     <div className={`p-1.5 px-2 rounded-lg border transition-all ${
                                                       isTop1 ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/50" : 
-                                                      isTop6 ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-900/50" : 
                                                       "bg-transparent border-transparent"
                                                     }`}>
                                                       <div className="text-[11px] font-semibold text-slate-900 dark:text-white leading-tight line-clamp-2 mb-1">
                                                         {isTop1 && <span className="text-amber-500 mr-1" title="Top-1 Appearance Leader">🥇</span>}
-                                                        {isTop6 && <span className="text-indigo-500 mr-1" title="Top-6 Appearance Leader">📊</span>}
                                                         {fund.name}
                                                       </div>
                                                       <div className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
@@ -1650,7 +1641,7 @@ export default function Dashboard() {
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                     
                                     {/* TOP-1 APPEARANCES */}
                                     <div className="flex flex-col">
@@ -1674,27 +1665,7 @@ export default function Dashboard() {
                                       </div>
                                     </div>
 
-                                    {/* TOP-6 APPEARANCES */}
-                                    <div className="flex flex-col">
-                                      <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
-                                        TOP-6 APPEARANCES
-                                      </h5>
-                                      <div className="flex flex-col gap-2.5">
-                                        {top6Sorted.slice(0, 3).map(([name, count], i) => (
-                                          <div key={name} className="bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200/50 dark:border-indigo-900/50 shadow-sm flex flex-col justify-center h-full">
-                                            <div className="flex items-start gap-2.5">
-                                              <span className="text-[11px] font-extrabold text-indigo-500 dark:text-indigo-400 mt-0.5">{i+1}.</span>
-                                              <div className="flex-1">
-                                                <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{name}</div>
-                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                                                  Appeared : <span className="text-indigo-600 dark:text-indigo-400 font-bold">{count} / {YEARS.length} Years</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
+
 
                                     {/* BEST CONSISTENT FUNDS */}
                                     <div className="flex flex-col">
