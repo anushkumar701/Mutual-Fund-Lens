@@ -1778,13 +1778,19 @@ export default function Dashboard() {
                                               <div className="flex-1">
                                                 <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{f.name}</div>
                                                 <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5 mt-1.5">
-                                                  <div className="grid grid-cols-[80px_1fr] gap-x-1">
+                                                  <div className="grid grid-cols-[80px_1fr] gap-x-1 gap-y-0.5">
                                                     <span>Return</span>
-                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.retRating}</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                      : {f.retRating} <span className="font-medium text-slate-400 dark:text-slate-500 text-[9px]">({f.meanRet > 0 ? '+' : ''}{f.meanRet.toFixed(1)}% Avg)</span>
+                                                    </span>
                                                     <span>Consistency</span>
-                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.consRating}</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                      : {f.consRating} <span className="font-medium text-slate-400 dark:text-slate-500 text-[9px]">({f.top6}/{YEARS.length} Yrs in Top-6)</span>
+                                                    </span>
                                                     <span>Volatility</span>
-                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.volRating}</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                      : {f.volRating} <span className="font-medium text-slate-400 dark:text-slate-500 text-[9px]">({f.stdDev.toFixed(1)} SD)</span>
+                                                    </span>
                                                   </div>
                                                 </div>
                                               </div>
