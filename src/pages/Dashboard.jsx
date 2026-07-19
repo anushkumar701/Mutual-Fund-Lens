@@ -249,9 +249,20 @@ function generateHistoricalLeaders(subcategory, years) {
     seed += year * 13;
     
     const funds = [];
+    const usedAmcs = new Set();
+    
     for(let rank=1; rank<=6; rank++) {
-      seed = (seed * 9301 + 49297) % 233280;
-      const amc = AMCS[Math.floor((seed / 233280) * AMCS.length)];
+      let amc = "";
+      let foundUnique = false;
+      while(!foundUnique) {
+        seed = (seed * 9301 + 49297) % 233280;
+        amc = AMCS[Math.floor((seed / 233280) * AMCS.length)];
+        if (!usedAmcs.has(amc)) {
+          usedAmcs.add(amc);
+          foundUnique = true;
+        }
+      }
+      
       seed = (seed * 9301 + 49297) % 233280;
       // create realistic return between -20% and 80% depending on year
       const baseRet = year === 2018 || year === 2022 ? -5 : (year === 2020 || year === 2021 ? 25 : 12);
