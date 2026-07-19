@@ -1537,22 +1537,40 @@ export default function Dashboard() {
                                 const currentSubcat = activeLeaderSubcat || subcatAverages[0].subcategory;
                                 const leadersData = generateHistoricalLeaders(currentSubcat, YEARS);
                                 
-                                // Calculate appearances
-                                const top1Counts = {};
-                                const top6Counts = {};
+                                // Calculate appearances, consistency, and highest returns
+                                const fundStats = {};
                                 YEARS.forEach(y => {
                                   const funds = leadersData[y];
                                   if(funds) {
-                                    const top1 = funds[0];
-                                    if(top1) top1Counts[top1.name] = (top1Counts[top1.name] || 0) + 1;
-                                    funds.slice(0, 6).forEach(f => {
-                                      top6Counts[f.name] = (top6Counts[f.name] || 0) + 1;
+                                    funds.slice(0, 6).forEach((f, idx) => {
+                                      if(!fundStats[f.name]) {
+                                        fundStats[f.name] = { name: f.name, top1: 0, top6: 0, returns: [] };
+                                      }
+                                      if(idx === 0) fundStats[f.name].top1 += 1;
+                                      fundStats[f.name].top6 += 1;
+                                      fundStats[f.name].returns.push(f.returnPct);
                                     });
                                   }
                                 });
                                 
-                                const top1Sorted = Object.entries(top1Counts).sort((a, b) => b[1] - a[1]);
-                                const top6Sorted = Object.entries(top6Counts).sort((a, b) => b[1] - a[1]);
+                                const fundStatsArray = Object.values(fundStats);
+                                
+                                const top1Sorted = [...fundStatsArray].sort((a, b) => b.top1 - a.top1).map(f => [f.name, f.top1]);
+                                const top6Sorted = [...fundStatsArray].sort((a, b) => b.top6 - a.top6).map(f => [f.name, f.top6]);
+                                
+                                const bestConsistentSorted = [...fundStatsArray].sort((a, b) => {
+                                  if(b.top6 !== a.top6) return b.top6 - a.top6;
+                                  if(b.top1 !== a.top1) return b.top1 - a.top1;
+                                  const maxB = Math.max(...b.returns);
+                                  const maxA = Math.max(...a.returns);
+                                  return maxB - maxA;
+                                });
+                                
+                                const highestReturnsSorted = [...fundStatsArray].map(f => ({
+                                  name: f.name,
+                                  highestReturn: Math.max(...f.returns)
+                                })).sort((a, b) => b.highestReturn - a.highestReturn);
+
                                 const top1Names = new Set(top1Sorted.slice(0, 3).map(x => x[0]));
                                 const top6Names = new Set(top6Sorted.slice(0, 3).map(x => x[0]));
 
@@ -1621,7 +1639,7 @@ export default function Dashboard() {
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                     
                                     {/* TOP-1 APPEARANCES */}
                                     <div className="flex flex-col">
@@ -1630,7 +1648,7 @@ export default function Dashboard() {
                                       </h5>
                                       <div className="flex flex-col gap-2.5">
                                         {top1Sorted.slice(0, 3).map(([name, count], i) => (
-                                          <div key={name} className="bg-amber-50/50 dark:bg-amber-900/10 rounded-lg p-3 border border-amber-200/50 dark:border-amber-900/50 shadow-sm flex flex-col justify-center">
+                                          <div key={name} className="bg-amber-50/50 dark:bg-amber-900/10 rounded-lg p-3 border border-amber-200/50 dark:border-amber-900/50 shadow-sm flex flex-col justify-center h-full">
                                             <div className="flex items-start gap-2.5">
                                               <span className="text-[11px] font-extrabold text-amber-500 dark:text-amber-400 mt-0.5">{i+1}.</span>
                                               <div className="flex-1">
@@ -1652,13 +1670,59 @@ export default function Dashboard() {
                                       </h5>
                                       <div className="flex flex-col gap-2.5">
                                         {top6Sorted.slice(0, 3).map(([name, count], i) => (
-                                          <div key={name} className="bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200/50 dark:border-indigo-900/50 shadow-sm flex flex-col justify-center">
+                                          <div key={name} className="bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200/50 dark:border-indigo-900/50 shadow-sm flex flex-col justify-center h-full">
                                             <div className="flex items-start gap-2.5">
                                               <span className="text-[11px] font-extrabold text-indigo-500 dark:text-indigo-400 mt-0.5">{i+1}.</span>
                                               <div className="flex-1">
                                                 <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{name}</div>
                                                 <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                                                   Appeared : <span className="text-indigo-600 dark:text-indigo-400 font-bold">{count} / {YEARS.length} Years</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* BEST CONSISTENT FUNDS */}
+                                    <div className="flex flex-col">
+                                      <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                        BEST CONSISTENT FUNDS (TOP 3)
+                                      </h5>
+                                      <div className="flex flex-col gap-2.5">
+                                        {bestConsistentSorted.slice(0, 3).map((f, i) => (
+                                          <div key={f.name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center h-full">
+                                            <div className="flex items-start gap-2.5">
+                                              <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                              <div className="flex-1">
+                                                <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{f.name}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5">
+                                                  <span>Appeared : <span className="text-slate-700 dark:text-slate-300 font-bold">{f.top6} / {YEARS.length} Years</span></span>
+                                                  <span>Top-1 Finishes : <span className="text-slate-700 dark:text-slate-300 font-bold">{f.top1} {f.top1 === 1 ? 'Time' : 'Times'}</span></span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* HIGHEST HISTORICAL RETURNS */}
+                                    <div className="flex flex-col">
+                                      <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                        HIGHEST HISTORICAL RETURNS (TOP 3)
+                                      </h5>
+                                      <div className="flex flex-col gap-2.5">
+                                        {highestReturnsSorted.slice(0, 3).map((f, i) => (
+                                          <div key={f.name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center h-full">
+                                            <div className="flex items-start gap-2.5">
+                                              <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                              <div className="flex-1">
+                                                <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{f.name}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5">
+                                                  <span>Highest Return : <span className="text-emerald-600 dark:text-emerald-400 font-bold">{f.highestReturn > 0 ? "+" : ""}{f.highestReturn.toFixed(0)}%</span></span>
+                                                  <span>Total Years Analysed : <span className="text-slate-700 dark:text-slate-300 font-bold">{YEARS.length}</span></span>
                                                 </div>
                                               </div>
                                             </div>
