@@ -1741,6 +1741,9 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* LOWEST VOLATILITY FUNDS */}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
                                     <div className="flex flex-col">
                                       <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
                                         LOWEST VOLATILITY FUNDS (TOP 3)
