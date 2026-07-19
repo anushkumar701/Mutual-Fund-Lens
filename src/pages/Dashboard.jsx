@@ -1564,8 +1564,29 @@ export default function Dashboard() {
                                   }
                                 });
                                 
-                                const fundStatsArray = Object.values(fundStats);
-                                
+                                const calcStdDev = (arr) => {
+                                  if (arr.length <= 1) return 0;
+                                  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+                                  const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1);
+                                  return Math.sqrt(variance);
+                                };
+
+                                const fundStatsArray = Object.values(fundStats).map(f => {
+                                  const stdDev = calcStdDev(f.returns);
+                                  const meanRet = f.returns.reduce((a,b) => a+b, 0) / f.returns.length;
+                                  let volLevel = "High";
+                                  if(stdDev < 12) volLevel = "Low";
+                                  else if(stdDev < 20) volLevel = "Medium";
+                                  
+                                  const consistencyScore = f.top6 * 2 + f.top1;
+                                  const score = meanRet + consistencyScore - stdDev;
+                                  
+                                  let retRating = meanRet > 25 ? "Excellent" : meanRet > 18 ? "Very Good" : meanRet > 12 ? "Good" : "Average";
+                                  let consRating = consistencyScore > 15 ? "Excellent" : consistencyScore > 10 ? "Very Good" : consistencyScore > 5 ? "Good" : "Average";
+                                  let volRating = stdDev < 12 ? "Excellent" : stdDev < 18 ? "Very Good" : stdDev < 25 ? "Good" : "Average";
+                                  
+                                  return { ...f, stdDev, meanRet, volLevel, score, retRating, consRating, volRating };
+                                });
                                 const top1Sorted = [...fundStatsArray].sort((a, b) => b.top1 - a.top1).map(f => [f.name, f.top1]);
                                 
                                 const bestConsistentSorted = [...fundStatsArray].sort((a, b) => {
@@ -1580,6 +1601,12 @@ export default function Dashboard() {
                                   name: f.name,
                                   highestReturn: Math.max(...f.returns)
                                 })).sort((a, b) => b.highestReturn - a.highestReturn);
+                                
+                                const lowestVolSorted = [...fundStatsArray]
+                                  .sort((a, b) => a.stdDev - b.stdDev);
+                                  
+                                const allRounderSorted = [...fundStatsArray]
+                                  .sort((a, b) => b.score - a.score);
 
                                 const top1Names = new Set(top1Sorted.slice(0, 3).map(x => x[0]));
 
@@ -1705,6 +1732,57 @@ export default function Dashboard() {
                                                 <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5">
                                                   <span>Highest Return : <span className="text-emerald-600 dark:text-emerald-400 font-bold">{f.highestReturn > 0 ? "+" : ""}{f.highestReturn.toFixed(0)}%</span></span>
                                                   <span>Total Years Analysed : <span className="text-slate-700 dark:text-slate-300 font-bold">{YEARS.length}</span></span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* LOWEST VOLATILITY FUNDS */}
+                                    <div className="flex flex-col">
+                                      <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                        LOWEST VOLATILITY FUNDS (TOP 3)
+                                      </h5>
+                                      <div className="flex flex-col gap-2.5">
+                                        {lowestVolSorted.slice(0, 3).map((f, i) => (
+                                          <div key={f.name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center h-full">
+                                            <div className="flex items-start gap-2.5">
+                                              <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                              <div className="flex-1">
+                                                <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{f.name}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5">
+                                                  <span>Volatility : <span className="text-slate-700 dark:text-slate-300 font-bold">{f.volLevel}</span></span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* TOP-3 ALL ROUNDER FUNDS */}
+                                    <div className="flex flex-col">
+                                      <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                        TOP-3 ALL ROUNDER FUNDS
+                                      </h5>
+                                      <div className="flex flex-col gap-2.5">
+                                        {allRounderSorted.slice(0, 3).map((f, i) => (
+                                          <div key={f.name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center h-full">
+                                            <div className="flex items-start gap-2.5">
+                                              <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                              <div className="flex-1">
+                                                <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{f.name}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex flex-col gap-0.5 mt-1.5">
+                                                  <div className="grid grid-cols-[80px_1fr] gap-x-1">
+                                                    <span>Return</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.retRating}</span>
+                                                    <span>Consistency</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.consRating}</span>
+                                                    <span>Volatility</span>
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">: {f.volRating}</span>
+                                                  </div>
                                                 </div>
                                               </div>
                                             </div>
