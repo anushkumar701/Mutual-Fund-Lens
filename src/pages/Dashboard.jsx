@@ -1537,8 +1537,9 @@ export default function Dashboard() {
                                 const currentSubcat = activeLeaderSubcat || subcatAverages[0].subcategory;
                                 const leadersData = generateHistoricalLeaders(currentSubcat, YEARS);
                                 return (
-                                  <div className="overflow-x-auto custom-scrollbar pb-2">
-                                    <div className="min-w-[1000px]">
+                                  <>
+                                    <div className="overflow-x-auto custom-scrollbar pb-2">
+                                      <div className="min-w-[1000px]">
                                       <table className="w-full text-xs border-collapse">
                                         <thead>
                                           <tr className="border-b border-slate-200/60 dark:border-slate-800/60 text-slate-400 dark:text-slate-500">
@@ -1577,8 +1578,128 @@ export default function Dashboard() {
                                       </table>
                                     </div>
                                   </div>
-                                );
-                              })()}
+
+                                  {/* --- NEW SECTIONS --- */}
+                                  {(() => {
+                                    // 1. Calculate Top-1 and Top-6 Appearances
+                                    const top1Counts = {};
+                                    const top6Counts = {};
+                                    
+                                    YEARS.forEach(y => {
+                                      const funds = leadersData[y];
+                                      if(funds) {
+                                        const top1 = funds[0];
+                                        if(top1) top1Counts[top1.name] = (top1Counts[top1.name] || 0) + 1;
+                                        funds.slice(0, 6).forEach(f => {
+                                          top6Counts[f.name] = (top6Counts[f.name] || 0) + 1;
+                                        });
+                                      }
+                                    });
+                                    
+                                    const top1Sorted = Object.entries(top1Counts).sort((a, b) => b[1] - a[1]);
+                                    const top6Sorted = Object.entries(top6Counts).sort((a, b) => b[1] - a[1]);
+                                    
+                                    // 2. Calculate Historical Category Summary
+                                    const categoryReturns = subcatDataset[currentSubcat] || [];
+                                    const totalYearsAnalysed = categoryReturns.length;
+                                    const highestRet = Math.max(...categoryReturns);
+                                    const lowestRet = Math.min(...categoryReturns);
+                                    const firstYearAvg = categoryReturns[0] || 0;
+                                    const latestYearAvg = categoryReturns[categoryReturns.length - 1] || 0;
+                                    const changeInAvg = latestYearAvg - firstYearAvg;
+                                    
+                                    return (
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                                        
+                                        {/* TOP-1 APPEARANCES */}
+                                        <div className="flex flex-col">
+                                          <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                            TOP-1 APPEARANCES
+                                          </h5>
+                                          <div className="flex flex-col gap-2.5">
+                                            {top1Sorted.slice(0, 3).map(([name, count], i) => (
+                                              <div key={name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center">
+                                                <div className="flex items-start gap-2.5">
+                                                  <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                                  <div className="flex-1">
+                                                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{name}</div>
+                                                    <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                                      Top-1 Finishes : <span className="text-slate-700 dark:text-slate-300 font-bold">{count} {count === 1 ? 'Time' : 'Times'}</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* TOP-6 APPEARANCES */}
+                                        <div className="flex flex-col">
+                                          <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                            TOP-6 APPEARANCES
+                                          </h5>
+                                          <div className="flex flex-col gap-2.5">
+                                            {top6Sorted.slice(0, 3).map(([name, count], i) => (
+                                              <div key={name} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center">
+                                                <div className="flex items-start gap-2.5">
+                                                  <span className="text-[11px] font-extrabold text-slate-400 mt-0.5">{i+1}.</span>
+                                                  <div className="flex-1">
+                                                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{name}</div>
+                                                    <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                                      Appeared : <span className="text-slate-700 dark:text-slate-300 font-bold">{count} / {YEARS.length} Years</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* HISTORICAL CATEGORY SUMMARY */}
+                                        <div className="flex flex-col">
+                                          <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                                            HISTORICAL CATEGORY SUMMARY
+                                          </h5>
+                                          <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-3">
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">Total Years Analysed :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{totalYearsAnalysed}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">Highest Historical Return :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{highestRet > 0 ? "+" : ""}{highestRet.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">Lowest Historical Return :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{lowestRet > 0 ? "+" : ""}{lowestRet.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-800 my-0.5" />
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">{YEARS[0]} Average Return :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{firstYearAvg > 0 ? "+" : ""}{firstYearAvg.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">{YEARS[YEARS.length - 1]} Average Return :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{latestYearAvg > 0 ? "+" : ""}{latestYearAvg.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[11px]">
+                                              <span className="text-slate-500 dark:text-slate-400 font-semibold">Change :</span>
+                                              <span className="font-extrabold text-slate-800 dark:text-slate-200">
+                                                {changeInAvg > 0 ? "+" : ""}{changeInAvg.toFixed(0)}%
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                      </div>
+                                    );
+                                  })()}
+                                
+                                
+                                
+                                </>
+                              );
+                            })()}
                             </div>
                           </div>
 
