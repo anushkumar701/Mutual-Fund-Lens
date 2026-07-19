@@ -139,8 +139,10 @@ export function calculateGoalYears(targetAmount, principal, annualReturn) {
 export function calculateELSSTaxSaving(elssAmount, taxSlab) {
   const maxDeduction = 150000;
   const eligible = Math.min(elssAmount, maxDeduction);
-  // 4% Health & Education Cess (applicable for income ≤ ₹50L)
-  const taxSaved = Math.round(eligible * (taxSlab / 100) * 1.04);
+  // Base tax saved = eligible × slab rate, then add 4% Health & Education Cess on the tax
+  const baseTax = eligible * (taxSlab / 100);
+  const cess = baseTax * 0.04;
+  const taxSaved = Math.round(baseTax + cess);
   const effectiveCost = elssAmount - taxSaved;
   return {
     eligible,

@@ -256,22 +256,29 @@ export function get52WeekHL(navData) {
 export function getMonthlyWinRate(navData) {
   if (!navData || navData.length < 24) return null;
   const monthMap = {};
+  // navData is newest-first; track first (oldest) and last (newest) NAV per month
   navData.forEach((d) => {
     const parts = d.date.split("-");
     if (parts.length !== 3) return;
     const [, mm, yyyy] = parts;
     const key = `${yyyy}-${mm}`;
-    if (!monthMap[key]) monthMap[key] = parseFloat(d.nav);
+    const nav = parseFloat(d.nav);
+    if (!monthMap[key]) {
+      monthMap[key] = { first: nav, last: nav };
+    } else {
+      // newest-first iteration: first seen = last (newest), later seen = first (oldest)
+      monthMap[key].first = nav;
+    }
   });
   const months = Object.keys(monthMap)
     .sort()
     .map((k) => monthMap[k]);
   let wins = 0;
-  for (let i = 1; i < months.length; i++) {
-    if (months[i] > months[i - 1]) wins++;
+  for (let i = 0; i < months.length; i++) {
+    if (months[i].last > months[i].first) wins++;
   }
-  return months.length > 1
-    ? Math.round((wins / (months.length - 1)) * 100)
+  return months.length > 0
+    ? Math.round((wins / months.length) * 100)
     : null;
 }
 

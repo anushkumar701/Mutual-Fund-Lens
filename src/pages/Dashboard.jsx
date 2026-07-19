@@ -1325,8 +1325,9 @@ export default function Dashboard() {
                   {/* Overall Performance Analysis (Average Returns 2013 - Present) */}
                   {(() => {
                     const overallAverages = Object.entries(DATA).map(([category, returns]) => {
-                      const sum = returns.reduce((acc, curr) => acc + curr, 0);
-                      const avg = sum / returns.length;
+                      // Geometric mean (CAGR) — industry standard for multi-year return averages
+                      const product = returns.reduce((acc, r) => acc * (1 + r / 100), 1);
+                      const avg = parseFloat(((Math.pow(product, 1 / returns.length) - 1) * 100).toFixed(2));
                       return { category, avg };
                     });
                     overallAverages.sort((a, b) => isWorstFirst ? a.avg - b.avg : b.avg - a.avg);

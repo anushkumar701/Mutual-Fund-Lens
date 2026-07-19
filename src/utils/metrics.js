@@ -117,6 +117,13 @@ export function calculateFundMetrics(navData) {
   // Use longest available return period for Sortino so numerator & denominator cover same timespan
   const sortinoReturn = return5Y ?? return3Y ?? return1Y;
 
+  // 1Y volatility for Sharpe ratio — ensures numerator & denominator cover the same period
+  const vol1Y = (() => {
+    // navData is newest-first; take ~252 trading days (1 year)
+    const oneYearSlice = navData.slice(0, Math.min(navData.length, 253));
+    return calculateVolatility(oneYearSlice);
+  })();
+
   return {
     return1Y,
     return3Y,
@@ -126,7 +133,7 @@ export function calculateFundMetrics(navData) {
     rolling3YData,
     maxDrawdown: maxDrawdown * 100,
     volatility,
-    sharpe: calculateSharpeRatio(return1Y, volatility),
+    sharpe: calculateSharpeRatio(return1Y, vol1Y),
     sortino:
       sortinoReturn !== null
         ? calculateSortinoRatio(navData, sortinoReturn)
@@ -319,32 +326,22 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   const profit = currentValue - totalInvested;
   const absoluteReturn = (profit / totalInvested) * 100;
 
-  // XIRR approximation via bisection on monthly IRR
-  // Bug-fixed: converge on the RATE interval (not on value match), break correctly
-  let xirr = null;
+  // True XIRR with actual dated cashflows
+  let xirrResult = null;
   try {
-    let lo = -0.5,
-      hi = 2.0;
-    let monthlyRate = (lo + hi) / 2;
-    for (let iter = 0; iter < 200; iter++) {
-      monthlyRate = (lo + hi) / 2;
-      if (Math.abs(hi - lo) < 1e-9) break; // converged on rate
-      if (Math.abs(monthlyRate) < 1e-10) {
-        monthlyRate = 0;
-        break;
+    const cashflows = [];
+    for (let m = 0; m < n; m++) {
+      const sipDate = new Date(latestDate);
+      sipDate.setMonth(sipDate.getMonth() - m);
+      const idx = binarySearchClosest(sorted, sipDate.getTime());
+      if (sorted[idx]?.nav) {
+        cashflows.push({ amount: -monthlyAmount, when: new Date(sorted[idx].ts) });
       }
-      const fv =
-        (monthlyAmount *
-          (1 + monthlyRate) *
-          (Math.pow(1 + monthlyRate, n) - 1)) /
-        monthlyRate;
-      if (fv > currentValue) hi = monthlyRate;
-      else lo = monthlyRate;
     }
-    xirr = parseFloat(((Math.pow(1 + monthlyRate, 12) - 1) * 100).toFixed(2));
-    if (!isFinite(xirr) || xirr < -50 || xirr > 200) xirr = null;
+    cashflows.push({ amount: currentValue, when: latestDate });
+    xirrResult = calculateTrueXIRR(cashflows);
   } catch {
-    xirr = null;
+    xirrResult = null;
   }
 
   return {
@@ -352,10 +349,7 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
     currentValue,
     profit,
     absoluteReturn,
-    // Note: xirr is an approximation using the annuity formula, not a true XIRR
-    // (which would require solving NPV = 0 with actual dated cashflows).
-    // Labelled as "est. XIRR" in UI to be transparent.
-    xirr,
+    xirr: xirrResult,
   };
 }
 
