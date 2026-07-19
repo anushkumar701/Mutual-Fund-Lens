@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useLocalStorage } from "./useLocalStorage";
 
 export function useTheme() {
-  // theme can be "system", "light", "dark", "bloomberg", "midnight"
+  // theme can be "system", "light", "dark"
   const [theme, setTheme] = useLocalStorage("fundlens_theme", "system");
 
   useEffect(() => {
@@ -16,19 +16,15 @@ export function useTheme() {
       resolved = prefersDark ? "dark" : "light";
     }
 
-    // Add "dark" class for any dark-based theme
-    if (resolved === "dark" || resolved === "bloomberg" || resolved === "midnight") {
+    // Add "dark" class for dark mode
+    if (resolved === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
 
-    // Set data-theme attribute for premium theme overrides
-    if (resolved === "bloomberg" || resolved === "midnight") {
-      root.setAttribute("data-theme", resolved);
-    } else {
-      root.removeAttribute("data-theme");
-    }
+    // Remove data-theme attribute since we no longer have custom premium themes
+    root.removeAttribute("data-theme");
   }, [theme]);
 
   // Listen for OS theme changes when in "system" mode

@@ -28,9 +28,7 @@ export default function ThemeToggle() {
   const themes = [
     { id: "system", label: "System (Auto)", icon: "🖥️", bg: "bg-gradient-to-r from-[#f0f4f8] to-[#0d1117]" },
     { id: "light", label: "Light Mode", icon: "☀️", bg: "bg-[#f0f4f8]" },
-    { id: "dark", label: "Navy (Dark)", icon: "🌙", bg: "bg-[#0d1117]" },
-    { id: "midnight", label: "Midnight Blue", icon: "🌌", bg: "bg-[#020617]" },
-    { id: "bloomberg", label: "Terminal Black", icon: "⬛", bg: "bg-[#000000]" },
+    { id: "dark", label: "Dark Mode", icon: "🌙", bg: "bg-[#0d1117]" },
   ];
 
   return (
@@ -55,7 +53,7 @@ export default function ThemeToggle() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 animate-fade-in-up">
           <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-100 dark:border-slate-700/50">
-            Premium Themes
+            Appearance
           </div>
           <div className="flex flex-col py-1">
             {themes.map((t) => (
