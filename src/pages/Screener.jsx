@@ -473,11 +473,13 @@ export default function Screener() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
               Fund Screener
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              {loading
-                ? "Loading..."
-                : `${activeCount.toLocaleString("en-IN")} active funds · ${funds.length.toLocaleString("en-IN")} total`}
-            </p>
+            {loading ? (
+              <span className="inline-block h-4 bg-slate-200 dark:bg-slate-700/60 rounded w-48 animate-pulse mt-1" />
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                {activeCount.toLocaleString("en-IN")} active funds · {funds.length.toLocaleString("en-IN")} total
+              </p>
+            )}
           </div>
           {activeFilters > 0 && (
             <button

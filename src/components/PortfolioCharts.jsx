@@ -11,6 +11,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { useState, useEffect } from "react";
 import { formatCurrencyINR } from "../utils/formatCurrency";
 
 const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#84cc16"];
@@ -25,8 +26,14 @@ const RANGE_LABELS = {
 
 function CustomTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
-    const portfolioVal = payload[0]?.value || 0;
-    const investedVal = payload[1]?.value || 0;
+    const portfolioItem = payload.find((p) => p.name === "Portfolio Value");
+    const investedItem = payload.find((p) => p.name === "Invested Capital");
+    const benchmarkItem = payload.find((p) => p.name === "Benchmark Value");
+
+    const portfolioVal = portfolioItem?.value || 0;
+    const investedVal = investedItem?.value || 0;
+    const benchmarkVal = benchmarkItem?.value || 0;
+
     const gain = portfolioVal - investedVal;
     const gainPct = investedVal > 0 ? (gain / investedVal) * 100 : 0;
     const isProfit = gain >= 0;
@@ -42,6 +49,12 @@ function CustomTooltip({ active, payload, label }) {
           <span className="text-slate-300">Invested Capital:</span>
           <span className="font-bold text-slate-400">{formatCurrencyINR(investedVal)}</span>
         </div>
+        {benchmarkItem && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-slate-350">Benchmark Value:</span>
+            <span className="font-bold text-purple-400">{formatCurrencyINR(benchmarkVal)}</span>
+          </div>
+        )}
         <div className="border-t border-slate-800/80 pt-1.5 mt-1.5 flex items-center justify-between gap-4">
           <span className="text-slate-400">Total Profit:</span>
           <span className={`font-bold ${isProfit ? "text-emerald-500" : "text-rose-500"}`}>
@@ -62,7 +75,20 @@ export default function PortfolioCharts({
   filteredChartData,
   pieChartData,
   totalCurrent,
+  activeBenchmark,
+  setActiveBenchmark,
+  loadingBenchmark,
+  BENCHMARKS = [],
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col min-h-[350px]">
@@ -73,20 +99,44 @@ export default function PortfolioCharts({
               Portfolio current value vs step-line of invested capital over time.
             </p>
           </div>
-          <div className="flex self-start sm:self-center bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
-            {["30d", "90d", "180d", "365d", "all"].map((r) => (
-              <button
-                key={r}
-                onClick={() => setChartRange(r)}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                  chartRange === r
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-                }`}
-              >
-                {RANGE_LABELS[r]}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Benchmark index overlay */}
+            <div className="flex items-center bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 px-1.5 uppercase tracking-wide">Vs Index:</span>
+              {BENCHMARKS.map((bm) => (
+                <button
+                  key={bm.id}
+                  onClick={() => setActiveBenchmark(activeBenchmark === bm.id ? null : bm.id)}
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 ${
+                    activeBenchmark === bm.id
+                      ? "bg-purple-650 dark:bg-purple-900 text-white shadow-sm font-black"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                  }`}
+                >
+                  {activeBenchmark === bm.id && loadingBenchmark && (
+                    <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {bm.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Time range selector */}
+            <div className="flex bg-slate-100/80 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 gap-0.5 shadow-sm">
+              {["30d", "90d", "180d", "365d", "all"].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setChartRange(r)}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                    chartRange === r
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                  }`}
+                >
+                  {RANGE_LABELS[r]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="flex-1 min-h-[260px]">
@@ -118,10 +168,10 @@ export default function PortfolioCharts({
                 />
                 <YAxis
                   stroke="#94a3b8"
-                  fontSize={10}
+                  fontSize={isMobile ? 9 : 10}
                   tickLine={false}
                   axisLine={false}
-                  width={75}
+                  width={isMobile ? 48 : 75}
                   domain={["auto", "auto"]}
                   padding={{ top: 20, bottom: 20 }}
                   tickFormatter={(v) => {
@@ -165,6 +215,21 @@ export default function PortfolioCharts({
                   activeDot={{ r: 4, strokeWidth: 0, fill: "#10b981" }}
                   fill="none"
                 />
+                {activeBenchmark && (
+                  <Area
+                    type="monotone"
+                    dataKey="Benchmark Value"
+                    stroke={BENCHMARKS.find((b) => b.id === activeBenchmark)?.color || "#a855f7"}
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    activeDot={{
+                      r: 5,
+                      strokeWidth: 0,
+                      fill: BENCHMARKS.find((b) => b.id === activeBenchmark)?.color || "#a855f7",
+                    }}
+                    fill="none"
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -188,8 +253,8 @@ export default function PortfolioCharts({
                       data={pieChartData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={45}
-                      outerRadius={65}
+                      innerRadius={isMobile ? 32 : 45}
+                      outerRadius={isMobile ? 50 : 65}
                       paddingAngle={3}
                       dataKey="value"
                     >

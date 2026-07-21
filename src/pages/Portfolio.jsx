@@ -6,6 +6,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import { useToast } from "../components/Toast";
 import { formatCurrencyINR } from "../utils/formatCurrency";
 import { syncPortfolioWidget } from "../utils/portfolioWidget";
+import { downsampleLTTB } from "../utils/downsample";
 import {
   calcStampDuty,
   UNIT_PRECISION,
@@ -19,6 +20,12 @@ import GoalCard from "../components/GoalCard";
 import GoalForm from "../components/GoalForm";
 
 const PortfolioCharts = lazy(() => import("../components/PortfolioCharts"));
+
+const BENCHMARKS = [
+  { id: "nifty50", label: "Nifty 50", code: "120716", color: "#a855f7" },
+  { id: "sensex", label: "Sensex", code: "118825", color: "#f97316" },
+  { id: "midcap150", label: "Nifty Midcap 150", code: "147622", color: "#06b6d4" },
+];
 
 // Process NAV list from newest to oldest into sorted oldest to newest array
 const processNavData = (rawDetails) => {
@@ -105,6 +112,12 @@ export default function Portfolio() {
     time: "evening",
   });
 
+  const [asyncXirrResults, setAsyncXirrResults] = useState({
+    portfolioXirr: null,
+    fundXirrs: {},
+    calculating: false
+  });
+
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -184,7 +197,7 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (!detailsCacheLoaded) return;
-    const saveCache = async () => {
+    const scheduleId = (window.requestIdleCallback || window.setTimeout)(async () => {
       try {
         if (Object.keys(detailsCache).length > 0) {
           const { set } = await import("idb-keyval");
@@ -194,13 +207,54 @@ export default function Portfolio() {
       } catch (e) {
         console.warn("Failed to save details cache to IndexedDB:", e);
       }
+    }, { timeout: 2000 });
+
+    return () => {
+      if (window.cancelIdleCallback) {
+        window.cancelIdleCallback(scheduleId);
+      } else {
+        window.clearTimeout(scheduleId);
+      }
     };
-    saveCache();
   }, [detailsCache, detailsCacheLoaded]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [editNavLoading, setEditNavLoading] = useState(false);
   const [failedPortfolioCodes, setFailedPortfolioCodes] = useState(new Set());
+
+  // Benchmark overlay states
+  const [activeBenchmark, setActiveBenchmark] = useState(null); // null | benchmark id
+  const [benchmarkData, setBenchmarkData] = useState(null); // sortedNavs array
+  const [loadingBenchmark, setLoadingBenchmark] = useState(false);
+
+  useEffect(() => {
+    if (!activeBenchmark) {
+      setBenchmarkData(null);
+      return;
+    }
+    const bm = BENCHMARKS.find((b) => b.id === activeBenchmark);
+    if (!bm) return;
+
+    let cancelled = false;
+    setLoadingBenchmark(true);
+    fetchFundDetail(bm.code)
+      .then((d) => {
+        if (!cancelled && d) {
+          const sorted = processNavData(d);
+          setBenchmarkData(sorted);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load benchmark:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBenchmark(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBenchmark]);
 
   // Form states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -862,6 +916,81 @@ export default function Portfolio() {
     }).sort((a, b) => b.currentValue - a.currentValue);
   }, [portfolioSummary.holdings]);
 
+  // ── Offload XIRR to Web Worker (non-blocking) ─────────────────────────────
+  useEffect(() => {
+    if (holdingsSafe.length === 0) {
+      setAsyncXirrResults({ portfolioXirr: null, fundXirrs: {}, calculating: false });
+      return;
+    }
+
+    setAsyncXirrResults(prev => ({ ...prev, calculating: true }));
+
+    // Prepare portfolio-level cashflows
+    const portfolioCashflows = [];
+    portfolioSummary.holdings.forEach(h => {
+      if (h.amount > 0) {
+        portfolioCashflows.push({ amount: -h.amount, when: h.investedDate });
+      }
+    });
+    if (portfolioSummary.totalCurrent > 0) {
+      portfolioCashflows.push({ amount: portfolioSummary.totalCurrent, when: new Date().toISOString() });
+    }
+
+    // Prepare per-fund cashflows (grouped by schemeCode)
+    const fundGroups = {};
+    portfolioSummary.holdings.forEach((h) => {
+      if (!fundGroups[h.schemeCode]) {
+        fundGroups[h.schemeCode] = { totalUnits: 0, currentNav: h.currentNav, transactions: [] };
+      }
+      fundGroups[h.schemeCode].totalUnits += h.units;
+      fundGroups[h.schemeCode].transactions.push(h);
+    });
+    const fundCashflows = {};
+    Object.entries(fundGroups).forEach(([code, g]) => {
+      const cfs = [];
+      g.transactions.forEach(t => {
+        if (t.amount > 0) cfs.push({ amount: -t.amount, when: t.investedDate });
+      });
+      const cv = g.totalUnits * g.currentNav;
+      if (cv > 0) cfs.push({ amount: cv, when: new Date().toISOString() });
+      fundCashflows[code] = cfs;
+    });
+
+    let worker;
+    try {
+      worker = new Worker(new URL("../workers/xirr.worker.js", import.meta.url));
+      worker.postMessage({ type: "CALC_ALL", portfolioCashflows, fundCashflows });
+
+      worker.onmessage = (e) => {
+        if (e.data.type === "RESULTS") {
+          setAsyncXirrResults({
+            portfolioXirr: e.data.portfolioXirr,
+            fundXirrs: e.data.fundXirrs,
+            calculating: false,
+          });
+        } else {
+          setAsyncXirrResults(prev => ({ ...prev, calculating: false }));
+        }
+        worker.terminate();
+      };
+
+      worker.onerror = () => {
+        // Fallback: synchronous values already computed in useMemo stay
+        setAsyncXirrResults(prev => ({ ...prev, calculating: false }));
+        worker.terminate();
+      };
+    } catch {
+      // Worker not supported — synchronous fallback in useMemo handles it
+      setAsyncXirrResults(prev => ({ ...prev, calculating: false }));
+    }
+
+    return () => { if (worker) worker.terminate(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portfolioSummary.holdings, portfolioSummary.totalCurrent]);
+
+  // Merge async XIRR results into portfolioSummary for consumers
+  const portfolioXirr = asyncXirrResults.portfolioXirr ?? portfolioSummary.xirr;
+
   // Update cached total portfolio value in localStorage for Navbar and Dashboard usage
   useEffect(() => {
     if (holdingsSafe.length === 0) {
@@ -902,8 +1031,8 @@ export default function Portfolio() {
       return isManual || failedPortfolioCodes.has(h.schemeCode) || detailsCache[h.schemeCode]?.sortedNavs;
     });
     if (!allLoaded) return [];
-    return generateHistoricalData(holdingsSafe, detailsCache, failedPortfolioCodes);
-  }, [holdingsSafe, detailsCache, failedPortfolioCodes]);
+    return generateHistoricalData(holdingsSafe, detailsCache, failedPortfolioCodes, benchmarkData);
+  }, [holdingsSafe, detailsCache, failedPortfolioCodes, benchmarkData]);
 
   // Filter historical growth data by time range
   const filteredChartData = useMemo(() => {
@@ -916,7 +1045,9 @@ export default function Portfolio() {
     else if (chartRange === "365d") cutoffDate.setDate(cutoffDate.getDate() - 365);
 
     const cutoffTs = cutoffDate.getTime();
-    return historicalChartData.filter((item) => item.timestamp >= cutoffTs);
+    const filtered = historicalChartData.filter((item) => item.timestamp >= cutoffTs);
+    // Downsample if over 500 points for chart rendering performance
+    return filtered.length > 500 ? downsampleLTTB(filtered, 500, "Portfolio Value") : filtered;
   }, [historicalChartData, chartRange]);
 
   // Pie chart data for fund weight allocation (grouped by scheme name).
@@ -1034,21 +1165,52 @@ export default function Portfolio() {
 
       {/* Main Grid */}
       {holdings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-white dark:bg-[#111622] text-center max-w-xl mx-auto shadow-sm">
-          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/40 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4">
+        <div className="max-w-xl mx-auto mt-8 bg-white dark:bg-[#111622] rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+          
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/40 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-5 shadow-inner">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
             </svg>
           </div>
-          <h2 className="text-xl font-bold">Your Portfolio is Empty</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Start tracking your investments by adding your mutual fund transactions. We will load historical performance curves automatically.
+          
+          <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Your Portfolio is Empty</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+            Take control of your investments. Add your transaction details below and we will automatically map and load live, historical performance data.
           </p>
+          
+          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-left">
+            <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">How it works</h4>
+            <div className="space-y-3.5">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+                <div>
+                  <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">Add Scheme & Units</h5>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Search 10,000+ mutual funds and enter your transaction info.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 text-[11px] font-bold flex items-center justify-center flex-shrink-0">2</span>
+                <div>
+                  <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">Autoload Historical NAVs</h5>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">We construct your growth curves and track daily performance automatically.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 text-[11px] font-bold flex items-center justify-center flex-shrink-0">3</span>
+                <div>
+                  <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">Monitor Real-time XIRR</h5>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Offloaded computations render your actual yields and CAGR in seconds.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <button
             onClick={() => setShowAddForm(true)}
-            className="mt-6 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg"
+            className="mt-6 w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all"
           >
-            Add your first transaction
+            Create Your First Holding
           </button>
         </div>
       ) : (
@@ -1083,8 +1245,8 @@ export default function Portfolio() {
 
             <div className="bg-white dark:bg-[#111622] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Actual Return (XIRR)</span>
-              <div className={`text-2xl font-black mt-1.5 ${portfolioSummary.xirr === null ? "text-slate-600 dark:text-slate-400" : portfolioSummary.xirr >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                {portfolioSummary.xirr !== null ? `${portfolioSummary.xirr >= 0 ? "+" : ""}${portfolioSummary.xirr.toFixed(2)}%` : "N/A"}
+              <div className={`text-2xl font-black mt-1.5 ${portfolioXirr === null ? "text-slate-600 dark:text-slate-400" : portfolioXirr >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                {portfolioXirr !== null ? `${portfolioXirr >= 0 ? "+" : ""}${portfolioXirr.toFixed(2)}%` : "N/A"}
               </div>
               <div className="mt-2 text-xs font-bold text-slate-400 flex items-center gap-1">
                 Annualized Yield
@@ -1121,6 +1283,10 @@ export default function Portfolio() {
               filteredChartData={filteredChartData}
               pieChartData={pieChartData}
               totalCurrent={portfolioSummary.totalCurrent}
+              activeBenchmark={activeBenchmark}
+              setActiveBenchmark={setActiveBenchmark}
+              loadingBenchmark={loadingBenchmark}
+              BENCHMARKS={BENCHMARKS}
             />
           </Suspense>
 
@@ -1453,9 +1619,14 @@ export default function Portfolio() {
                               </div>
                             </td>
                             <td className="px-5 py-4 text-right font-bold text-slate-700 dark:text-slate-300">
-                              <span className={c.xirr === null ? "text-slate-500" : c.xirr >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                {c.xirr !== null ? `${c.xirr >= 0 ? "+" : ""}${c.xirr.toFixed(1)}%` : "N/A"}
-                              </span>
+                              {(() => {
+                                const x = asyncXirrResults.fundXirrs[c.schemeCode] ?? c.xirr;
+                                return (
+                                  <span className={x === null ? "text-slate-500" : x >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                                    {x !== null ? `${x >= 0 ? "+" : ""}${x.toFixed(1)}%` : "N/A"}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-5 py-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
                               {c.totalUnits.toFixed(4)}
@@ -2159,7 +2330,7 @@ export default function Portfolio() {
 }
 
 // Generate sampled historical data values for Recharts AreaChart
-function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
+function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes, benchmarkNavs = null) {
   let oldestDate = new Date();
   holdings.forEach((h) => {
     if (h.investedDate) {
@@ -2190,6 +2361,7 @@ function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
 
     let totalCurrentValue = 0;
     let totalInvestedValue = 0;
+    let totalBenchmarkValue = 0;
 
     holdings.forEach((h) => {
       if (h.investedDate) {
@@ -2205,16 +2377,33 @@ function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
           } else {
             totalCurrentValue += h.amount;
           }
+
+          if (benchmarkNavs && benchmarkNavs.length > 0) {
+            const buyNav = getNavOnDate(benchmarkNavs, buyDate.getTime());
+            const currentNav = getNavOnDate(benchmarkNavs, ts);
+            if (buyNav > 0) {
+              const bmUnits = h.amount / buyNav;
+              totalBenchmarkValue += bmUnits * currentNav;
+            } else {
+              totalBenchmarkValue += h.amount;
+            }
+          }
         }
       }
     });
 
-    dataPoints.push({
+    const point = {
       date: dateStr,
       timestamp: ts,
       "Portfolio Value": Math.round(totalCurrentValue),
       "Invested Capital": Math.round(totalInvestedValue),
-    });
+    };
+
+    if (benchmarkNavs && benchmarkNavs.length > 0) {
+      point["Benchmark Value"] = Math.round(totalBenchmarkValue);
+    }
+
+    dataPoints.push(point);
 
     currentDate.setDate(currentDate.getDate() + stepDays);
   }
@@ -2230,6 +2419,7 @@ function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
   if (latestPoint && latestPoint.date !== todayStr) {
     let totalCurrentValue = 0;
     let totalInvestedValue = 0;
+    let totalBenchmarkValue = 0;
     holdings.forEach((h) => {
       totalInvestedValue += h.amount;
       const details = detailsMap[h.schemeCode];
@@ -2238,13 +2428,37 @@ function generateHistoricalData(holdings, detailsMap, failedPortfolioCodes) {
       } else {
         totalCurrentValue += h.amount;
       }
+
+      if (benchmarkNavs && benchmarkNavs.length > 0) {
+        if (h.investedDate) {
+          const [yyyy, mm, dd] = h.investedDate.split("-");
+          const buyDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10));
+          const buyNav = getNavOnDate(benchmarkNavs, buyDate.getTime());
+          const latestNav = benchmarkNavs[benchmarkNavs.length - 1].nav;
+          if (buyNav > 0) {
+            const bmUnits = h.amount / buyNav;
+            totalBenchmarkValue += bmUnits * latestNav;
+          } else {
+            totalBenchmarkValue += h.amount;
+          }
+        } else {
+          totalBenchmarkValue += h.amount;
+        }
+      }
     });
-    dataPoints.push({
+    
+    const point = {
       date: todayStr,
       timestamp: today.getTime(),
       "Portfolio Value": Math.round(totalCurrentValue),
       "Invested Capital": Math.round(totalInvestedValue),
-    });
+    };
+
+    if (benchmarkNavs && benchmarkNavs.length > 0) {
+      point["Benchmark Value"] = Math.round(totalBenchmarkValue);
+    }
+
+    dataPoints.push(point);
   }
 
   return dataPoints;

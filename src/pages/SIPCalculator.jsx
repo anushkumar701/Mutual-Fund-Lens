@@ -25,6 +25,7 @@ import { formatINR } from "../utils/formatCurrency";
 import { fetchFundDetail } from "../hooks/useFunds";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFunds } from "../hooks/useFunds";
+import { taxRules as configTaxRules, LATEST_FY } from "../config/taxRules";
 
 function ResultCard({ label, value, accent, sub }) {
   return (
@@ -545,6 +546,7 @@ export default function SIPCalculator() {
   const [taxSellAmount, setTaxSellAmount] = useState(150000);
   const [taxBuyDate, setTaxBuyDate] = useState("2023-01-15");
   const [taxSellDate, setTaxSellDate] = useState("2025-01-15");
+  const [selectedFY, setSelectedFY] = useState(LATEST_FY);
 
   // SIP Date Optimizer state
   const { funds } = useFunds();
@@ -731,8 +733,8 @@ export default function SIPCalculator() {
   const taxResult = useMemo(() => {
     // For SIP with step-up, the final year SIP amount is amount * (1 + stepUp/100)^(years - 1)
     const finalSip = isLumpsum ? 0 : amount * Math.pow(1 + stepUp / 100, years - 1);
-    return calculateTaxes("Equity", !isLumpsum, result.invested, result.maturity, years, effectiveReturn, finalSip);
-  }, [isLumpsum, result, years, effectiveReturn, amount, stepUp]);
+    return calculateTaxes("Equity", !isLumpsum, result.invested, result.maturity, years, effectiveReturn, finalSip, selectedFY);
+  }, [isLumpsum, result, years, effectiveReturn, amount, stepUp, selectedFY]);
 
   const wealthMultiple =
     result.invested > 0 ? (result.maturity / result.invested).toFixed(2) : "—";
@@ -1022,21 +1024,38 @@ export default function SIPCalculator() {
 
               <div className="card p-4 space-y-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 border-emerald-100 dark:border-emerald-800">
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                    Tax Breakdown (Equity Fund)
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      Tax Breakdown (Equity Fund)
+                    </p>
+                    <select
+                      value={selectedFY}
+                      onChange={(e) => setSelectedFY(e.target.value)}
+                      className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded px-2 py-0.5 font-semibold text-slate-700 dark:text-slate-350 cursor-pointer shadow-sm focus:outline-none"
+                    >
+                      {Object.keys(configTaxRules).map((fy) => (
+                        <option key={fy} value={fy}>
+                          {configTaxRules[fy].label || fy}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="grid grid-cols-2 gap-2 mt-3">
                     <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
-                      <div className="text-[10px] text-slate-500 uppercase">STCG (20%)</div>
+                      <div className="text-[10px] text-slate-500 uppercase">
+                        STCG ({(((configTaxRules[selectedFY] || configTaxRules[LATEST_FY]).equitySTCG || 0.20) * 100).toFixed(0)}%)
+                      </div>
                       <div className="font-bold text-slate-700 dark:text-slate-300">{formatINR(taxResult.stcg)}</div>
                     </div>
                     <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
-                      <div className="text-[10px] text-slate-500 uppercase">LTCG (12.5%)</div>
+                      <div className="text-[10px] text-slate-500 uppercase">
+                        LTCG ({(((configTaxRules[selectedFY] || configTaxRules[LATEST_FY]).equityLTCG || 0.125) * 100).toFixed(1)}%)
+                      </div>
                       <div className="font-bold text-slate-700 dark:text-slate-300">{formatINR(taxResult.ltcg)}</div>
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
-                    *Assumes 1.25L LTCG exemption. SIPs have split STCG/LTCG. 
+                    *Assumes ₹{(((configTaxRules[selectedFY] || configTaxRules[LATEST_FY]).equityLTCGExemption || 125000) / 100000).toFixed(2)}L LTCG exemption. SIPs have split STCG/LTCG. 
                   </p>
                 </div>
               </div>
@@ -2408,8 +2427,15 @@ export default function SIPCalculator() {
                       <input
                         id="tax-buy-date"
                         type="date"
+                        max={new Date().toISOString().split("T")[0]}
                         value={taxBuyDate}
-                        onChange={(e) => setTaxBuyDate(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTaxBuyDate(val);
+                          if (taxSellDate && val && new Date(val) > new Date(taxSellDate)) {
+                            setTaxSellDate(val);
+                          }
+                        }}
                         className="input-base py-2 text-sm w-full"
                       />
                     </div>
@@ -2423,8 +2449,16 @@ export default function SIPCalculator() {
                       <input
                         id="tax-sell-date"
                         type="date"
+                        max={new Date().toISOString().split("T")[0]}
                         value={taxSellDate}
-                        onChange={(e) => setTaxSellDate(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (taxBuyDate && val && new Date(val) < new Date(taxBuyDate)) {
+                            setTaxSellDate(taxBuyDate);
+                          } else {
+                            setTaxSellDate(val);
+                          }
+                        }}
                         className="input-base py-2 text-sm w-full"
                       />
                     </div>

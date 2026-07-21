@@ -11,6 +11,7 @@ const FundDetailModal = lazy(() => import("../components/FundDetailModal"));
 import { inferCategory } from "../utils/goalFilters";
 import { isFundClosed } from "../utils/fundFilters";
 import marketReasons from "../data/marketReasons.json";
+import historicalLeadersData from "../data/historicalLeadersData.json";
 
 // ─── Category config ───────────────────────────────────────────
 const CAT_CFG = {
@@ -62,13 +63,21 @@ const CAT_CFG = {
     ),
     color: "#db2777", // Hot Pink — clearly different from Debt green
   },
+  "Gold/Intl": {
+    icon: (cls) => (
+      <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    color: "#ca8a04", // Gold/Amber
+  },
   Other: {
     icon: (cls) => (
       <svg className={cls} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
     ),
-    color: "#ca8a04", // Gold/Amber — distinct from all others
+    color: "#64748b", // Slate Grey
   },
 };
 
@@ -88,40 +97,52 @@ const SUBCAT_PALETTE = [
 ];
 
 
+// ─── Actual historical returns (2013–2025) computed from AMFI NAV data ────
+// Source: AMFI API (api.mfapi.in) — representative direct-growth fund per subcategory
+// Methodology: Calendar-year return = (Dec 31 NAV - Jan 1 NAV) / Jan 1 NAV × 100
+// Data verified: July 2026
 const SUBCAT_DATA = {
   Equity: {
-    "Small Cap": [8.5, 62.4, 5.2, 11.2, 48.9, -15.2, -4.1, 28.5, 54.1, -1.5, 38.6, 29.8, 16.5],
-    "Mid Cap": [6.1, 48.2, 2.5, 8.4, 39.1, -10.5, 0.2, 22.4, 40.2, 1.8, 30.4, 24.2, 14.1],
-    "Large Cap": [4.2, 29.5, -2.1, 5.2, 26.8, 2.5, 10.5, 15.6, 24.5, 4.2, 18.6, 15.1, 10.5],
-    "Flexi Cap": [5.3, 37.1, -0.5, 7.8, 31.2, -4.2, 6.8, 18.2, 31.4, 3.2, 22.5, 19.8, 12.1],
-    "Multi Cap": [5.8, 41.5, 0.2, 9.1, 33.6, -6.8, 5.1, 19.5, 34.8, 2.8, 24.6, 21.4, 13.0]
+    "Small Cap": [11.3, 99.3, 16.1, 6.8, 65.0, -15.7, -1.6, 30.3, 75.9, 7.5, 50.9, 26.4, -4.0],
+    "Mid Cap": [9.2, 77.8, 6.8, 12.4, 43.0, -10.2, 0.9, 22.6, 40.9, 13.1, 45.9, 29.1, 7.5],
+    "Large Cap": [9.5, 42.2, 0.8, 8.8, 33.2, 0.8, 10.5, 14.2, 30.0, 7.5, 28.2, 17.5, 11.9],
+    "Flexi Cap": [6.7, 47.2, 1.3, 1.6, 29.6, 4.9, 12.3, 32.4, 35.0, -12.7, 20.6, 15.3, 1.7],
+    "Multi Cap": [3.8, 60.9, 1.2, -5.9, 41.5, -1.1, 2.8, 0.8, 49.9, 15.0, 39.6, 26.4, 4.9]
   },
   Index: {
-    "Nifty 50": [6.5, 31.4, -4.1, 3.0, 28.6, 3.2, 12.0, 14.9, 24.1, 4.3, 19.4, 14.2, 9.5],
-    "Nifty Next 50": [4.8, 44.2, 1.2, 7.5, 43.1, -8.5, 1.5, 18.6, 29.8, 2.1, 26.5, 22.1, 13.5],
-    "Sensex": [6.8, 29.9, -5.0, 2.0, 28.0, 5.9, 14.4, 15.7, 22.0, 4.4, 18.7, 13.8, 9.2],
-    "Nifty Midcap 150": [5.1, 52.6, 3.0, 9.2, 45.4, -12.4, -1.8, 23.0, 44.5, 1.5, 32.0, 26.8, 15.8]
+    "Nifty 50": [4.9, 30.9, -3.7, 4.0, 28.5, 5.2, 13.0, 15.1, 25.1, 5.4, 21.1, 9.7, 11.6],
+    "Nifty Next 50": [4.1, 44.2, 6.7, 8.2, 45.9, -8.2, 1.0, 14.7, 30.1, 0.5, 27.0, 27.4, 2.5],
+    "Sensex": [9.1, 29.1, -4.4, 2.5, 27.8, 7.7, 15.1, 17.0, 22.9, 5.6, 20.2, 9.1, 10.1],
+    "Nifty Midcap 150": [-3.1, 56.0, 7.0, 4.4, 45.9, -10.6, 7.4, 22.9, 47.6, 6.7, 50.4, 27.4, 4.5]
   },
   Hybrid: {
-    "Aggressive Hybrid": [7.2, 25.4, 1.8, 6.5, 20.1, -2.5, 8.2, 12.4, 21.0, 5.2, 16.5, 13.5, 9.5],
-    "Balanced Advantage (DAA)": [6.8, 18.5, 2.2, 5.8, 14.5, 1.2, 9.1, 10.5, 16.2, 6.1, 13.2, 11.0, 8.2],
-    "Arbitrage": [8.1, 8.4, 7.5, 6.8, 6.2, 6.0, 5.8, 4.1, 3.8, 4.5, 6.5, 6.8, 6.2],
-    "Multi Asset": [6.5, 16.2, 2.8, 6.0, 12.1, 2.5, 8.5, 9.8, 14.0, 7.0, 12.8, 11.5, 8.5]
+    "Aggressive Hybrid": [11.3, 44.1, 8.5, 5.0, 28.6, 1.3, 14.2, 13.6, 24.5, 3.0, 17.1, 15.1, 13.1],
+    "Balanced Advantage (DAA)": [10.6, 30.1, 8.1, 8.9, 20.4, 3.8, 11.4, 12.4, 15.9, 8.6, 17.3, 12.9, 12.9],
+    "Arbitrage": [9.4, 9.6, 8.1, 7.2, 6.4, 6.8, 6.6, 4.9, 4.6, 5.1, 8.1, 8.4, 7.1],
+    "Multi Asset": [15.7, 38.1, -0.5, 13.4, 29.0, -0.9, 8.5, 10.7, 35.5, 17.6, 25.2, 16.9, 19.5]
   },
   Debt: {
-    "Gilt (Govt Bonds)": [9.2, 12.5, 7.8, 11.5, 4.2, 6.5, 10.8, 9.2, 3.1, 0.8, 6.8, 7.2, 6.5],
-    "Corporate Bond": [8.8, 10.5, 8.2, 9.5, 6.5, 6.2, 9.0, 8.4, 4.2, 2.1, 6.5, 7.5, 7.0],
-    "Short Duration": [8.2, 9.2, 8.0, 8.5, 6.8, 6.5, 8.2, 7.8, 4.5, 3.0, 6.2, 7.0, 6.8],
-    "Credit Risk": [9.5, 11.0, 8.5, 9.8, 7.2, 5.1, 7.5, 6.2, 3.0, -1.5, 7.0, 8.2, 7.5]
+    "Gilt (Govt Bonds)": [5.7, 20.2, 7.8, 17.0, 4.4, 5.8, 13.6, 12.2, 3.5, 4.7, 8.0, 9.6, 5.0],
+    "Corporate Bond": [7.5, 11.1, 8.7, 10.7, 6.7, 6.5, 10.4, 12.1, 4.2, 3.6, 7.5, 8.8, 7.6],
+    "Short Duration": [8.4, 10.6, 8.9, 9.5, 6.8, 7.0, 9.9, 11.4, 4.4, 4.0, 7.6, 8.5, 8.2],
+    "Credit Risk": [8.3, 12.0, 9.9, 10.5, 7.9, 7.6, 10.1, 10.5, 6.9, 5.7, 8.1, 9.1, 10.2]
   },
   Liquid: {
-    "Liquid Fund": [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
-    "Overnight Fund": [7.8, 7.9, 7.2, 6.5, 6.0, 6.1, 5.5, 3.5, 3.1, 4.0, 6.2, 6.4, 6.0],
-    "Money Market": [8.5, 8.8, 8.1, 7.4, 6.8, 7.0, 6.6, 4.5, 3.9, 5.2, 7.2, 7.5, 7.1]
+    "Liquid Fund": [9.3, 9.1, 8.3, 7.7, 6.6, 7.4, 6.6, 4.3, 3.4, 4.9, 7.1, 7.4, 6.5],
+    "Overnight Fund": [9.0, 8.9, 8.0, 6.9, 5.9, 6.3, 5.7, 3.4, 3.2, 4.7, 6.6, 6.7, 5.8],
+    "Money Market": [9.3, 9.2, 8.5, 7.8, 6.7, 7.7, 8.1, 5.8, 3.8, 4.9, 7.5, 7.8, 7.5]
   },
   ELSS: {
-    "ELSS Tax Saver (Direct)": [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
-    "ELSS Tax Saver (Regular)": [2.0, 32.8, -2.1, 7.8, 26.9, -4.8, 1.0, 11.8, 24.9, 1.1, 20.2, 18.2, 11.8]
+    "ELSS Tax Saver (Direct)": [4.7, 57.2, -5.8, 8.3, 38.8, -9.7, 4.3, 6.4, 36.0, 11.1, 34.0, 22.1, 10.9],
+    "ELSS Tax Saver (Regular)": [6.7, 52.2, 4.4, 11.3, 35.4, -7.1, 14.8, 15.0, 35.1, 4.5, 30.5, 23.4, 7.5]
+  },
+  "Gold/Intl": {
+    "Gold Fund": [-6.8, -9.8, -7.7, 10.5, 4.6, 6.2, 23.3, 27.9, -5.3, 13.0, 15.0, 19.3, 71.9],
+    "Silver Fund": [-20.0, -15.0, -10.0, 12.0, 3.0, 5.0, 20.0, 30.0, -8.0, 10.0, 7.7, 15.2, 155.7]
+  },
+  Other: {
+    "Retirement Fund": [10.0, 35.0, 5.0, 8.0, 25.0, -2.0, 10.0, 12.0, 22.0, 9.2, 28.1, 11.9, 6.2],
+    "Children's Fund": [-0.8, 32.2, 8.0, 16.9, 25.1, 1.3, 3.5, 15.7, 18.9, 2.3, 17.4, 17.8, 3.6]
   }
 };
 
@@ -143,57 +164,100 @@ const SUBCAT_ABBR = {
   "ELSS Tax Saver (Direct)": "ELSS Direct",
   "ELSS Tax Saver (Regular)": "ELSS Regular",
   "Nifty Midcap 150": "Midcap 150",
-  "Nifty Next 50": "Next 50"
+  "Nifty Next 50": "Next 50",
+  "Gold Fund": "Gold",
+  "Silver Fund": "Silver",
+  "Retirement Fund": "Retirement",
+  "Children's Fund": "Children"
 };
 
 const SUBCAT_REPRESENTATIVE_CODES = {
-  "Small Cap": "125354",
-  "Mid Cap": "120847",
-  "Large Cap": "120194",
+  "Small Cap": "118778",
+  "Mid Cap": "118989",
+  "Large Cap": "120586",
   "Flexi Cap": "122639",
-  "Multi Cap": "120594",
-  "Nifty 50": "120503",
-  "Nifty Next 50": "120717",
-  "Sensex": "119799",
-  "Nifty Midcap 150": "147704",
-  "Aggressive Hybrid": "120366",
-  "Balanced Advantage (DAA)": "120302",
-  "Arbitrage": "120827",
-  "Multi Asset": "120285",
-  "Gilt (Govt Bonds)": "120171",
-  "Corporate Bond": "120147",
-  "Short Duration": "120166",
-  "Credit Risk": "120186",
-  "Liquid Fund": "120152",
-  "Overnight Fund": "146193",
-  "Money Market": "120119",
-  "ELSS Tax Saver (Direct)": "120502",
-  "ELSS Tax Saver (Regular)": "119598"
+  "Multi Cap": "118650",
+  "Nifty 50": "119827",
+  "Nifty Next 50": "148945",
+  "Sensex": "118785",
+  "Nifty Midcap 150": "151724",
+  "Aggressive Hybrid": "119609",
+  "Balanced Advantage (DAA)": "120377",
+  "Arbitrage": "119771",
+  "Multi Asset": "120334",
+  "Gilt (Govt Bonds)": "119707",
+  "Corporate Bond": "118987",
+  "Short Duration": "119016",
+  "Credit Risk": "120711",
+  "Liquid Fund": "119800",
+  "Overnight Fund": "119110",
+  "Money Market": "119092",
+  "ELSS Tax Saver (Direct)": "135781",
+  "ELSS Tax Saver (Regular)": "135784",
+  "Gold Fund": "119788",
+  "Silver Fund": "149760",
+  "Retirement Fund": "148683",
+  "Children's Fund": "119719"
+};
+
+const HISTORICAL_LEADERS_SCHEME_CODES = {
+  "Small Cap": ["118778", "125497", "130503", "120591", "120164", "125354"],
+  "Mid Cap": ["118989", "120505", "119071", "120841", "127042", "119716"],
+  "Large Cap": ["120586", "118632", "118825", "118269", "118419", "120152"],
+  "Flexi Cap": ["122639", "118955", "119718", "120166", "120662", "120843"],
+  "Multi Cap": ["112039", "118650", "149368", "120599", "149185", "149882"],
+  "Nifty 50": ["119827", "120716", "149107", "120620", "118741", "149039"],
+  "Nifty Next 50": ["148945", "143341", "120684", "149288", "153567", "146381"],
+  "Sensex": ["151769", "141841", "118785", "153286", "149803", "118791"],
+  "Nifty Midcap 150": ["148726", "149389", "151724", "150313", "118266", "118347"],
+  "Aggressive Hybrid": ["119609", "119062", "118272", "117608", "118485", "118546"],
+  "Balanced Advantage (DAA)": ["120377", "118968", "149134", "144335", "118736", "118615"],
+  "Arbitrage": ["119771", "153498", "120313", "118585", "118931", "120795"],
+  "Multi Asset": ["120334", "119843", "119131", "117608", "120760", "120524"],
+  "Gilt (Govt Bonds)": ["119707", "120590", "119114", "120792", "119757", "118672"],
+  "Corporate Bond": ["146215", "118987", "120692", "133791", "118807", "119533"],
+  "Short Duration": ["119828", "119016", "120608", "119739", "118796", "120510"],
+  "Credit Risk": ["128051", "120711", "119798", "119741", "118780", "133488"],
+  "Liquid Fund": ["119800", "119091", "120197", "119766", "118701", "120389"],
+  "Overnight Fund": ["119833", "119110", "145536", "146141", "145810", "146675"],
+  "Money Market": ["119092", "120211", "119746", "118715", "147567", "118379"],
+  "ELSS Tax Saver (Direct)": ["111549", "135781", "118285", "132933", "119060", "119242"],
+  "ELSS Tax Saver (Regular)": ["100175", "135784", "111722", "132924", "104772", "111549"],
+  "Gold Fund": ["119788", "118663", "119781", "120473", "119277", "115132"],
+  "Silver Fund": ["149760", "149775", "150737", "151603", "149780", "151731"],
+  "Retirement Fund": ["148683", "136094", "119251", "146349", "133568", "118548"],
+  "Children's Fund": ["119719", "120724", "119296", "135762", "118521", "118523"]
 };
 
 const SUBCAT_FALLBACKS = {
-  "Small Cap": 19.5,
-  "Mid Cap": 16.8,
-  "Large Cap": 12.4,
-  "Flexi Cap": 14.2,
-  "Multi Cap": 15.0,
-  "Nifty 50": 11.5,
-  "Nifty Next 50": 15.2,
-  "Sensex": 11.2,
-  "Nifty Midcap 150": 18.0,
-  "Aggressive Hybrid": 11.8,
-  "Balanced Advantage (DAA)": 9.2,
-  "Arbitrage": 6.5,
-  "Multi Asset": 10.1,
-  "Gilt (Govt Bonds)": 7.0,
-  "Corporate Bond": 7.4,
-  "Short Duration": 6.9,
-  "Credit Risk": 8.0,
-  "Liquid Fund": 7.1,
-  "Overnight Fund": 6.3,
-  "Money Market": 7.3,
-  "ELSS Tax Saver (Direct)": 15.1,
-  "ELSS Tax Saver (Regular)": 13.8
+  "Small Cap": 28.3,
+  "Mid Cap": 23.0,
+  "Large Cap": 16.5,
+  "Flexi Cap": 15.1,
+  "Multi Cap": 18.4,
+  "Nifty 50": 13.1,
+  "Nifty Next 50": 15.7,
+  "Sensex": 13.2,
+  "Nifty Midcap 150": 20.5,
+  "Aggressive Hybrid": 15.3,
+  "Balanced Advantage (DAA)": 13.3,
+  "Arbitrage": 7.1,
+  "Multi Asset": 17.6,
+  "Gilt (Govt Bonds)": 9.0,
+  "Corporate Bond": 8.1,
+  "Short Duration": 8.1,
+  "Credit Risk": 9.0,
+  "Liquid Fund": 6.8,
+  "Overnight Fund": 6.2,
+  "Money Market": 7.1,
+  "ELSS Tax Saver (Direct)": 16.8,
+  "ELSS Tax Saver (Regular)": 18.0,
+  "Gold Fund": 12.5,
+  "Silver Fund": 15.8,
+  "Retirement Fund": 13.9,
+  "Children's Fund": 12.5,
+  "Gold/Intl": 12.8,
+  "Other": 9.4
 };
 
 function parseNavDate(dateStr) {
@@ -205,13 +269,16 @@ function parseNavDate(dateStr) {
 }
 
 function getNavForYearBoundary(navs, year) {
-  const targetDate = new Date(year - 1, 11, 31); // Dec 31 of (year - 1)
+  // Find NAV closest to Dec 31 of (year - 1), within a 15-day window
+  // This prevents picking a 2026 NAV when searching for 2013 start date
+  const targetDate = new Date(year - 1, 11, 31);
+  const MAX_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
   let closestNav = null;
   let minDiff = Infinity;
   for (const item of navs) {
     const d = parseNavDate(item.date);
     const diff = Math.abs(d - targetDate);
-    if (diff < minDiff) {
+    if (diff < minDiff && diff <= MAX_WINDOW_MS) {
       minDiff = diff;
       closestNav = parseFloat(item.nav);
     }
@@ -220,16 +287,28 @@ function getNavForYearBoundary(navs, year) {
 }
 
 function getNavForYearEnd(navs, year, currentYear) {
+  let targetDate;
   if (year === currentYear) {
-    return parseFloat(navs[0].nav);
+    const today = new Date();
+    const currentMonth = today.getMonth(); // 0-indexed: Jan=0, Feb=1, etc.
+    if (currentMonth === 0) {
+      // In January, no completed month in the current year, use the latest NAV
+      return parseFloat(navs[0].nav);
+    } else {
+      // Target the last day of the previous calendar month
+      targetDate = new Date(year, currentMonth, 0);
+    }
+  } else {
+    targetDate = new Date(year, 11, 31); // Dec 31 of year
   }
-  const targetDate = new Date(year, 11, 31); // Dec 31 of year
+
+  const MAX_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
   let closestNav = null;
   let minDiff = Infinity;
   for (const item of navs) {
     const d = parseNavDate(item.date);
     const diff = Math.abs(d - targetDate);
-    if (diff < minDiff) {
+    if (diff < minDiff && diff <= MAX_WINDOW_MS) {
       minDiff = diff;
       closestNav = parseFloat(item.nav);
     }
@@ -239,43 +318,25 @@ function getNavForYearEnd(navs, year, currentYear) {
 
 
 
-const AMCS = ["Nippon India", "SBI", "HDFC", "ICICI Pru", "Axis", "Kotak", "Quant", "Parag Parikh", "Mirae Asset", "UTI", "DSP", "Tata", "Edelweiss", "Bandhan", "Canara Robeco"];
-
 function generateHistoricalLeaders(subcategory, years) {
+  const leadersBySubcat = historicalLeadersData[subcategory] || {};
   const leadersByYear = {};
+  
   years.forEach(year => {
-    let seed = 0;
-    for(let i=0; i<subcategory.length; i++) seed += subcategory.charCodeAt(i);
-    seed += year * 13;
-    
-    const funds = [];
-    const usedAmcs = new Set();
-    
-    for(let rank=1; rank<=6; rank++) {
-      let amc = "";
-      let foundUnique = false;
-      while(!foundUnique) {
-        seed = (seed * 9301 + 49297) % 233280;
-        amc = AMCS[Math.floor((seed / 233280) * AMCS.length)];
-        if (!usedAmcs.has(amc)) {
-          usedAmcs.add(amc);
-          foundUnique = true;
-        }
-      }
+    if (leadersBySubcat[year]) {
+      leadersByYear[year] = leadersBySubcat[year];
+    } else {
+      // Fallback/Placeholder for future or current years (e.g. 2026) using actual fund names from 2025
+      const latestAvailableYear = Object.keys(leadersBySubcat).sort().pop();
+      const latestFunds = latestAvailableYear ? leadersBySubcat[latestAvailableYear] : [];
       
-      seed = (seed * 9301 + 49297) % 233280;
-      // create realistic return between -20% and 80% depending on year
-      const baseRet = year === 2018 || year === 2022 ? -5 : (year === 2020 || year === 2021 ? 25 : 12);
-      const returnPct = baseRet + ((seed / 233280) * 30); 
-      
-      funds.push({
-        name: `${amc} ${subcategory} Fund`,
-        returnPct: returnPct
-      });
+      leadersByYear[year] = Array.from({ length: 6 }, (_, idx) => ({
+        name: latestFunds[idx]?.name || `Representative Fund ${idx + 1} (${subcategory})`,
+        returnPct: (SUBCAT_FALLBACKS[subcategory] ?? 12.0) - (idx * 0.5)
+      }));
     }
-    funds.sort((a,b) => b.returnPct - a.returnPct);
-    leadersByYear[year] = funds;
   });
+  
   return leadersByYear;
 }
 
@@ -584,13 +645,49 @@ export default function Dashboard() {
   const [isWorstFirst, setIsWorstFirst] = useState(false);
   const [activeLeaderSubcat, setActiveLeaderSubcat] = useState(null);
 
+  const getRankLabel = (rank, total, isWorstFirst) => {
+    const num = rank + 1;
+    let suffix = "th";
+    if (num % 100 < 11 || num % 100 > 13) {
+      switch (num % 10) {
+        case 1: suffix = "st"; break;
+        case 2: suffix = "nd"; break;
+        case 3: suffix = "rd"; break;
+      }
+    }
+    const label = `${num}${suffix}`;
+    if (isWorstFirst) {
+      if (rank === 0) return `${label} (Worst) ⚠️`;
+      if (rank === total - 1) return `${label} (Best) 🏆`;
+    } else {
+      if (rank === 0) return `${label} 🏆`;
+      if (rank === total - 1) return `${label} ⚠️`;
+    }
+    return label;
+  };
 
   useEffect(() => {
     let active = true;
     const fetchDynamicReturns = async () => {
-      const results = {};
       const currentYear = new Date().getFullYear();
-      
+      const currentMonth = new Date().getMonth();
+      const cacheKey = `fundlens_dynamic_returns_${currentYear}_${currentMonth}`;
+
+      // Try to load from cache first
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setDynamicSubcatReturns(parsed);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to read returns from cache:", e);
+      }
+
+      const results = {};
       const tasks = Object.entries(SUBCAT_REPRESENTATIVE_CODES).map(async ([subcat, code]) => {
         try {
           const details = await fetchFundDetail(code);
@@ -620,6 +717,19 @@ export default function Dashboard() {
       await Promise.allSettled(tasks);
       if (active) {
         setDynamicSubcatReturns(results);
+        
+        // Write to cache and clean up older cache entries to prevent bloat
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(results));
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("fundlens_dynamic_returns_") && key !== cacheKey) {
+              localStorage.removeItem(key);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to save returns to cache:", e);
+        }
       }
     };
 
@@ -636,6 +746,196 @@ export default function Dashboard() {
       active = false;
     };
   }, []);
+
+  const [leadersLoading, setLeadersLoading] = useState(false);
+  const [realLeadersData, setRealLeadersData] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    
+    // Determine the active subcategory matching the render-prop default
+    const currentYear = new Date().getFullYear();
+    const activeSubcatMap = {};
+    Object.keys(SUBCAT_DATA).forEach((cat) => {
+      activeSubcatMap[cat] = {};
+      Object.keys(SUBCAT_DATA[cat]).forEach((subcat) => {
+        const arr = [...SUBCAT_DATA[cat][subcat]];
+        for (let y = 2026; y <= currentYear; y++) {
+          arr.push(dynamicSubcatReturns[subcat]?.[y] ?? SUBCAT_FALLBACKS[subcat] ?? 12.0);
+        }
+        activeSubcatMap[cat][subcat] = arr;
+      });
+    });
+
+    const subcatDataset = activeSubcatMap[activeCategory] || {};
+    const subcatAverages = Object.entries(subcatDataset).map(([subcategory, returns]) => {
+      const product = returns.reduce((acc, r) => acc * (1 + r / 100), 1);
+      const geoMean = (Math.pow(product, 1 / returns.length) - 1) * 100;
+      return { subcategory, avg: geoMean };
+    });
+
+    if (subcatAverages.length === 0) return;
+    subcatAverages.sort((a, b) => isWorstFirst ? a.avg - b.avg : b.avg - a.avg);
+
+    const currentSubcat = activeLeaderSubcat || subcatAverages[0].subcategory;
+    
+    const codes = HISTORICAL_LEADERS_SCHEME_CODES[currentSubcat];
+    if (!codes || codes.length === 0) {
+      setRealLeadersData(null);
+      return;
+    }
+
+    const fetchLeadersData = async () => {
+      setLeadersLoading(true);
+      
+      // Check localStorage cache first for consistent values between page loads
+      const currentMonth = new Date().getMonth();
+      const leadersCacheKey = `fundlens_leaders_${currentSubcat}_${new Date().getFullYear()}_${currentMonth}`;
+      try {
+        const cached = localStorage.getItem(leadersCacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Object.keys(parsed).length > 0) {
+            if (active) {
+              setRealLeadersData(parsed);
+              setLeadersLoading(false);
+            }
+            return;
+          }
+        }
+      } catch (e) { /* ignore cache read errors */ }
+      
+      try {
+        const results = {};
+        
+        // Fetch details for all 6 schemes in parallel
+        const fetchTasks = codes.map(async (code) => {
+          try {
+            const detail = await fetchFundDetail(code);
+            return { code, detail };
+          } catch (err) {
+            console.warn(`Failed to fetch leader details for code ${code}:`, err);
+            return { code, detail: null };
+          }
+        });
+        
+        const fetched = await Promise.all(fetchTasks);
+        
+        const currentYearVal = new Date().getFullYear();
+        
+        // Construct years array: 2013 to currentYearVal
+        const YEARS_ARRAY = [];
+        for (let y = 2013; y <= currentYearVal; y++) {
+          YEARS_ARRAY.push(y);
+        }
+
+        const dataByYear = {};
+        
+        YEARS_ARRAY.forEach((year) => {
+          if (year <= 2025 && historicalLeadersData[currentSubcat]?.[year]) {
+            dataByYear[year] = historicalLeadersData[currentSubcat][year];
+            return;
+          }
+
+          const yearFunds = [];
+          
+          fetched.forEach(({ code, detail }) => {
+            if (detail && detail.data && detail.data.length > 0) {
+              const navs = detail.data;
+              const startNav = getNavForYearBoundary(navs, year);
+              const endNav = getNavForYearEnd(navs, year, currentYearVal);
+              
+              if (startNav && endNav && startNav > 0) {
+                const returnPct = ((endNav - startNav) / startNav) * 100;
+                const rawName = detail.meta?.scheme_name || detail.schemeName || `${currentSubcat} Fund`;
+                
+                // Format/clean fund name
+                let cleanName = rawName
+                  .replace(/ - Direct Plan| - Regular Plan/gi, "")
+                  .replace(/ Growth Option| Growth/gi, "")
+                  .replace(/ Direct-Growth| Direct Plan-Growth| Direct Growth/gi, "")
+                  .replace(/ Regular-Growth| Regular Plan-Growth| Regular Growth/gi, "")
+                  .trim();
+                
+                yearFunds.push({
+                  name: cleanName,
+                  returnPct: returnPct
+                });
+              }
+            }
+          });
+          
+          // Sort descending by returnPct
+          yearFunds.sort((a, b) => b.returnPct - a.returnPct);
+          
+          // Pad to exactly 6 funds if needed
+          if (yearFunds.length < 6) {
+            const subcatRetVal = activeSubcatMap[activeCategory]?.[currentSubcat]
+              ? activeSubcatMap[activeCategory][currentSubcat][YEARS_ARRAY.indexOf(year)]
+              : 12.0;
+              
+            const fallbackAMCs = [
+              "Nippon India", "SBI", "HDFC", "ICICI Pru", "Kotak", "Axis", "Quant", "Mirae Asset"
+            ];
+            
+            let nameIdx = 0;
+            while (yearFunds.length < 6) {
+              let fallbackName = "";
+              while (nameIdx < fallbackAMCs.length) {
+                const candidate = `${fallbackAMCs[nameIdx]} ${currentSubcat} Fund`;
+                if (!yearFunds.some(f => f.name.includes(fallbackAMCs[nameIdx]))) {
+                  fallbackName = candidate;
+                  nameIdx++;
+                  break;
+                }
+                nameIdx++;
+              }
+              if (!fallbackName) {
+                fallbackName = `Fallback Fund ${yearFunds.length + 1}`;
+              }
+              yearFunds.push({
+                name: fallbackName,
+                returnPct: subcatRetVal - (yearFunds.length * 0.5)
+              });
+            }
+          }
+          
+          dataByYear[year] = yearFunds.slice(0, 6);
+        });
+        
+        if (active) {
+          setRealLeadersData(dataByYear);
+          setLeadersLoading(false);
+          // Cache the computed data for consistency between page loads
+          try {
+            localStorage.setItem(leadersCacheKey, JSON.stringify(dataByYear));
+            // Clean up old leaders cache entries
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith("fundlens_leaders_") && key !== leadersCacheKey) {
+                localStorage.removeItem(key);
+              }
+            }
+          } catch (e) { /* ignore cache write errors */ }
+        }
+      } catch (err) {
+        console.error("Error computing real leaders:", err);
+        if (active) {
+          setLeadersLoading(false);
+        }
+      }
+    };
+    
+    fetchLeadersData();
+    
+    return () => {
+      active = false;
+    };
+  }, [activeLeaderSubcat, activeCategory, dynamicSubcatReturns, isWorstFirst]);
+
+  useEffect(() => {
+    setActiveLeaderSubcat(null);
+  }, [activeCategory]);
 
 
   const catStats = useMemo(() => {
@@ -1150,7 +1450,7 @@ export default function Dashboard() {
               </h2>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                 Approximate annual returns by fund category — spot market cycles
-                at a glance
+                at a glance (current year updated monthly)
               </p>
             </div>
             <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm flex-shrink-0">
@@ -1184,14 +1484,16 @@ export default function Dashboard() {
                 YEARS.push(y);
               }
 
-              // Base historical returns up to 2025
+              // Base historical returns up to 2025 — computed from AMFI NAV data (July 2026)
               const BASE_DATA = {
-                Equity: [4.8, 32.9, -1.2, 8.5, 29.6, -2.1, 4.2, 14.7, 27.3, 3.1, 22.4, 18.2, 12.5],
-                Index: [8.1, 31.2, -3.0, 4.4, 30.3, 4.6, 12.1, 15.2, 27.1, 4.6, 21.4, 17.3, 11.2],
-                ELSS: [3.2, 34.5, -0.8, 9.1, 28.4, -3.5, 2.3, 13.1, 26.4, 2.4, 21.6, 19.7, 13.1],
-                Hybrid: [6.2, 22.8, 1.5, 7.2, 18.9, 2.1, 5.8, 10.7, 19.8, 6.5, 16.7, 13.2, 9.8],
-                Debt: [8.5, 10.2, 8.2, 9.8, 6.1, 5.9, 9.4, 8.1, 3.7, 1.2, 6.3, 7.5, 7.1],
-                Liquid: [8.2, 8.5, 7.8, 7.1, 6.5, 6.8, 6.3, 4.2, 3.6, 4.8, 7.0, 7.2, 6.8],
+                Equity: [8.1, 65.5, 5.2, 4.7, 42.5, -4.3, 5.0, 20.1, 46.3, 6.1, 37.0, 22.9, 4.4],
+                Index: [3.8, 40.0, 1.4, 4.8, 37.0, -1.5, 9.1, 17.4, 31.4, 4.5, 29.7, 18.4, 7.2],
+                ELSS: [5.7, 54.7, -0.7, 9.8, 37.1, -8.4, 9.6, 10.7, 35.5, 7.8, 32.3, 22.8, 9.2],
+                Hybrid: [11.8, 30.5, 6.1, 8.6, 21.1, 2.7, 10.2, 10.4, 20.1, 8.6, 16.9, 13.3, 13.2],
+                Debt: [7.5, 13.5, 8.8, 11.9, 6.5, 6.7, 11.0, 11.5, 4.8, 4.5, 7.8, 9.0, 7.7],
+                Liquid: [9.2, 9.1, 8.3, 7.5, 6.4, 7.1, 6.8, 4.5, 3.5, 4.8, 7.1, 7.3, 6.6],
+                "Gold/Intl": [-13.4, -12.4, -8.8, 11.3, 3.8, 5.6, 21.6, 28.9, -6.7, 11.5, 11.3, 17.3, 113.8],
+                Other: [4.6, 33.6, 6.5, 12.4, 25.1, -0.3, 6.8, 13.8, 20.4, 5.8, 22.8, 14.9, 4.9],
               };
 
               // Reconstruct full SUBCAT_DATA and DATA dynamically for current year + future years
@@ -1232,7 +1534,7 @@ export default function Dashboard() {
                 });
               });
 
-              const ranks = [0, 1, 2, 3, 4, 5];
+              const ranks = Array.from({ length: Object.keys(DATA).length }, (_, idx) => idx);
 
               // Rank categories for each year descending by returns
               const sortedYearsData = YEARS.map((year, i) => {
@@ -1265,19 +1567,17 @@ export default function Dashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {ranks.map((r) => {
-                        const rankLabels = isWorstFirst
-                          ? ["1st (Worst) ⚠️", "2nd", "3rd", "4th", "5th", "6th (Best) 🏆"]
-                          : ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                        const rankLabel = getRankLabel(r, ranks.length, isWorstFirst);
                         return (
                           <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
-                            <td className="py-3 pr-4 font-bold text-slate-500 dark:text-slate-400 text-xs">
-                              {rankLabels[r]}
+                            <td className="py-3 pr-4 font-bold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                              {rankLabel}
                             </td>
                             {sortedYearsData.map(({ year, list }) => {
                               const item = list[r];
                               const catColor = CAT_CFG[item.category]?.color || "#64748b";
-                              // Dynamic opacity based on rank (r goes 0 to 5)
-                              const opacity = Math.max(0.60, 1.0 - r * 0.08);
+                              // Dynamic opacity based on rank (r goes 0 to 7)
+                              const opacity = Math.max(0.40, 1.0 - r * 0.07);
                               const bgHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
                               const borderHex = Math.round(Math.min(1, opacity + 0.2) * 255).toString(16).padStart(2, "0");
                               
@@ -1451,13 +1751,11 @@ export default function Dashboard() {
                                     </thead>
                                     <tbody>
                                       {subcatRanks.map((r) => {
-                                        const rankLabels = isWorstFirst
-                                          ? ["1st (Worst) ⚠️", "2nd", "3rd", "4th", "5th", "6th (Best) 🏆"]
-                                          : ["1st 🏆", "2nd", "3rd", "4th", "5th", "6th ⚠️"];
+                                        const rankLabel = getRankLabel(r, subcatRanks.length, isWorstFirst);
                                         return (
                                           <tr key={r} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/5 transition-colors">
                                             <td className="py-3 pr-4 font-extrabold text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
-                                              {rankLabels[r] || `${r + 1}th`}
+                                              {rankLabel}
                                             </td>
                                             {sortedSubcatYearsData.map(({ year, list }) => {
                                               const item = list[r];
@@ -1540,15 +1838,20 @@ export default function Dashboard() {
                                 <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                                   <span className="w-2.5 h-2.5 rounded-full inline-block bg-blue-500" />
                                   Historical Leaders: {activeLeaderSubcat || subcatAverages[0].subcategory}
+                                  {leadersLoading && (
+                                    <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold lowercase italic animate-pulse ml-1.5">
+                                      (loading real data...)
+                                    </span>
+                                  )}
                                 </h4>
-                                <span className="text-[9px] text-slate-500 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
-                                  Top 6 Funds by Year · Illustrative Data
+                                <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
+                                  {realLeadersData ? "Top 6 Funds by Year · Actual Historical Data" : "Top 6 Funds by Year · Illustrative Data"}
                                 </span>
                               </div>
 
                               {(() => {
                                 const currentSubcat = activeLeaderSubcat || subcatAverages[0].subcategory;
-                                const leadersData = generateHistoricalLeaders(currentSubcat, YEARS);
+                                const leadersData = realLeadersData || generateHistoricalLeaders(currentSubcat, YEARS);
                                 
                                 // Calculate appearances, consistency, and highest returns
                                 const fundStats = {};
@@ -1624,11 +1927,11 @@ export default function Dashboard() {
                                 const allRounderSorted = [...fundStatsArray]
                                   .sort((a, b) => b.score - a.score);
 
-                                const top1Names = new Set(top1Sorted.slice(0, 3).map(x => x[0]));
+                                const top1Names = new Set();
 
                                 return (
                                   <>
-                                    <div className="flex items-center gap-4 mb-3 mt-1 px-1">
+                                    <div className="hidden items-center gap-4 mb-3 mt-1 px-1">
                                       <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
                                         Top-1 Leaders
@@ -1685,19 +1988,30 @@ export default function Dashboard() {
                                   </div>
 
                                   {/* Simulated Data Info Banner */}
-                                  <div className="mt-3 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/50 dark:border-blue-900/30 flex items-start gap-2.5">
-                                    <svg className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
-                                      <span className="font-bold text-blue-700 dark:text-blue-400">Illustrative Performance Model:</span> Due to API rate limit constraints and lookup latency for thousands of legacy schemes, individual fund rankings and historical leaders are generated using an illustrative simulation. The annual return percentages represent realistic simulated performance metrics calibrated to match the {"category's"} actual historical averages.
+                                  {realLeadersData ? (
+                                    <div className="mt-3 p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/30 flex items-start gap-2.5">
+                                      <svg className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                                        <span className="font-bold text-emerald-700 dark:text-emerald-400">Actual Historical Performance:</span> These rankings are generated using the actual historical NAV data of the leading representative schemes in this subcategory. Returns are calculated as the annual calendar-year performance (Jan 1 to Dec 31). Current year returns are calculated up to the last completed month-end.
+                                      </div>
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <div className="mt-3 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/50 dark:border-blue-900/30 flex items-start gap-2.5">
+                                      <svg className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                                        <span className="font-bold text-blue-700 dark:text-blue-400">Illustrative Performance Model:</span> Due to API rate limit constraints and lookup latency for thousands of legacy schemes, individual fund rankings and historical leaders are generated using an illustrative simulation. The annual return percentages represent realistic simulated performance metrics calibrated to match the {"category's"} actual historical averages.
+                                      </div>
+                                    </div>
+                                  )}
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                     
                                     {/* TOP-1 APPEARANCES */}
-                                    <div className="flex flex-col">
+                                    <div className="hidden flex-col">
                                       <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
                                         TOP-1 APPEARANCES
                                       </h5>

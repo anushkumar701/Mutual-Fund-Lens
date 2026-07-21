@@ -3,11 +3,27 @@ import xirr from "xirr";
 
 function parseDate(dateStr) {
   if (!dateStr || typeof dateStr !== "string") return new Date(NaN);
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return new Date(NaN);
-  const [dd, mm, yyyy] = parts;
-  const date = new Date(`${yyyy}-${mm}-${dd}`);
-  return isNaN(date.getTime()) ? new Date(NaN) : date;
+  
+  // Try DD-MM-YYYY
+  const ddMmYyyy = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (ddMmYyyy) {
+    return new Date(`${ddMmYyyy[3]}-${ddMmYyyy[2]}-${ddMmYyyy[1]}`);
+  }
+  
+  // Try YYYY-MM-DD
+  const yyyyMmDd = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (yyyyMmDd) {
+    return new Date(dateStr);
+  }
+
+  // Try DD/MM/YYYY or D/M/YYYY
+  const ddMmYyyySlash = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddMmYyyySlash) {
+    return new Date(`${ddMmYyyySlash[3]}-${ddMmYyyySlash[2]}-${ddMmYyyySlash[1]}`);
+  }
+  
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? new Date(NaN) : parsed;
 }
 
 // Build a sorted ascending array of { ts, nav } for binary search
@@ -80,39 +96,42 @@ export function calculateFundMetrics(navData) {
   const return5Y = calcCAGR(getNavAgo(5), 5);
   const return10Y = calcCAGR(getNavAgo(10), 10);
   
-  let rolling3YReturns = [];
-  for (let i = 0; i < sorted.length; i++) {
-    const startNav = sorted[i].nav;
-    const startTs = sorted[i].ts;
-    const targetDate = new Date(startTs);
-    targetDate.setFullYear(targetDate.getFullYear() + 3);
-    const targetTs = targetDate.getTime();
-    
-    // Quick bounds check - if targetTs is beyond our latest data, we can break
-    if (targetTs > sorted[sorted.length - 1].ts + 15 * 24 * 60 * 60 * 1000) break;
-    
-    const endIdx = binarySearchClosest(sorted, targetTs);
-    if (endIdx > i && Math.abs(sorted[endIdx].ts - targetTs) <= 15 * 24 * 60 * 60 * 1000) {
-      const endNav = sorted[endIdx].nav;
-      const cagr = (Math.pow(endNav / startNav, 1 / 3) - 1) * 100;
-      rolling3YReturns.push(cagr);
-    }
-  }
+  // ── Rolling Return Helper ───────────────────────────────────────────────────
+  // Computes all rolling CAGR windows for the given period (in years).
+  // Returns { avg, min, max, median, count } or null if insufficient data.
+  const computeRolling = (years) => {
+    const returns = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const startNav = sorted[i].nav;
+      const startTs = sorted[i].ts;
+      const targetDate = new Date(startTs);
+      targetDate.setFullYear(targetDate.getFullYear() + years);
+      const targetTs = targetDate.getTime();
 
-  let rolling3Y = null;
-  let rolling3YData = null;
-  if (rolling3YReturns.length > 0) {
-    rolling3YReturns.sort((a, b) => a - b);
-    const count = rolling3YReturns.length;
-    const avg = rolling3YReturns.reduce((a, b) => a + b, 0) / count;
-    const min = rolling3YReturns[0];
-    const max = rolling3YReturns[count - 1];
+      if (targetTs > sorted[sorted.length - 1].ts + 15 * 24 * 60 * 60 * 1000) break;
+
+      const endIdx = binarySearchClosest(sorted, targetTs);
+      if (endIdx > i && Math.abs(sorted[endIdx].ts - targetTs) <= 15 * 24 * 60 * 60 * 1000) {
+        const endNav = sorted[endIdx].nav;
+        const cagr = (Math.pow(endNav / startNav, 1 / years) - 1) * 100;
+        returns.push(cagr);
+      }
+    }
+    if (returns.length === 0) return { value: null, data: null };
+    returns.sort((a, b) => a - b);
+    const count = returns.length;
+    const avg = returns.reduce((a, b) => a + b, 0) / count;
+    const min = returns[0];
+    const max = returns[count - 1];
     const median = count % 2 === 0
-      ? (rolling3YReturns[count / 2 - 1] + rolling3YReturns[count / 2]) / 2
-      : rolling3YReturns[Math.floor(count / 2)];
-    rolling3Y = avg;
-    rolling3YData = { avg, min, max, median, count };
-  }
+      ? (returns[count / 2 - 1] + returns[count / 2]) / 2
+      : returns[Math.floor(count / 2)];
+    return { value: avg, data: { avg, min, max, median, count } };
+  };
+
+  const { value: rolling1Y, data: rolling1YData } = computeRolling(1);
+  const { value: rolling3Y, data: rolling3YData } = computeRolling(3);
+  const { value: rolling5Y, data: rolling5YData } = computeRolling(5);
 
   // Use longest available return period for Sortino so numerator & denominator cover same timespan
   const sortinoReturn = return5Y ?? return3Y ?? return1Y;
@@ -139,14 +158,22 @@ export function calculateFundMetrics(navData) {
     return3Y,
     return5Y,
     return10Y,
+    rolling1Y,
+    rolling1YData,
     rolling3Y,
     rolling3YData,
+    rolling5Y,
+    rolling5YData,
     maxDrawdown: maxDrawdown * 100,
     volatility,
     sharpe: calculateSharpeRatio(return1Y, vol1Y),
     sortino:
       sortinoReturn !== null && sortinoNavSlice !== null
-        ? calculateSortinoRatio(sortinoNavSlice, sortinoReturn)
+        ? calculateSortinoRatio(sortinoNavSlice, sortinoReturn, 6.5, "zero")
+        : null,
+    sortinoRF:
+      sortinoReturn !== null && sortinoNavSlice !== null
+        ? calculateSortinoRatio(sortinoNavSlice, sortinoReturn, 6.5, "rf")
         : null,
   };
 }
@@ -171,7 +198,7 @@ export function calculateVolatility(navData) {
   const variance =
     returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) /
     (returns.length - 1);
-  return Math.sqrt(variance) * Math.sqrt(252) * 100;
+  return Math.sqrt(variance) * Math.sqrt(returns.length) * 100;
 }
 
 /**
@@ -189,28 +216,33 @@ export function calculateSharpeRatio(
 
 /**
  * Sortino Ratio = (Annual Return - Risk Free Rate) / Downside Deviation
- * Downside deviation uses ALL returns in denominator (not just negative ones),
- * and measures deviations below zero (MAR = 0), as per standard finance practice.
+ * Supports marType: "zero" (MAR = 0%) or "rf" (MAR = Risk-Free Rate).
+ * Calculates downside deviation only over returns that are below daily MAR.
  */
 export function calculateSortinoRatio(
   navData,
   annualReturn,
   riskFreeRate = 6.5,
+  marType = "zero",
 ) {
   if (!navData || annualReturn === null) return null;
   const returns = getDailyReturns(navData);
   if (returns.length < 30) return null;
-  // Minimum Acceptable Return (MAR) per day — using 0 (no loss tolerance)
-  const MAR = 0;
-  // Sum of squared deviations below MAR, divided by TOTAL observations (not just downside days)
+
+  // Daily Minimum Acceptable Return (MAR)
+  const marDaily = marType === "rf" ? (riskFreeRate / 100) / returns.length : 0;
+  const downsideReturns = returns.filter((r) => r < marDaily);
+  if (downsideReturns.length === 0) return null;
+
   const downsideVariance =
-    returns.reduce((acc, r) => {
-      const below = Math.min(r - MAR, 0);
-      return acc + below * below;
-    }, 0) / returns.length;
+    downsideReturns.reduce((acc, r) => acc + Math.pow(r - marDaily, 2), 0) /
+    downsideReturns.length;
   if (downsideVariance === 0) return null;
-  const downsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(252) * 100;
+
+  // Annualize using actual number of trading days
+  const downsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(returns.length) * 100;
   if (downsideDeviation === 0) return null;
+
   return parseFloat(
     ((annualReturn - riskFreeRate) / downsideDeviation).toFixed(2),
   );
@@ -318,23 +350,26 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
   let totalInvested = 0,
     totalUnits = 0;
   const n = years * 12;
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
   for (let m = 0; m < n; m++) {
     const sipDate = new Date(latestDate);
     sipDate.setMonth(sipDate.getMonth() - m);
     const targetTs = sipDate.getTime();
-    // Binary search — O(log n) per iteration instead of O(n)
     const idx = binarySearchClosest(sorted, targetTs);
     const closestNav = sorted[idx]?.nav;
     if (closestNav) {
-      totalInvested += monthlyAmount;
-      totalUnits += monthlyAmount / closestNav;
+      const diff = Math.abs(sorted[idx].ts - targetTs);
+      if (diff <= threeDaysMs) {
+        totalInvested += monthlyAmount;
+        totalUnits += monthlyAmount / closestNav;
+      }
     }
   }
 
   const currentValue = totalUnits * latestNav;
   const profit = currentValue - totalInvested;
-  const absoluteReturn = (profit / totalInvested) * 100;
+  const absoluteReturn = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
 
   // True XIRR with actual dated cashflows
   let xirrResult = null;
@@ -343,13 +378,19 @@ export function calculateHistoricalSIP(navData, monthlyAmount, years) {
     for (let m = 0; m < n; m++) {
       const sipDate = new Date(latestDate);
       sipDate.setMonth(sipDate.getMonth() - m);
-      const idx = binarySearchClosest(sorted, sipDate.getTime());
+      const targetTs = sipDate.getTime();
+      const idx = binarySearchClosest(sorted, targetTs);
       if (sorted[idx]?.nav) {
-        cashflows.push({ amount: -monthlyAmount, when: new Date(sorted[idx].ts) });
+        const diff = Math.abs(sorted[idx].ts - targetTs);
+        if (diff <= threeDaysMs) {
+          cashflows.push({ amount: -monthlyAmount, when: new Date(sorted[idx].ts) });
+        }
       }
     }
-    cashflows.push({ amount: currentValue, when: latestDate });
-    xirrResult = calculateTrueXIRR(cashflows);
+    if (cashflows.length > 0) {
+      cashflows.push({ amount: currentValue, when: latestDate });
+      xirrResult = calculateTrueXIRR(cashflows);
+    }
   } catch {
     xirrResult = null;
   }

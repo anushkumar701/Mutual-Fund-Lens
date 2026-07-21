@@ -28,8 +28,9 @@ export default function SIPSlider({
 
   const handleInputBlur = () => {
     setEditing(false);
-    const num = Number(inputVal.replace(/,/g, ""));
-    if (!isNaN(num) && num >= min && num <= max) {
+    let num = Number(inputVal.replace(/,/g, ""));
+    if (!isNaN(num)) {
+      num = Math.max(min, Math.min(max, num));
       onChange(num);
     }
     setInputVal("");

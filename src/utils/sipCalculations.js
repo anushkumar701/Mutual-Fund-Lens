@@ -1,4 +1,5 @@
 // utils/sipCalculations.js
+import { calculateTaxes as calcTaxes } from "./taxCalculations";
 
 // Shared zero result to prevent ₹Infinity / ₹NaN on extreme inputs
 const zeroResult = () => ({
@@ -271,84 +272,8 @@ export function calculateSWP(
  * @param {number}  annualReturn  percentage (e.g. 12)
  * @param {number}  finalYearSIPAmount  monthly SIP amount in the final year (for step-up)
  */
-export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, annualReturn, finalYearSIPAmount = 0) {
-  const totalGain = maturity - totalInvested;
-  if (totalGain <= 0) return { stcg: 0, ltcg: 0, tax: 0, postTaxMaturity: maturity, postTaxReturn: 0 };
-
-  // ── Gold / International Funds ─────────────────────────────────────────────
-  // 24-month threshold. LTCG = 12.5% on FULL gain (the ₹1.25L carve-out is equity-only).
-  if (fundType === "Gold/Intl") {
-    const holdMonths = years * 12;
-    if (holdMonths < 24) {
-      // STCG at slab rate
-      const tax = totalGain * 0.30;
-      return { stcg: Math.round(totalGain), ltcg: 0, tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
-    }
-    // LTCG at 12.5%, no exemption
-    const tax = totalGain * 0.125;
-    return { stcg: 0, ltcg: Math.round(totalGain), tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
-  }
-
-  // ── Grandfathered Debt (purchased before 1 Apr 2023) ───────────────────────
-  // These units still get LTCG treatment: 12.5% after a 24-month hold, even on
-  // redemptions happening now in FY 2026-27. Units < 24mo are slab-rate STCG.
-  if (fundType === "Debt_Pre2023") {
-    const holdMonths = years * 12;
-    if (holdMonths < 24) {
-      const tax = totalGain * 0.30;
-      return { stcg: Math.round(totalGain), ltcg: 0, tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
-    }
-    // LTCG at 12.5%, no exemption (debt exemption was never ₹1.25L — that's equity-only)
-    const tax = totalGain * 0.125;
-    return { stcg: 0, ltcg: Math.round(totalGain), tax: Math.round(tax), postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
-  }
-
-  // ── Debt (post-Apr-2023 purchases) ─────────────────────────────────────────
-  if (fundType === "Debt") {
-    // All gains at slab rate (assuming 30% for conservative worst-case planning)
-    const tax = totalGain * 0.30;
-    return { stcg: 0, ltcg: 0, tax, postTaxMaturity: Math.round(maturity - tax), postTaxReturn: Math.round(totalGain - tax) };
-  }
-
-  // ── Equity / ELSS / Index ──────────────────────────────────────────────────
-  let stcg = 0;
-  let ltcg = 0;
-
-  if (years <= 1) {
-    // All gains are short-term
-    stcg = totalGain;
-  } else {
-    if (!isSIP) {
-      // Lumpsum > 1 year -> all LTCG
-      ltcg = totalGain;
-    } else {
-      // SIP: last 12 months are STCG, rest is LTCG
-      // Compound-correct monthly rate
-      const r = Math.pow(1 + annualReturn / 100, 1 / 12) - 1;
-      let stInvested = 0;
-      let stValue = 0;
-      for (let m = 1; m <= 12; m++) {
-        stInvested += finalYearSIPAmount;
-        // The instalment made 'm' months ago compounded for 'm' months
-        stValue += finalYearSIPAmount * Math.pow(1 + r, m);
-      }
-      stcg = Math.max(0, stValue - stInvested);
-      ltcg = Math.max(0, totalGain - stcg);
-    }
-  }
-
-  const stcgTax = stcg * 0.20; // 20% STCG
-  const taxableLtcg = Math.max(0, ltcg - 125000); // 1.25L exemption (equity-only)
-  const ltcgTax = taxableLtcg * 0.125; // 12.5% LTCG
-  const tax = stcgTax + ltcgTax;
-
-  return {
-    stcg: Math.round(stcg),
-    ltcg: Math.round(ltcg),
-    tax: Math.round(tax),
-    postTaxMaturity: Math.round(maturity - tax),
-    postTaxReturn: Math.round(totalGain - tax)
-  };
+export function calculateTaxes(fundType, isSIP, totalInvested, maturity, years, annualReturn, finalYearSIPAmount = 0, fyCode = undefined) {
+  return calcTaxes(fundType, isSIP, totalInvested, maturity, years, annualReturn, finalYearSIPAmount, fyCode);
 }
 
 /**

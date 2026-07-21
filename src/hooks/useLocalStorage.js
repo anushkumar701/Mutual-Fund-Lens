@@ -1,10 +1,59 @@
 // hooks/useLocalStorage.js
 import { useState, useEffect, useCallback } from "react";
 
+const OBFUSCATION_KEY = "fundlens_secure_salt_2026";
+const secureKeys = ["fundlens_portfolio", "fundlens_portfolio_notify", "fundlens_portfolio_total_value"];
+
+function encrypt(text) {
+  let result = "";
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length);
+    result += String.fromCharCode(charCode);
+  }
+  return btoa(unescape(encodeURIComponent(result)));
+}
+
+function decrypt(ciphertext) {
+  try {
+    const raw = decodeURIComponent(escape(atob(ciphertext)));
+    let result = "";
+    for (let i = 0; i < raw.length; i++) {
+      const charCode = raw.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length);
+      result += String.fromCharCode(charCode);
+    }
+    return result;
+  } catch (e) {
+    return ciphertext; // Fallback to raw text if not encrypted
+  }
+}
+
+function getStorageItem(key) {
+  const val = localStorage.getItem(key);
+  if (!val) return null;
+  if (secureKeys.includes(key)) {
+    try {
+      const decrypted = decrypt(val);
+      JSON.parse(decrypted); // Verify if it is valid JSON
+      return decrypted;
+    } catch {
+      return val; // Fallback to raw text
+    }
+  }
+  return val;
+}
+
+function setStorageItem(key, val) {
+  if (secureKeys.includes(key)) {
+    localStorage.setItem(key, encrypt(val));
+  } else {
+    localStorage.setItem(key, val);
+  }
+}
+
 export function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
     try {
-      const item = localStorage.getItem(key);
+      const item = getStorageItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch {
       return initialValue;
@@ -16,8 +65,17 @@ export function useLocalStorage(key, initialValue) {
     const handler = (e) => {
       if (e.key !== key) return;
       try {
-        // newValue is null when the key was deleted by another tab
-        const parsed = e.newValue !== null ? JSON.parse(e.newValue) : initialValue;
+        let valToParse = e.newValue;
+        if (valToParse !== null && secureKeys.includes(key)) {
+          try {
+            const decrypted = decrypt(valToParse);
+            JSON.parse(decrypted);
+            valToParse = decrypted;
+          } catch {
+            // fallback
+          }
+        }
+        const parsed = valToParse !== null ? JSON.parse(valToParse) : initialValue;
         setStoredValue(parsed);
       } catch {
         // Ignore invalid JSON from other tabs
@@ -30,21 +88,17 @@ export function useLocalStorage(key, initialValue) {
   const setValue = useCallback(
     (value) => {
       try {
-        // Read current persisted value to resolve functional updates correctly
         let current = initialValue;
         try {
-          current =
-            JSON.parse(localStorage.getItem(key) ?? "null") ?? initialValue;
+          const item = getStorageItem(key);
+          current = JSON.parse(item ?? "null") ?? initialValue;
         } catch {
           /* ignore */
         }
         const valueToStore = value instanceof Function ? value(current) : value;
-        // Write to storage FIRST (synchronous) — NOT inside the state updater
-        // Prevents React 18 Strict Mode double-invocation from double-writing storage
-        localStorage.setItem(key, JSON.stringify(valueToStore));
+        setStorageItem(key, JSON.stringify(valueToStore));
         setStoredValue(valueToStore);
       } catch {
-        // Storage quota exceeded / private mode — fall back to in-memory state only
         setStoredValue((current) =>
           value instanceof Function ? value(current) : value,
         );

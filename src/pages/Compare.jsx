@@ -16,12 +16,13 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { fetchFundDetail, useFunds } from "../hooks/useFunds";
 import { useDebounce } from "../hooks/useDebounce";
 import { formatINR } from "../utils/formatCurrency";
+import { taxRules, LATEST_FY } from "../config/taxRules";
 import {
   calculateFundMetrics,
   calculateHistoricalSIP,
   calculateBestWorstMonth,
 } from "../utils/metrics";
-import { getExpenseRatio } from "../utils/expenseRatio";
+import { getExpenseRatio, getExpenseRatioBreakdown } from "../utils/expenseRatio";
 import { isSolutionOriented } from "../utils/goalFilters";
 import {
   getFundAgeYears,
@@ -32,6 +33,7 @@ import {
   getMonthlyWinRate,
 } from "../utils/chartUtils";
 import { getHistoricalRate } from "../utils/historicalRates";
+import { downsampleLTTB } from "../utils/downsample";
 import ComparedFundCard from "../components/ComparedFundCard";
 import MARKET_EVENTS from "../data/marketReasons.json";
 
@@ -320,6 +322,16 @@ export default function Compare() {
     });
     return () => obs.disconnect();
   }, []);
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const activeColors = isDark ? DARK_CHART_COLORS : LIGHT_CHART_COLORS;
 
   // ── Undo-remove state ────────────────────────────────────────────────────────
@@ -336,6 +348,7 @@ export default function Compare() {
   const [sipYears, setSipYears] = useState(3);
   const [sipYearsInput, setSipYearsInput] = useState("3");
   const [sipMode, setSipMode] = useState("sip"); // 'sip' | 'lumpsum'
+  const [selectedFY, setSelectedFY] = useState(LATEST_FY);
   const [sipFundTER, setSipFundTER] = useLocalStorage(
     "fundlens_custom_ter",
     {},
@@ -713,6 +726,10 @@ export default function Compare() {
     if (["3Y", "5Y", "10Y", "15Y", "20Y", "25Y", "MAX"].includes(range)) {
       data = toMonthlyData(data);
     }
+    // Downsample if still over 500 points (LTTB preserves visual shape)
+    if (data.length > 500) {
+      data = downsampleLTTB(data, 500);
+    }
     return data;
   }, [fundData, range, activeBenchmark, benchmarkData]);
 
@@ -767,17 +784,41 @@ export default function Compare() {
       };
 
       allYears.forEach((year) => {
-        const sNav = findNav(new Date(`${year}-01-01`));
-        const eNav = findNav(
-          year === currentYear ? now : new Date(`${year}-12-31`),
-        );
+        const yearStart = new Date(`${year}-01-01`).getTime();
+        const yearEnd = new Date(`${year}-12-31`).getTime();
+        const yearEntries = sorted.filter((d) => d.ts >= yearStart && d.ts <= yearEnd);
+        
         if (!data[year]) data[year] = {};
-        if (sNav && eNav && sNav > 0)
-          data[year][name] = ((eNav - sNav) / sNav) * 100;
+        
+        if (yearEntries.length === 0) {
+          data[year][name] = null;
+          return;
+        }
+        
+        const firstEntry = yearEntries[yearEntries.length - 1]; // oldest in year
+        const lastEntry = yearEntries[0]; // newest in year
+        const daysDiff = (lastEntry.ts - firstEntry.ts) / (24 * 3600 * 1000);
+        
+        // If data span is < 180 days, return null
+        if (daysDiff < 180) {
+          data[year][name] = null;
+          return;
+        }
+        
+        const sNav = firstEntry.nav;
+        const eNav = lastEntry.nav;
+        
+        if (sNav && eNav && sNav > 0) {
+          // Exact day count exponent formula
+          const cagr = (Math.pow(eNav / sNav, 365.25 / daysDiff) - 1) * 100;
+          data[year][name] = cagr;
+        } else {
+          data[year][name] = null;
+        }
       });
     });
     const validYears = allYears.filter(
-      (y) => Object.keys(data[y] || {}).length > 0,
+      (y) => Object.keys(data[y] || {}).some((k) => data[y][k] !== null),
     );
     return { years: validYears, data };
   }, [fundData]);
@@ -1134,18 +1175,26 @@ export default function Compare() {
         <div id="compare-export-area" className="space-y-6">
           {/* Fund cards */}
           {fundData.length === 0 ? (
-            <div className="card p-10 text-center space-y-6">
-              <div className="text-5xl">📊</div>
+            <div className="bg-white dark:bg-[#111622] rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-lg relative overflow-hidden max-w-xl mx-auto space-y-6">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+              
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto mb-5 shadow-inner">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+              </div>
+              
               <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-                  Start your comparison
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">
+                  Start Your Fund Comparison
                 </h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Search above or pick a popular fund below to get started
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                  Search above by name or AMFI code to compare metrics. Or select one of the popular funds below to quickly bootstrap the comparison workspace:
                 </p>
               </div>
+              
               {/* Popular fund quick-add chips */}
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
                 {POPULAR_FUNDS.filter(
                   (pf) => !compareList.map(String).includes(String(pf.code)),
                 )
@@ -1155,9 +1204,9 @@ export default function Compare() {
                       key={pf.code}
                       onClick={() => handleAddCode(pf.code)}
                       disabled={!!loadingCode || compareList.length >= 4}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-all disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="text-base">+</span> {pf.name}
+                      <span className="text-sm font-bold">+</span> {pf.name}
                     </button>
                   ))}
               </div>
@@ -1384,7 +1433,7 @@ export default function Compare() {
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <LineChart
                       data={chartData}
-                      margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
+                      margin={{ top: 12, right: isMobile ? 8 : 16, left: isMobile ? -10 : 0, bottom: 8 }}
                     >
                       <CartesianGrid
                         vertical={false}
@@ -1490,7 +1539,7 @@ export default function Compare() {
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        width={62}
+                        width={isMobile ? 42 : 62}
                         dx={-2}
                         // Auto-fit domain to actual data values — never force-include 0
                         domain={[
@@ -1795,7 +1844,7 @@ export default function Compare() {
                               (f) =>
                                 row[f.meta?.scheme_name || String(f.schemeCode)],
                             );
-                            const defined = vals.filter((v) => v !== undefined);
+                            const defined = vals.filter((v) => v !== undefined && v !== null);
                             const bestVal =
                               defined.length > 0 ? Math.max(...defined) : null;
                             let event = MARKET_EVENTS[year];
@@ -1847,16 +1896,17 @@ export default function Compare() {
                                     fund.meta?.scheme_name ||
                                     String(fund.schemeCode);
                                   const val = row[name];
-                                  const isGain = val !== undefined && val >= 0;
+                                  const isGain = val !== undefined && val !== null && val >= 0;
                                   const isBest =
                                     val !== undefined &&
+                                    val !== null &&
                                     val === bestVal &&
                                     defined.length > 1;
                                   return (
                                     <td
                                       key={fund.schemeCode}
                                       className={`px-4 py-3 font-semibold text-sm tabular-nums ${
-                                        val === undefined
+                                        val === undefined || val === null
                                           ? "text-slate-300 dark:text-slate-600"
                                           : isGain
                                             ? "text-emerald-600 dark:text-emerald-400"
@@ -1870,8 +1920,8 @@ export default function Compare() {
                                             : ""
                                         }
                                       >
-                                        {val === undefined
-                                          ? "—"
+                                        {val === undefined || val === null
+                                          ? "N/A"
                                           : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
                                       </span>
                                     </td>
@@ -2039,6 +2089,29 @@ export default function Compare() {
                             isReturn: true,
                           },
                           {
+                            key: "rolling1Y",
+                            label: "1Y Rolling Return",
+                            desc: "Average 1-Year CAGR rolled daily. Shows short-term consistency.",
+                            format: (val, m) => {
+                              if (val == null) return "—";
+                              if (!m || !m.rolling1YData) return `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+                              const d = m.rolling1YData;
+                              return (
+                                <div className="flex flex-col items-end">
+                                  <span>{val >= 0 ? "+" : ""}{val.toFixed(2)}%</span>
+                                  <div className="text-[9px] text-slate-400 font-normal mt-1 leading-tight flex flex-col items-end opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <span>Min: <span className="font-medium text-slate-500 dark:text-slate-400">{d.min >= 0 ? "+" : ""}{d.min.toFixed(1)}%</span></span>
+                                    <span>Max: <span className="font-medium text-slate-500 dark:text-slate-400">{d.max >= 0 ? "+" : ""}{d.max.toFixed(1)}%</span></span>
+                                    <span>Med: <span className="font-medium text-slate-500 dark:text-slate-400">{d.median >= 0 ? "+" : ""}{d.median.toFixed(1)}%</span></span>
+                                  </div>
+                                </div>
+                              );
+                            },
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
                             key: "rolling3Y",
                             label: "3Y Rolling Return",
                             desc: "Average 3-Year CAGR rolled daily. Higher indicates consistent returns.",
@@ -2066,6 +2139,29 @@ export default function Compare() {
                             label: "5Y CAGR",
                             desc: "Compound Annual Growth Rate over 5 years.",
                             format: (val) => (val != null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—"),
+                            isBetter: "higher",
+                            section: "Performance",
+                            isReturn: true,
+                          },
+                          {
+                            key: "rolling5Y",
+                            label: "5Y Rolling Return",
+                            desc: "Average 5-Year CAGR rolled daily. Best measure of long-term consistency.",
+                            format: (val, m) => {
+                              if (val == null) return "—";
+                              if (!m || !m.rolling5YData) return `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+                              const d = m.rolling5YData;
+                              return (
+                                <div className="flex flex-col items-end">
+                                  <span>{val >= 0 ? "+" : ""}{val.toFixed(2)}%</span>
+                                  <div className="text-[9px] text-slate-400 font-normal mt-1 leading-tight flex flex-col items-end opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <span>Min: <span className="font-medium text-slate-500 dark:text-slate-400">{d.min >= 0 ? "+" : ""}{d.min.toFixed(1)}%</span></span>
+                                    <span>Max: <span className="font-medium text-slate-500 dark:text-slate-400">{d.max >= 0 ? "+" : ""}{d.max.toFixed(1)}%</span></span>
+                                    <span>Med: <span className="font-medium text-slate-500 dark:text-slate-400">{d.median >= 0 ? "+" : ""}{d.median.toFixed(1)}%</span></span>
+                                  </div>
+                                </div>
+                              );
+                            },
                             isBetter: "higher",
                             section: "Performance",
                             isReturn: true,
@@ -2118,8 +2214,17 @@ export default function Compare() {
                           },
                           {
                             key: "sortino",
-                            label: "Sortino Ratio",
-                            desc: "Return per unit of downside risk — higher is better.",
+                            label: "Sortino Ratio (MAR = 0%)",
+                            desc: "Return per unit of downside risk below 0% — higher is better.",
+                            format: (val) => (val ? val.toFixed(2) : "—"),
+                            isBetter: "higher",
+                            section: "Risk",
+                            isReturn: false,
+                          },
+                          {
+                            key: "sortinoRF",
+                            label: "Sortino Ratio (MAR = Risk-Free)",
+                            desc: "Return per unit of downside risk below risk-free rate — higher is better.",
                             format: (val) => (val ? val.toFixed(2) : "—"),
                             isBetter: "higher",
                             section: "Risk",
@@ -2428,6 +2533,24 @@ export default function Compare() {
                           )}
                         </div>
                       </div>
+
+                      {/* Tax Financial Year Selector */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider">
+                          Tax Year (FY)
+                        </label>
+                        <select
+                          value={selectedFY}
+                          onChange={(e) => setSelectedFY(e.target.value)}
+                          className="input-base text-xs py-1 px-2 font-semibold bg-white dark:bg-slate-800 text-slate-750 dark:text-slate-205 cursor-pointer shadow-sm focus:outline-none"
+                        >
+                          {Object.keys(taxRules).map((fy) => (
+                            <option key={fy} value={fy}>
+                              {taxRules[fy].label || fy}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2468,6 +2591,44 @@ export default function Compare() {
                           onSave={setFundTER}
                           erData={erData}
                         />
+
+                        {/* Actual fees (Direct vs Regular) */}
+                        {(() => {
+                          const breakdown = getExpenseRatioBreakdown(fund.schemeCode);
+                          return (
+                            <div className="mt-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg p-2.5 border border-slate-100 dark:border-slate-700/60">
+                              <div className="flex justify-between items-center text-[10.5px] font-medium text-slate-500 mb-1">
+                                <span>Actual Fees (Direct vs Regular)</span>
+                                {breakdown.spread !== null ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-1 rounded">
+                                    Saved {breakdown.spread}%
+                                  </span>
+                                ) : (
+                                  <span className="relative group cursor-help text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/30 px-1.5 rounded flex items-center gap-1">
+                                    N/A
+                                    <span className="hidden group-hover:block absolute bottom-full right-0 mb-1 w-48 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal leading-tight">
+                                      We don't have the Regular plan data for this scheme.
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100/60 dark:border-slate-700/40">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-400">Direct</span>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-350">
+                                    {breakdown.directTER !== null ? `${breakdown.directTER}%` : "N/A"}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col border-l border-slate-200 dark:border-slate-700/40 pl-2">
+                                  <span className="text-[9px] text-slate-400">Regular</span>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-350">
+                                    {breakdown.regularTER !== null ? `${breakdown.regularTER}%` : "N/A"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {!sipResult ? (
                           <p className="text-xs text-slate-400">
@@ -2614,18 +2775,19 @@ export default function Compare() {
                                     <span className="relative group cursor-help bg-slate-200 dark:bg-slate-600 rounded-full w-3 h-3 flex items-center justify-center font-bold text-[8px]">
                                       ?
                                       <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-1.5 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 text-center font-normal normal-case leading-tight">
-                                        Assumes 12.5% LTCG tax on profit above
-                                        ₹1.25 Lakh. Simplified estimate —
+                                        Assumes {((taxRules[selectedFY] || taxRules[LATEST_FY]).equityLTCG * 100).toFixed(1)}% LTCG tax on profit above
+                                        ₹{((taxRules[selectedFY] || taxRules[LATEST_FY]).equityLTCGExemption / 100000).toFixed(2)} Lakh. Simplified estimate —
                                         consult a CA for exact figures.
                                       </span>
                                     </span>
                                   </span>
                                   {(() => {
+                                    const rules = taxRules[selectedFY] || taxRules[LATEST_FY];
                                     const taxable = Math.max(
                                       0,
-                                      sipResult.profit - 125000,
+                                      sipResult.profit - rules.equityLTCGExemption,
                                     );
-                                    const tax = taxable * 0.125;
+                                    const tax = taxable * rules.equityLTCG;
                                     const postTax = sipResult.profit - tax;
                                     return (
                                       <span className="font-bold text-slate-700 dark:text-slate-300">

@@ -3,10 +3,12 @@
 //   2. AMFI TER data (src/data/expenseRatios.json) — most accurate
 
 import terDataRaw from "../data/expenseRatios.json";
+import schemeMappingsRaw from "../data/schemeMappings.json";
 
 // Pre-process: the JSON has { _meta, funds } structure
 const terFunds = terDataRaw?.funds || {};
 const terMeta = terDataRaw?._meta || null;
+const schemeMappings = schemeMappingsRaw?.schemeMappings || [];
 
 // localStorage keys
 const ACTIVE_PLATFORM_KEY = "fundlens_active_platform";
@@ -217,5 +219,40 @@ export function getTERMeta() {
     fetchedAt: terMeta.fetchedAt,
     count: terMeta.count,
     source: "AMFI India (via captn3m0/india-mutual-fund-ter-tracker)",
+  };
+}
+
+/**
+ * Get direct vs regular plan breakdown without guessing.
+ */
+export function getExpenseRatioBreakdown(schemeCode, expenseRatios = terFunds, mappings = schemeMappings) {
+  const codeStr = String(schemeCode);
+  const mapping = mappings.find(m => String(m.directCode) === codeStr || String(m.regularCode) === codeStr);
+  
+  if (!mapping) {
+    return { 
+      directTER: null, 
+      regularTER: null, 
+      spread: null, 
+      error: 'Direct/Regular mapping not available',
+      isGuessed: false
+    };
+  }
+  
+  const normDirectName = normalizeKey(mapping.directName);
+  const normRegularName = normalizeKey(mapping.regularName);
+  
+  const directEntry = expenseRatios[normDirectName] || expenseRatios[normalizeKey(mapping.directName.replace(/direct/i, ""))];
+  const regularEntry = expenseRatios[normRegularName] || expenseRatios[normalizeKey(mapping.regularName.replace(/regular/i, ""))];
+  
+  const directTER = directEntry?.d ?? null;
+  const regularTER = regularEntry?.r ?? null;
+  const spread = (directTER !== null && regularTER !== null) ? parseFloat((regularTER - directTER).toFixed(2)) : null;
+  
+  return {
+    directTER,
+    regularTER,
+    spread,
+    isGuessed: false
   };
 }

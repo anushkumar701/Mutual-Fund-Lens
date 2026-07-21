@@ -1,0 +1,34 @@
+{
+  "schemeMappings": [
+    {
+      "directCode": "120503",
+      "regularCode": "120502",
+      "directName": "Axis Bluechip Fund - Direct Plan",
+      "regularName": "Axis Bluechip Fund - Regular Plan"
+    },
+    {
+      "directCode": "120843",
+      "regularCode": "120842",
+      "directName": "Parag Parikh Flexi Cap Fund - Direct Plan",
+      "regularName": "Parag Parikh Flexi Cap Fund - Regular Plan"
+    },
+    {
+      "directCode": "119819",
+      "regularCode": "119818",
+      "directName": "SBI Bluechip Fund - Direct Plan",
+      "regularName": "SBI Bluechip Fund - Regular Plan"
+    },
+    {
+      "directCode": "119551",
+      "regularCode": "119550",
+      "directName": "HDFC Flexi Cap Fund - Direct Plan",
+      "regularName": "HDFC Flexi Cap Fund - Regular Plan"
+    },
+    {
+      "directCode": "120716",
+      "regularCode": "120715",
+      "directName": "Mirae Asset Large Cap Fund - Direct Plan",
+      "regularName": "Mirae Asset Large Cap Fund - Regular Plan"
+    }
+  ]
+}
