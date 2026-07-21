@@ -1926,6 +1926,11 @@ export default function Dashboard() {
                                 };
 
                                 const top1Names = new Set();
+                                Object.values(fundStats).forEach(f => {
+                                  if (f.top1 > 0) {
+                                    top1Names.add(f.name);
+                                  }
+                                });
                                 const totalFundsInCategory = getSubcatFundCount(currentSubcat);
 
                                 return (
@@ -1973,8 +1978,18 @@ export default function Dashboard() {
                                                 Rank {rank}
                                               </td>
                                               {YEARS.map(y => {
-                                                const fund = leadersData[y][rank - 1];
-                                                const isTop1 = top1Names.has(fund.name);
+                                                const fund = leadersData[y] ? leadersData[y][rank - 1] : null;
+                                                const isTop1 = fund ? top1Names.has(fund.name) : false;
+                                                
+                                                if (!fund) {
+                                                  return (
+                                                    <td key={y} className="py-2.5 px-3">
+                                                      <div className="p-1.5 px-2 rounded-lg border border-transparent text-slate-400 dark:text-slate-500 italic text-[11.5px]">
+                                                        N/A
+                                                      </div>
+                                                    </td>
+                                                  );
+                                                }
                                                 
                                                 return (
                                                   <td key={y} className="py-2.5 px-3">
