@@ -637,7 +637,7 @@ function QuickCalc() {
 
 // ─── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
-  const { funds, loading, loadingSlow, error, refetch, triggerFetch } = useFunds({ lazy: true });
+  const { funds, loading, loadingSlow, error, refetch, triggerFetch } = useFunds();
   const [watchlist] = useLocalStorage("fundlens_watchlist", []);
   const [modalFund, setModalFund] = useState(null);
   const [activeCategory, setActiveCategory] = useState("Equity");
@@ -1834,21 +1834,6 @@ export default function Dashboard() {
 
                             {/* Historical Leaders Table (Embedded below Average Performance Bar) */}
                             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/60">
-                              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                                  <span className="w-2.5 h-2.5 rounded-full inline-block bg-blue-500" />
-                                  Historical Leaders: {activeLeaderSubcat || subcatAverages[0].subcategory}
-                                  {leadersLoading && (
-                                    <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold lowercase italic animate-pulse ml-1.5">
-                                      (loading real data...)
-                                    </span>
-                                  )}
-                                </h4>
-                                <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
-                                  {realLeadersData ? "Top 6 Funds by Year · Actual Historical Data" : "Top 6 Funds by Year · Illustrative Data"}
-                                </span>
-                              </div>
-
                               {(() => {
                                 const currentSubcat = activeLeaderSubcat || subcatAverages[0].subcategory;
                                 const leadersData = realLeadersData || generateHistoricalLeaders(currentSubcat, YEARS);
@@ -1927,10 +1912,38 @@ export default function Dashboard() {
                                 const allRounderSorted = [...fundStatsArray]
                                   .sort((a, b) => b.score - a.score);
 
+                                const getSubcatFundCount = (subcat) => {
+                                  if (!funds || !funds.length) return 0;
+                                  let term = subcat.toLowerCase().replace(' (daa)', '').replace(' (govt bonds)', '').replace(' fund', '').replace(' (direct)', '').replace(' (regular)', '').trim();
+                                  if (term === 'elss tax saver') term = 'elss';
+                                  if (term === 'balanced advantage') term = 'advantage';
+                                  
+                                  let count = 0;
+                                  for (let i = 0; i < funds.length; i++) {
+                                    if (funds[i].schemeName.toLowerCase().includes(term)) count++;
+                                  }
+                                  return count;
+                                };
+
                                 const top1Names = new Set();
+                                const totalFundsInCategory = getSubcatFundCount(currentSubcat);
 
                                 return (
                                   <>
+                                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                      <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full inline-block bg-blue-500" />
+                                        Historical Leaders: {currentSubcat} <span className="text-slate-500 dark:text-slate-400 normal-case font-semibold">({totalFundsInCategory.toLocaleString("en-IN")} funds available)</span>
+                                        {leadersLoading && (
+                                          <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold lowercase italic animate-pulse ml-1.5">
+                                            (loading real data...)
+                                          </span>
+                                        )}
+                                      </h4>
+                                      <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full shadow-sm border border-slate-100 dark:border-slate-800">
+                                        {realLeadersData ? `Top 6 Funds by Year · Actual Historical Data` : `Top 6 Funds by Year · Illustrative Data`}
+                                      </span>
+                                    </div>
                                     <div className="hidden items-center gap-4 mb-3 mt-1 px-1">
                                       <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
